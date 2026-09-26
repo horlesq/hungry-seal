@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "80161e6836b3b40f4e83730a290deb40ac14d877d38c97ad5f6d71be37ce74c3"
+    },
+    "game-developer": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/game-developer/SKILL.md",
+      "computedHash": "f3fe0ec8a36bf09f2e4fc9d55f213160acfce2b6400976f5455d1a513f2b7f5b"
+    },
+    "phaser-coder": {
+      "source": "yakoub-ai/phaser4-gamedev",
+      "sourceType": "github",
+      "skillPath": "skills/phaser-coder/SKILL.md",
+      "computedHash": "41916e3c6d097a812bbdec345017989b8a970e7641a2a6ead9c917687a9cf8e6"
+    },
+    "phaser4-game-architecture": {
+      "source": "weberwang/phaser-skills",
+      "sourceType": "github",
+      "skillPath": "skills/phaser4-game-architecture/SKILL.md",
+      "computedHash": "c5733184366260e66ae0a46e8d4a967adf63979d49d61e2d3d43685dd59fa33f"
+    }
+  }
+}

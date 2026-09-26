@@ -1,0 +1,264 @@
+// Automated smoke playtest: boots the game in headless Chrome, drives keyboard, mouse and
+// multi-touch input, asserts on live game state and saves screenshots to .playtest/.
+//
+// Usage: npm run playtest     (exit code 1 on console errors or failed checks)
+// Env:   PLAYTEST_BROWSER=chrome|msedge   (default chrome)
+//        PLAYTEST_GL=gpu|swiftshader      (default gpu; swiftshader = software, ~15 FPS)
+import { mkdir } from 'node:fs/promises';
+import { chromium } from 'playwright-core';
+import { createServer } from 'vite';
+
+const OUT = '.playtest';
+const PORT = 5199;
+const URL = `http://localhost:${PORT}/?debug`;
+const GAME_W = 1280;
+const GAME_H = 720;
+const FLOOR_CONTACT_Y = 6400 - 22;
+
+const errors = [];
+const warnings = [];
+const checks = [];
+
+function check(name, ok, detail = '') {
+  checks.push({ name, ok, detail });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
+}
+
+function watch(page, label) {
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`[${label}] console.error: ${m.text()}`);
+    if (m.type() === 'warning') warnings.push(`[${label}] console.warn: ${m.text()}`);
+  });
+  page.on('pageerror', (e) => errors.push(`[${label}] pageerror: ${e.message}`));
+  page.on('response', (r) => {
+    if (r.status() >= 400) errors.push(`[${label}] HTTP ${r.status()}: ${r.url()}`);
+  });
+}
+
+const sealState = (page) =>
+  page.evaluate(() => {
+    const game = window.__PHASER_GAME__;
+    const scene = game.scene.getScene('Game');
+    const m = scene.seal.motion;
+    return {
+      x: m.x,
+      y: m.y,
+      speed: m.speed,
+      inWater: m.inWater,
+      boosting: m.boosting,
+      stamina: m.stamina,
+      source: scene.controls.source,
+      fps: game.loop.actualFps,
+    };
+  });
+
+/** Polls seal state until `pred` holds or the timeout passes. Returns all samples. */
+async function until(page, pred, timeout = 5000, every = 50) {
+  const samples = [];
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    const s = await sealState(page);
+    samples.push(s);
+    if (pred(s, samples)) return { ok: true, last: s, samples };
+    await page.waitForTimeout(every);
+  }
+  return { ok: false, last: samples.at(-1), samples };
+}
+
+const sceneActive = (page, key) =>
+  page.waitForFunction((k) => window.__PHASER_GAME__?.scene.isActive(k), key, { timeout: 15000 });
+
+/** Converts game coordinates to page coordinates using the scaled canvas rect. */
+async function toPage(page, gx, gy) {
+  const r = await page.evaluate(() => {
+    const b = document.querySelector('canvas').getBoundingClientRect();
+    return { left: b.left, top: b.top, width: b.width, height: b.height };
+  });
+  return { x: r.left + (gx / GAME_W) * r.width, y: r.top + (gy / GAME_H) * r.height };
+}
+
+async function desktop(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  const page = await ctx.newPage();
+  watch(page, 'desktop');
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/01-menu.png` });
+
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Game');
+  await sceneActive(page, 'Hud');
+  await page.waitForTimeout(700);
+  check('game + hud scenes start from menu', true);
+  const texturesOk = await page.evaluate(() =>
+    ['seal', 'fx-bubble', 'bg-seabed-far', 'bg-depth-gradient'].every((k) =>
+      window.__PHASER_GAME__.textures.exists(k),
+    ),
+  );
+  check('placeholder + gradient textures exist', texturesOk);
+
+  // Swim right.
+  const s0 = await sealState(page);
+  await page.keyboard.down('d');
+  const right = await until(page, (s) => s.x > s0.x + 300, 4000);
+  await page.screenshot({ path: `${OUT}/02-swim-right.png` });
+  await page.keyboard.up('d');
+  check('keyboard swims right', right.ok, `dx=${(right.last.x - s0.x).toFixed(0)}`);
+  check('input source = keyboard', right.last.source === 'keyboard', right.last.source);
+
+  // Leap: boost straight up through the surface.
+  await page.keyboard.down('w');
+  await page.keyboard.down('Space');
+  const leap = await until(page, (s) => !s.inWater && s.y < 560, 4000);
+  if (leap.ok) await page.screenshot({ path: `${OUT}/03-leap.png` });
+  await page.keyboard.up('Space');
+  await page.keyboard.up('w');
+  check(
+    'boosting while holding Space',
+    leap.samples.some((s) => s.boosting),
+  );
+  check('breaches the surface (airborne)', leap.ok, `y=${leap.last.y.toFixed(0)}`);
+  const down = await until(page, (s) => s.inWater, 4000);
+  check('splashes back into the water', down.ok);
+
+  // Dive into the deep, then all the way to the seabed.
+  await page.keyboard.down('s');
+  const deep = await until(page, (s) => s.y > s0.y + 1800, 10000);
+  await page.screenshot({ path: `${OUT}/04-deep.png` });
+  check('dives deep', deep.ok, `y=${deep.last.y.toFixed(0)}`);
+  const floor = await until(page, (s) => s.y >= FLOOR_CONTACT_Y - 0.5, 20000);
+  await page.waitForTimeout(400);
+  const onFloor = await sealState(page);
+  await page.keyboard.up('s');
+  await page.screenshot({ path: `${OUT}/05-seabed.png` });
+  check(
+    'stops at the seabed',
+    floor.ok && onFloor.y <= FLOOR_CONTACT_Y + 0.5,
+    `y=${onFloor.y.toFixed(1)}`,
+  );
+
+  // Mouse: seal swims toward the cursor without clicking.
+  const leftPt = await toPage(page, 150, 360);
+  const m0 = await sealState(page);
+  await page.mouse.move(leftPt.x, leftPt.y, { steps: 5 });
+  const mouse = await until(page, (s) => s.x < m0.x - 150, 4000);
+  check('mouse steers toward cursor', mouse.ok, `dx=${(mouse.last.x - m0.x).toFixed(0)}`);
+  check('input source = mouse', mouse.last.source === 'mouse', mouse.last.source);
+  await page.mouse.down();
+  const mb = await until(page, (s) => s.boosting, 1500);
+  await page.mouse.up();
+  check('mouse button boosts', mb.ok);
+
+  // Debug toggle and back to menu.
+  await page.keyboard.press('Backquote');
+  const debugOff = await page.evaluate(() => window.__PHASER_GAME__.registry.get('debug'));
+  check('backtick toggles debug off', debugOff === false);
+  await page.keyboard.press('Escape');
+  await sceneActive(page, 'Menu');
+  const hudStopped = await page.evaluate(() => !window.__PHASER_GAME__.scene.isActive('Hud'));
+  check('ESC returns to menu and stops HUD', hudStopped);
+
+  // Re-enter to make sure scenes restart cleanly (listeners, textures).
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(500);
+  const again = await sealState(page);
+  check('game restarts cleanly', again.inWater && Number.isFinite(again.x));
+  await page.waitForTimeout(1500);
+  const fps = await page.evaluate(() => window.__PHASER_GAME__.loop.actualFps);
+  console.log(`      desktop fps: ${fps.toFixed(0)}`);
+  await ctx.close();
+}
+
+async function mobile(browser) {
+  const ctx = await browser.newContext({
+    viewport: { width: 915, height: 412 },
+    deviceScaleFactor: 2,
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await ctx.newPage();
+  watch(page, 'mobile');
+  const cdp = await ctx.newCDPSession(page);
+  const touch = (type, points) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: p.id })),
+    });
+
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(400);
+  const center = await toPage(page, 640, 360);
+  await page.touchscreen.tap(center.x, center.y);
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(700);
+
+  const boostVisible = await page.evaluate(
+    () => window.__PHASER_GAME__.scene.getScene('Hud').boostButton.visible,
+  );
+  check('touch: boost button visible', boostVisible);
+
+  const s0 = await sealState(page);
+  const right = await toPage(page, 1150, 380);
+  await touch('touchStart', [{ ...right, id: 1 }]);
+  const hold = await until(page, (s) => s.x > s0.x + 200, 4000);
+  check('touch: hold steers toward finger', hold.ok, `dx=${(hold.last.x - s0.x).toFixed(0)}`);
+  check('input source = touch', hold.last.source === 'touch', hold.last.source);
+
+  // Second finger on the boost button while still steering with the first.
+  const boostBtn = await toPage(page, 1162, 602);
+  await touch('touchStart', [
+    { ...right, id: 1 },
+    { ...boostBtn, id: 2 },
+  ]);
+  const boost = await until(page, (s) => s.boosting, 2000);
+  await page.waitForTimeout(250);
+  const s2 = await sealState(page);
+  await page.screenshot({ path: `${OUT}/06-mobile-boost.png` });
+  check('touch: boost button boosts while steering', boost.ok);
+  check('touch: boost finger does not steer', s2.x > boost.last.x, `still heading right`);
+  await touch('touchEnd', []);
+  const stop = await until(page, (s) => s.speed < 5, 5000);
+  check('touch: release glides to a stop', stop.ok, `speed=${stop.last.speed.toFixed(1)}`);
+  await ctx.close();
+}
+
+await mkdir(OUT, { recursive: true });
+const server = await createServer({
+  server: { port: PORT, strictPort: true },
+  logLevel: 'error',
+});
+await server.listen();
+
+const gl = process.env.PLAYTEST_GL ?? 'gpu';
+const glArgs =
+  gl === 'swiftshader'
+    ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+    : process.platform === 'win32'
+      ? ['--use-angle=d3d11', '--enable-gpu']
+      : ['--enable-gpu'];
+const browser = await chromium.launch({
+  channel: process.env.PLAYTEST_BROWSER ?? 'chrome',
+  headless: true,
+  args: [...glArgs, '--ignore-gpu-blocklist'],
+});
+
+try {
+  await desktop(browser);
+  await mobile(browser);
+} catch (err) {
+  errors.push(`playtest crashed: ${err.stack ?? err}`);
+} finally {
+  await browser.close();
+  await server.close();
+}
+
+const failed = checks.filter((c) => !c.ok);
+if (warnings.length) console.log(`\nWarnings:\n  ${warnings.join('\n  ')}`);
+if (errors.length) console.log(`\nErrors:\n  ${errors.join('\n  ')}`);
+console.log(
+  `\n${checks.length - failed.length}/${checks.length} checks passed, ${errors.length} errors. Screenshots in ${OUT}/`,
+);
+process.exit(failed.length || errors.length ? 1 : 0);

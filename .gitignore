@@ -1,0 +1,9 @@
+node_modules
+dist
+.playtest
+*.local
+.DS_Store
+
+# Claude Code: skill folders are machine-specific junctions into .agents/skills
+.claude/skills/
+.claude/settings.local.json

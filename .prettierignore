@@ -1,0 +1,9 @@
+dist
+node_modules
+.agents
+.claude
+.playtest
+docs
+*.md
+package-lock.json
+skills-lock.json
