@@ -31,7 +31,8 @@ hungry-seal/
       assets.ts         asset manifest (keys -> optional urls)
       creatures.ts      creature definitions (tier, speeds, nutrition, behaviors, zones, school)
       hazards.ts        hazard definitions (jellyfish, mine: damage, knockback, stun, drift)
-      predators.ts      predator definitions (shark: tier, speeds, radii, timings, rewards)
+      predators.ts      predator definitions (tier, speeds, radii, timings, rewards, spawn rule, glow)
+      depths.ts         shared draw depths (darkness overlay, glows)
       upgrades.ts       upgrade definitions (name, costs, effect text) and per-level effects
     scenes/
       BootScene.ts      reads ?debug, starts Preload
@@ -70,6 +71,8 @@ hungry-seal/
       HazardField.ts       pooled hazard spawning/stepping (spawnAt for scripted/tests)
       Predators.ts         predator spawning by schedule, AI stepping, off-screen warning arrows
       CoinField.ts         coin clusters + prey drops, collection
+      Pickups.ts           treasure chests (seabed) + magnet orbs; returns pickup events
+      Darkness.ts          depth darkness overlay with the seal's light (darknessAt() in zones.ts)
       FrenzySystem.ts      PURE frenzy meter/duration (tested in frenzy.test.ts)
       UpgradeSystem.ts     PURE upgrade levels -> run modifiers, purchase rules (upgrades.test.ts)
       Tutorial.ts          PURE first-run hint rules (tutorial.test.ts)
@@ -143,7 +146,8 @@ hungry-seal/
 - Spawner keeps ~`SPAWN.targetAlive` creatures, spawning just off-screen (70% ahead of the seal) with the zone at the spawn point choosing a weighted creature, and recycles creatures > `despawnDistance` from the camera centre. Pooled objects are reused: code that holds a creature reference across frames must also check it wasn't respawned (e.g. compare its `motion` object).
 
 ## Danger, damage and saves
-- Hazards and predators spawn by run time (`systems/danger.ts` + `DANGER` config); URL `?calm` forces danger time to 0 (no hazards/predators) for testing and tuning.
+- Hazards spawn by run time (`hazardsAllowed`); each predator kind has its own `spawn` rule in `predators.ts` — a run-time schedule (shark, orca) or home zones where it lives while the camera is there (anglerfish) — evaluated by `predatorsAllowed(rule, elapsed, viewZone)` in `systems/danger.ts`. URL `?calm` forces danger time to 0, so no hazards and no predators (every rule has `after` > 0).
+- Darkness/glow layering: world sprites < `Depths.Darkness` (25) overlay < `Depths.Glow` (26) glows < floating text (30). Anything that must be findable in the dark gets a glow image at `Depths.Glow`.
 - Contacts: hazards vs the seal's body circle; predator **mouth** circle vs the seal's body; the seal's mouth vs a predator's body when the seal has outgrown it (predators flee then).
 - `GameScene.hurt()` is the single damage path: hunger damage, knockback (`applyKnockback` — a decaying impulse separate from swimming, so facing doesn't flip), stun, i-frames, combo reset, hit-stop, shake, `seal:hurt` event (HUD vignette flash). It records the last hit for the death cause.
 - Hit-stop: `GameScene.update` returns early while `hitStop > 0` (tweens keep running).

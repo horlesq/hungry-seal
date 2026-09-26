@@ -1,10 +1,10 @@
-// Predator spawning (by run-time schedule), AI stepping, and off-screen warning arrows that
-// point at predators hunting the seal from outside the view.
+// Predator spawning (each kind by its own rule: run-time schedule or home zones), AI
+// stepping, and off-screen warning arrows that point at predators hunting the seal.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { DANGER, SPAWN } from '../config/balance';
-import { PREDATORS, type PredatorDef, type PredatorId } from '../config/predators';
-import { zoneBand } from '../config/zones';
+import { PREDATOR_LIST, PREDATORS, type PredatorDef, type PredatorId } from '../config/predators';
+import { zoneAt, zoneBand } from '../config/zones';
 import { textureScale } from '../services/Viewport';
 import { Predator } from '../entities/Predator';
 import { stepPredator, type PredatorContext, type PredatorEvent } from '../entities/predatorAI';
@@ -13,7 +13,7 @@ import { canEat } from './feeding';
 import { pickOffscreenPoint } from './spawnPoint';
 import { WATER_BOTTOM, WATER_TOP, type Threat } from './Spawner';
 
-const POOL_SIZE = 4;
+const POOL_SIZE = 8;
 /** Predators are big and slow to re-find; keep them around longer than prey. */
 const DESPAWN_DISTANCE = SPAWN.despawnDistance * 1.6;
 const ARROW_INSET = 42;
@@ -31,7 +31,7 @@ export class Predators {
   readonly group: Phaser.GameObjects.Group;
   readonly alive: Predator[] = [];
   private readonly arrows: Phaser.GameObjects.Image[] = [];
-  private timer = 0;
+  private readonly timers = new Map<PredatorId, number>();
   private readonly ctx: PredatorContext;
   private readonly events: PredatorEventInfo[] = [];
 
@@ -95,10 +95,15 @@ export class Predators {
       else this.alive.push(p);
     }
 
-    this.timer -= dt;
-    if (this.timer <= 0) {
-      this.timer = DANGER.predatorSpawnInterval;
-      if (this.alive.length < predatorsAllowed(elapsed)) this.spawn(PREDATORS.shark, camera, seal);
+    // Each predator kind follows its own spawn rule (schedule or home zones).
+    const viewZone = zoneAt(camera.midPoint.y).id;
+    for (const def of PREDATOR_LIST) {
+      const timer = (this.timers.get(def.id) ?? 0) - dt;
+      this.timers.set(def.id, timer);
+      if (timer > 0) continue;
+      this.timers.set(def.id, DANGER.predatorSpawnInterval);
+      const alive = this.alive.filter((p) => p.def.id === def.id).length;
+      if (alive < predatorsAllowed(def.spawn, elapsed, viewZone)) this.spawn(def, camera, seal);
     }
 
     this.updateArrows(camera);
@@ -111,7 +116,7 @@ export class Predators {
     return predator?.spawn(PREDATORS[id], x, y, heading) ?? null;
   }
 
-  /** Spawns a predator just off-screen inside its depth band (the run-time schedule). */
+  /** Spawns a predator just off-screen inside its depth band. */
   spawn(def: PredatorDef, camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): Predator | null {
     // Spawn inside its own depth band, just off-screen.
     const band = zoneBand(def.zones);

@@ -1,7 +1,7 @@
 // Permanent upgrades bought with coins in the shop. Effects are applied at the start of each
 // run by systems/UpgradeSystem.ts.
 
-export type UpgradeId = 'speed' | 'belly' | 'metabolism' | 'boost';
+export type UpgradeId = 'speed' | 'belly' | 'metabolism' | 'boost' | 'jaws' | 'magnet' | 'frenzy';
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -22,6 +22,12 @@ export const UPGRADE_EFFECTS = {
   metabolismPerLevel: 0.07,
   /** Boost stamina lasts longer and refills faster per level. */
   boostPerLevel: 0.18,
+  /** Growth points per meal per level. */
+  jawsPerLevel: 0.1,
+  /** Coin magnet radius per level. */
+  magnetPerLevel: 0.3,
+  /** Frenzy meter gain per meal per level. */
+  frenzyPerLevel: 0.12,
 } as const;
 
 const COSTS = [60, 150, 300, 550, 900] as const;
@@ -54,6 +60,27 @@ export const UPGRADES: readonly UpgradeDef[] = [
     description: 'Longer, faster-refilling boost',
     costs: COSTS,
     effect: (l) => `+${Math.round(l * UPGRADE_EFFECTS.boostPerLevel * 100)}% boost`,
+  },
+  {
+    id: 'jaws',
+    name: 'Big Jaws',
+    description: 'Grow faster from every meal',
+    costs: COSTS,
+    effect: (l) => `+${Math.round(l * UPGRADE_EFFECTS.jawsPerLevel * 100)}% growth`,
+  },
+  {
+    id: 'magnet',
+    name: 'Coin Whiskers',
+    description: 'Pull in coins from further away',
+    costs: COSTS,
+    effect: (l) => `+${Math.round(l * UPGRADE_EFFECTS.magnetPerLevel * 100)}% magnet range`,
+  },
+  {
+    id: 'frenzy',
+    name: 'Feeding Frenzy',
+    description: 'Fill the frenzy meter faster',
+    costs: COSTS,
+    effect: (l) => `+${Math.round(l * UPGRADE_EFFECTS.frenzyPerLevel * 100)}% frenzy charge`,
   },
 ];
 

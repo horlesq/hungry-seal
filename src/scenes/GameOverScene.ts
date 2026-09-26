@@ -16,6 +16,9 @@ const TITLES: Record<DeathCause, { title: string; subtitle: string; color: strin
   shark: { title: 'CHOMPED!', subtitle: 'A shark got you', color: '#ff5a4f' },
   mine: { title: 'KABOOM!', subtitle: 'You swam into a sea mine', color: '#ffb13c' },
   jellyfish: { title: 'STUNG!', subtitle: 'Zapped by a jellyfish', color: '#ff8ae0' },
+  orca: { title: 'CRUNCHED!', subtitle: 'An orca caught you', color: '#e8eef4' },
+  anglerfish: { title: 'LURED!', subtitle: 'Never follow the pretty light', color: '#9ffcff' },
+  pufferfish: { title: 'SPIKED!', subtitle: 'That pufferfish was puffed up', color: '#ffd23c' },
 };
 
 export class GameOverScene extends Phaser.Scene {

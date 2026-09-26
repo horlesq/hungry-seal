@@ -2,7 +2,7 @@
 // its definition, school membership and visuals. Reused via the Spawner's Group.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
-import { hardLimits, type CreatureDef } from '../config/creatures';
+import { hardLimits, PUFFED_SCALE, type CreatureDef } from '../config/creatures';
 import { zoneBand } from '../config/zones';
 import { textureScale } from '../services/Viewport';
 import {
@@ -11,6 +11,7 @@ import {
   type CreatureMotion,
   type CreatureMotionParams,
 } from './creatureAI';
+import { Depths } from '../config/depths';
 
 /** A group of creatures that follow the first living member. */
 export class School {
@@ -41,6 +42,9 @@ export class Creature extends Phaser.GameObjects.Sprite {
   private facing = 1;
   /** def.scale adjusted for the texture's pixel density. */
   private displayScale = 1;
+  /** Soft light for glowing species, drawn above the deep-water darkness. */
+  private glow: Phaser.GameObjects.Image | null = null;
+  private shownPuffed = false;
 
   // Signature matches what Phaser.GameObjects.Group passes when creating pool members.
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
@@ -60,12 +64,25 @@ export class Creature extends Phaser.GameObjects.Sprite {
     this.bumpCooldown = 0;
     this.facing = Math.cos(heading) >= 0 ? 1 : -1;
     this.displayScale = def.scale * textureScale(this.scene, def.texture);
+    this.shownPuffed = false;
     this.setTexture(def.texture)
       .setActive(true)
       .setVisible(true)
       .setAlpha(1)
       .setDepth(8)
       .setPosition(x, y);
+    if (def.glow) {
+      this.glow ??= this.scene.add
+        .image(0, 0, TextureKeys.Glow)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(Depths.Glow);
+      this.glow
+        .setTint(def.glow.color)
+        .setScale(def.glow.size * textureScale(this.scene, TextureKeys.Glow))
+        .setVisible(true);
+    } else {
+      this.glow?.setVisible(false);
+    }
     this.syncVisual(0);
     return this;
   }
@@ -81,26 +98,47 @@ export class Creature extends Phaser.GameObjects.Sprite {
   despawn(): void {
     this.school?.remove(this);
     this.school = null;
+    this.glow?.setVisible(false);
     this.setActive(false).setVisible(false);
   }
 
   get radius(): number {
-    return this.def.radius;
+    return this.def.radius * (this.puffed ? PUFFED_SCALE : 1);
   }
 
   get flies(): boolean {
     return this.def.behaviors.includes('fly');
   }
 
+  /** Pufferfish currently blown up (eating it now hurts). */
+  get puffed(): boolean {
+    return this.motion.puffed;
+  }
+
   syncVisual(dt: number): void {
     const m = this.motion;
     this.setPosition(m.x, m.y);
     this.bumpCooldown = Math.max(0, this.bumpCooldown - dt);
-    // Flip belly-down when swimming left (with a quick squash through zero).
     const cos = Math.cos(m.heading);
     const target = cos > 0.1 ? 1 : cos < -0.1 ? -1 : this.facing >= 0 ? 1 : -1;
-    this.facing += (target - this.facing) * Math.min(1, dt * 14);
-    this.setRotation(m.heading);
-    this.setScale(this.displayScale, this.displayScale * this.facing);
+
+    if (this.params.puff && this.shownPuffed !== m.puffed) {
+      this.shownPuffed = m.puffed;
+      this.setTexture(m.puffed ? TextureKeys.PufferfishPuffed : this.def.texture);
+    }
+    const s = this.displayScale * (m.puffed ? PUFFED_SCALE : 1);
+
+    if (this.params.walk) {
+      // Walkers stay upright and just face their direction.
+      this.facing = target;
+      this.setRotation(0);
+      this.setScale(s * this.facing, s);
+    } else {
+      // Flip belly-down when swimming left (with a quick squash through zero).
+      this.facing += (target - this.facing) * Math.min(1, dt * 14);
+      this.setRotation(m.heading);
+      this.setScale(s, s * this.facing);
+    }
+    this.glow?.setPosition(m.x, m.y);
   }
 }

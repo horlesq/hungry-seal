@@ -42,6 +42,7 @@ export class HudScene extends Phaser.Scene {
   private coinText!: Phaser.GameObjects.Text;
   private coinIcon!: Phaser.GameObjects.Image;
   private coins = 0;
+  private magnetText!: Phaser.GameObjects.Text;
   private comboRoot!: Phaser.GameObjects.Container;
   private comboText!: Phaser.GameObjects.Text;
   private comboCount!: Phaser.GameObjects.Text;
@@ -99,6 +100,9 @@ export class HudScene extends Phaser.Scene {
       EventBus.on('run:growth', this.onGrowth, this),
       EventBus.on('run:score', (score) => (this.targetScore = score)),
       EventBus.on('run:coins', this.onCoins, this),
+      EventBus.on('run:magnet', (s) =>
+        this.magnetText.setVisible(s > 0).setText(`COIN MAGNET ${s}s`),
+      ),
       EventBus.on('run:combo', this.onCombo, this),
       EventBus.on('run:frenzy', (state) => (this.frenzy = state)),
       EventBus.on('hint', this.onHint, this),
@@ -246,7 +250,18 @@ export class HudScene extends Phaser.Scene {
       .image(0, 0, TextureKeys.Coin)
       .setScale(0.9 * textureScale(this, TextureKeys.Coin));
     this.onCoins(0);
-    this.rightRoot.add([label, this.scoreText, this.coinIcon, this.coinText]);
+    this.magnetText = this.add
+      .text(-24, 122, '', {
+        fontFamily: UI_FONT,
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ff8a7a',
+        stroke: '#0b3a66',
+        strokeThickness: 5,
+      })
+      .setOrigin(1, 0)
+      .setVisible(false);
+    this.rightRoot.add([label, this.scoreText, this.coinIcon, this.coinText, this.magnetText]);
   }
 
   private onCoins(coins: number): void {

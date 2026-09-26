@@ -1,7 +1,9 @@
-// Pooled predator sprite (shark). Behavior lives in predatorAI (pure); this class owns the
-// sprite, the "!" warning shown while it's about to charge, and state-driven visuals.
+// Pooled predator sprite (shark, orca, anglerfish). Behavior lives in predatorAI (pure);
+// this class owns the sprite, the "!" warning shown while it's about to charge, an optional
+// glowing spot (the anglerfish lure, drawn above the deep-water darkness) and state visuals.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
+import { Depths } from '../config/depths';
 import { UI_FONT } from '../config/layout';
 import type { PredatorDef } from '../config/predators';
 import { zoneBand } from '../config/zones';
@@ -13,6 +15,7 @@ export class Predator extends Phaser.GameObjects.Sprite {
   motion!: PredatorMotion;
   band = { top: 0, bottom: 0 };
   private readonly alert: Phaser.GameObjects.Text;
+  private glow: Phaser.GameObjects.Image | null = null;
   private facing = 1;
 
   // Signature matches what Phaser.GameObjects.Group passes when creating pool members.
@@ -45,6 +48,18 @@ export class Predator extends Phaser.GameObjects.Sprite {
       .setDepth(11)
       .setActive(true)
       .setVisible(true);
+    if (def.glow) {
+      this.glow ??= this.scene.add
+        .image(0, 0, TextureKeys.Glow)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(Depths.Glow);
+      this.glow
+        .setTint(def.glow.color)
+        .setScale(def.glow.size * textureScale(this.scene, TextureKeys.Glow))
+        .setVisible(true);
+    } else {
+      this.glow?.setVisible(false);
+    }
     this.syncVisual(0, 0);
     return this;
   }
@@ -83,10 +98,22 @@ export class Predator extends Phaser.GameObjects.Sprite {
     this.alert
       .setVisible(warning || (m.state === 'chase' && m.stateTime < 0.4))
       .setPosition(m.x, m.y - 50);
+
+    const g = this.def.glow;
+    if (g && this.glow) {
+      // Offset is authored facing right; mirror vertically when facing left, then rotate.
+      const oy = g.y * (this.facing >= 0 ? 1 : -1);
+      const sin = Math.sin(m.heading);
+      this.glow
+        .setPosition(m.x + g.x * cos - oy * sin, m.y + g.x * sin + oy * cos)
+        // Pulse; flare while about to strike.
+        .setAlpha(warning ? 1 : 0.65 + 0.25 * Math.sin(time * 0.004));
+    }
   }
 
   despawn(): void {
     this.alert.setVisible(false);
+    this.glow?.setVisible(false);
     this.setActive(false).setVisible(false);
   }
 }

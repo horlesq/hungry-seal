@@ -88,13 +88,16 @@ export const HUNGER = {
 export const GROWTH = {
   /** Growth points to go from stage N to N+1 (index 0 = stage 1 -> 2). Max stage = length + 1. */
   stageCosts: [80, 200, 380, 600],
-  /** Per stage, index 0 = stage 1. Bite tier = stage number. */
+  /**
+   * Per stage, index 0 = stage 1. Bite tier = stage number. `zoom` pulls the camera back as
+   * the seal grows so a big seal still sees as much ocean around it.
+   */
   stages: [
-    { scale: 0.72, speedMult: 1 },
-    { scale: 0.82, speedMult: 1.04 },
-    { scale: 0.92, speedMult: 1.08 },
-    { scale: 1.02, speedMult: 1.12 },
-    { scale: 1.12, speedMult: 1.16 },
+    { scale: 0.72, speedMult: 1, zoom: 1 },
+    { scale: 0.82, speedMult: 1.04, zoom: 0.96 },
+    { scale: 0.92, speedMult: 1.08, zoom: 0.91 },
+    { scale: 1.02, speedMult: 1.12, zoom: 0.86 },
+    { scale: 1.12, speedMult: 1.16, zoom: 0.82 },
   ],
 } as const;
 
@@ -107,6 +110,10 @@ export const FEEDING = {
   bumpSpeedKeep: 0.35,
   /** Seconds before the same creature can bump the seal again. */
   bumpCooldown: 0.6,
+  /** Eating a puffed-up pufferfish: damage, knockback, stun. */
+  pufferDamage: 14,
+  pufferKnockback: 300,
+  pufferStun: 0.4,
 } as const;
 
 export const SPAWN = {
@@ -170,12 +177,7 @@ export const DANGER = {
   hazardsPerMinute: 2,
   hazardsMax: 7,
   hazardSpawnInterval: 1.2,
-  /** Max predators alive after N seconds of the run. */
-  predatorSchedule: [
-    { after: 45, count: 1 },
-    { after: 150, count: 2 },
-    { after: 270, count: 3 },
-  ],
+  /** Seconds between spawn attempts per predator kind (spawn rules live in predators.ts). */
   predatorSpawnInterval: 6,
 } as const;
 
@@ -191,6 +193,21 @@ export const FRENZY = {
   magnetRadius: 280,
   /** Score for smashing through a hazard during a frenzy. */
   hazardScore: 50,
+} as const;
+
+export const PICKUPS = {
+  /** Treasure chests sit on the seabed: at most one around, spawned while near the bottom. */
+  chestCheckInterval: 6,
+  chestNearFloor: 900,
+  chestCoins: [12, 18],
+  chestScore: 150,
+  chestRadius: 30,
+  /** Magnet orbs float in the water now and then; collect for a big coin magnet. */
+  magnetInterval: 35,
+  magnetLifetime: 30,
+  magnetDuration: 12,
+  magnetRadius: 320,
+  orbRadius: 20,
 } as const;
 
 /** Brief freezes on impactful moments (seconds). */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultSave, migrateSave, purchase, recordRun } from './saveData';
 import { SaveService } from './SaveService';
+import { emptyUpgrades } from '../systems/UpgradeSystem';
 
 class MemoryStorage {
   store = new Map<string, string>();
@@ -30,14 +31,14 @@ describe('save data', () => {
     const s = migrateSave({ version: 1, coins: 80, bestScore: 900, runs: 3 });
     expect(s.version).toBe(2);
     expect(s.coins).toBe(80);
-    expect(s.upgrades).toEqual({ speed: 0, belly: 0, metabolism: 0, boost: 0 });
+    expect(s.upgrades).toEqual(emptyUpgrades());
     expect(s.tutorialDone).toBe(true);
     expect(migrateSave({ version: 1, runs: 0 }).tutorialDone).toBe(false);
   });
 
   it('clamps corrupt upgrade levels', () => {
     const s = migrateSave({ upgrades: { speed: 99, belly: -2, metabolism: 'x', boost: 2.7 } });
-    expect(s.upgrades).toEqual({ speed: 5, belly: 0, metabolism: 0, boost: 2 });
+    expect(s.upgrades).toEqual({ ...emptyUpgrades(), speed: 5, belly: 0, metabolism: 0, boost: 2 });
   });
 
   it('buys upgrades with banked coins', () => {

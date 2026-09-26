@@ -4,9 +4,28 @@ import { TextureKeys, type TextureKey } from './assets';
 import { WORLD, type ZoneId } from './zones';
 
 /** `fly` = lives above the water (seabirds): spawned in the sky, clamped to the air. */
-export type BehaviorId = 'wander' | 'drift' | 'flee' | 'school' | 'jet' | 'fly';
+export type BehaviorId =
+  | 'wander'
+  | 'drift'
+  | 'flee'
+  | 'school'
+  | 'jet'
+  | 'fly'
+  /** Walks along the seabed (crabs). */
+  | 'walk'
+  /** Puffs up spiky near the seal; eating it puffed hurts (pufferfish). */
+  | 'puff';
 export type CreatureId =
-  'minnow' | 'shrimp' | 'sardine' | 'squid' | 'penguin' | 'turtle' | 'seabird';
+  | 'minnow'
+  | 'shrimp'
+  | 'sardine'
+  | 'squid'
+  | 'penguin'
+  | 'turtle'
+  | 'seabird'
+  | 'pufferfish'
+  | 'crab'
+  | 'lanternfish';
 
 export interface CreatureDef {
   id: CreatureId;
@@ -39,6 +58,8 @@ export interface CreatureDef {
   zones: readonly ZoneId[];
   /** Explicit vertical range (world y) overriding the zones' band, e.g. near the surface. */
   band?: { top: number; bottom: number };
+  /** Glows (visible through the deep-water darkness). */
+  glow?: { color: number; size: number };
   /** Relative spawn chance among creatures allowed in a zone. */
   weight: number;
 }
@@ -185,6 +206,68 @@ export const CREATURES: Record<CreatureId, CreatureDef> = {
     band: { top: WORLD.surfaceY - 280, bottom: WORLD.surfaceY - 20 },
     weight: 1,
   },
+  pufferfish: {
+    id: 'pufferfish',
+    name: 'Pufferfish',
+    texture: TextureKeys.Pufferfish,
+    tier: 2,
+    radius: 14,
+    scale: 1,
+    speed: 55,
+    fleeSpeed: 90,
+    turnRate: 3,
+    accel: 300,
+    fleeRadius: 0,
+    nutrition: 14,
+    score: 40,
+    growth: 10,
+    // Doesn't flee: it puffs up. Sneak up from far, or eat it spikes and all and take a hit.
+    behaviors: ['wander', 'puff'],
+    zones: ['reef', 'ocean'],
+    weight: 1.5,
+  },
+  crab: {
+    id: 'crab',
+    name: 'Crab',
+    texture: TextureKeys.Crab,
+    tier: 2,
+    radius: 16,
+    scale: 1,
+    speed: 45,
+    fleeSpeed: 160,
+    turnRate: 8,
+    accel: 500,
+    fleeRadius: 160,
+    nutrition: 16,
+    score: 45,
+    growth: 12,
+    behaviors: ['walk', 'flee'],
+    zones: ['abyss'],
+    // Scuttles along the seabed.
+    band: { top: WORLD.floorY - 40, bottom: WORLD.floorY - 18 },
+    weight: 3,
+  },
+  lanternfish: {
+    id: 'lanternfish',
+    name: 'Lanternfish',
+    texture: TextureKeys.Lanternfish,
+    tier: 1,
+    radius: 10,
+    scale: 1,
+    speed: 80,
+    fleeSpeed: 260,
+    turnRate: 5,
+    accel: 600,
+    fleeRadius: 200,
+    nutrition: 7,
+    score: 15,
+    growth: 6,
+    behaviors: ['school', 'wander', 'flee'],
+    school: { min: 4, max: 7, spread: 40 },
+    zones: ['deep', 'abyss'],
+    glow: { color: 0x7ffcff, size: 0.22 },
+    weight: 4,
+  },
 };
 
 /** Vertical limits a creature can never leave: the air for flyers, the water for the rest. */
@@ -193,6 +276,9 @@ export function hardLimits(def: CreatureDef): { top: number; bottom: number } {
     ? { top: WORLD.ceilingY + 40, bottom: WORLD.surfaceY - 12 }
     : { top: WORLD.surfaceY + 16, bottom: WORLD.floorY - 16 };
 }
+
+/** Radius multiplier while a pufferfish is inflated. */
+export const PUFFED_SCALE = 1.7;
 
 export const CREATURE_LIST: readonly CreatureDef[] = Object.values(CREATURES);
 export const SWIMMERS: readonly CreatureDef[] = CREATURE_LIST.filter(

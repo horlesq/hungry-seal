@@ -66,7 +66,7 @@ Appear from 25 s into a run: 2 allowed at first, +2 per minute, max 7 (`DANGER` 
 | Toxic waste / oil (later) | Zone | Drains hunger fast |
 
 ### Predators
-- Shark ✅ (ocean/deep), Orca (deep), Giant squid / Anglerfish (abyss).
+- Shark ✅ (ocean/deep, from 45 s), Orca ✅ (ocean/deep, from 3 min; tier 6 = never edible outside a frenzy, 40 damage), Anglerfish ✅ (deep/abyss while you're there: lurks still behind a glowing lure, 0.35 s telegraph, short 540 px/s lunge; edible from size 4). Giant squid later.
 - States: patrol → notice (0.8 s telegraph: stops, turns to the seal, flashes red, "!") → chase (370 px/s, turns slower than the seal, gives up after 6 s or 900 px) → bite → recover (swims off, then 4 s cooldown). Only hunts a seal that's in the water. Off-screen hunters show a red arrow at the screen edge.
 - Shark bite: 28 damage + knockback. Outrun it with boost, out-turn it, or leap out of the water.
 - Seal outgrowing a predator's tier (shark = tier 5, max size) makes it flee and turns it into a big reward (45 nutrition, 250 score, 5 coins).
@@ -84,6 +84,9 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 | 3 | Squid ✅ | Ocean/Deep | 16 | 60 | cruises slowly, escapes in jet bursts (420 px/s kicks) |
 | 3 | Penguin ✅ | Upper reef (near surface) | 20 | 90 | groups of 2-3, fast (390 px/s flee) |
 | 4 | Sea turtle ✅ | Reef/Ocean | 32 | 120 | slow, doesn't flee: a big safe meal once you're size 4 |
+| 2 | Pufferfish ✅ | Reef/Ocean | 14 | 40 | doesn't flee; puffs into a spiky ball near you (bigger hitbox). Eating it puffed stings: 14 damage + knockback |
+| 1 | Lanternfish ✅ | Deep/Abyss | 7 | 15 | glowing schools of 4-7; food for small seals in the dark |
+| 2 | Crab ✅ | Abyss seabed | 16 | 45 | walks along the floor, scuttles sideways away from you |
 | 2 | Crab | Reef floor | 10 | 25 | walks, snaps |
 | 3 | Seabird | Surface/Air | 15 | 50 | glides, dives |
 | 3 | Squid | Ocean | 18 | 60 | jets away |
@@ -96,7 +99,17 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 - **Gems (later):** rare, premium-feel currency for skins; earned from rare events, not sold.
 - **Upgrades** (permanent, bought with coins in the Shop; 5 levels, costs 60 / 150 / 300 / 550 / 900) — done for 4:
   - Flippers: +4% top speed per level. Big Belly: +12 max hunger per level. Blubber: -7% hunger drain per level. Turbo Tail: +18% boost (lasts longer, refills faster) per level.
-  - Later: Bite/Growth (faster growth), Coin magnet, Frenzy charge rate.
+  - Big Jaws: +10% growth per meal per level. Coin Whiskers: +30% coin magnet range per level. Feeding Frenzy: +12% frenzy charge per level. (All 7 done.)
+
+## Pickups (done)
+- **Treasure chest:** sits on the abyss seabed (one at a time, while you're near the bottom). Touch to burst it open: 12-18 coins + 150 score.
+- **Magnet orb:** floating bubble, roughly every 35 s ahead of you, lasts 30 s. Grab it for 12 s of long-range (320 px) coin magnet; HUD shows the countdown.
+- Chests and orbs glow, so they're findable in the dark.
+
+## Depth and light (done)
+- The deep gets dark: darkness starts ~600 px above the Deep and ramps to ~90% at the seabed. The seal carries a small light circle (clear ~110 px, dark by ~360 px).
+- Glows show through the dark: anglerfish lures, lanternfish, jellyfish (pink), mine warning lights (blinking red), chests, orbs.
+- The camera pulls back as the seal grows (100% → 82% zoom at size 5).
 - **Skins:** cosmetic seal variants (harbor, leopard, arctic, pirate, etc.).
 - **Missions (later):** 3 rotating goals per run set ("eat 20 crabs", "reach abyss").
 - Save data in localStorage: coins, best score, best distance, runs, settings (done); upgrade levels, skins owned/equipped (Phase 4+).

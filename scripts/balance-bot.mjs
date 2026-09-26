@@ -35,10 +35,10 @@ while (Date.now() - start < seconds * 1000) {
   const info = await page.evaluate((human) => {
     const s = window.__PHASER_GAME__.scene.getScene('Game');
     // Tally hits by source (for the summary line), including a fatal one.
-    window.__hits ??= { jellyfish: 0, mine: 0, shark: 0 };
+    window.__hits ??= {};
     if (s.lastHit && s.lastHit.at !== window.__lastHitAt) {
       window.__lastHitAt = s.lastHit.at;
-      window.__hits[s.lastHit.source]++;
+      window.__hits[s.lastHit.source] = (window.__hits[s.lastHit.source] ?? 0) + 1;
     }
     if (s.dead)
       return {

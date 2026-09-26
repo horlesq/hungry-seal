@@ -721,7 +721,7 @@ async function phase4(browser) {
   await click(-125, 505);
   await sceneActive(page, 'Shop');
   await page.waitForTimeout(500);
-  await click(-150, 450);
+  await click(-143, 311); // Big Belly's BUY (row 1, card 2)
   await page.waitForTimeout(300);
   const bought = await save();
   check(
@@ -730,7 +730,11 @@ async function phase4(browser) {
     `belly=${bought.upgrades?.belly} coins=${bought.coins}`,
   );
   await page.screenshot({ path: `${OUT}/14-shop.png` });
-  await click(170, 640); // PLAY
+  const cards = await page.evaluate(
+    () => window.__PHASER_GAME__.scene.getScene('Shop').cards.length,
+  );
+  check('shop lists all 7 upgrades', cards === 7, `${cards} cards`);
+  await click(160, 668); // PLAY
   await sceneActive(page, 'Game');
   await sceneActive(page, 'Hud');
   await page.waitForTimeout(900);
@@ -845,6 +849,148 @@ async function phase4(browser) {
   await ctx.close();
 }
 
+/** Phase 5: zoom by size, darkness + glows, new creatures/predators, pickups. */
+async function phase5(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  const page = await ctx.newPage();
+  watch(page, 'phase5');
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(800);
+  await noStarve(page);
+
+  // Growing to max size pulls the camera back.
+  const zoom0 = await inGame(page, (s) => s.cameras.main.zoom);
+  await inGame(page, (s) => {
+    s.growth.add(10_000);
+    s.seal.setStage(s.growth.stage);
+  });
+  await page.waitForTimeout(3000);
+  const zoom1 = await inGame(page, (s) => s.cameras.main.zoom);
+  check(
+    'camera zooms out as the seal grows',
+    zoom1 < zoom0 * 0.88,
+    `${zoom0.toFixed(2)} -> ${zoom1.toFixed(2)}`,
+  );
+
+  // Pufferfish puffs up near the seal and stings when eaten puffed.
+  await inGame(page, (s) => {
+    window.__puffer = s.spawner.spawnAt('pufferfish', s.seal.x + 120, s.seal.y);
+    window.__pufferMotion = window.__puffer.motion;
+  });
+  await page.waitForTimeout(400);
+  const puffed = await page.evaluate(() => window.__puffer.puffed);
+  check('pufferfish puffs up near the seal', puffed === true);
+  const hBefore = await inGame(page, (s) => {
+    s.hunger.value = 60;
+    const c = window.__puffer;
+    const m = s.seal.motion;
+    m.heading = 0;
+    m.speed = 0;
+    m.x = 0;
+    m.y = 0;
+    const vec = {
+      x: 0,
+      y: 0,
+      set(x, y) {
+        this.x = x;
+        this.y = y;
+        return this;
+      },
+    };
+    const offset = s.seal.mouthPosition(vec).x;
+    m.x = c.motion.x - offset;
+    m.y = c.motion.y;
+    c.motion.speed = 0;
+    return s.hunger.value;
+  });
+  await page.waitForTimeout(300);
+  const sting = await inGame(page, (s) => ({
+    eaten: !(window.__puffer.active && window.__puffer.motion === window.__pufferMotion),
+    source: s.lastHit?.source,
+  }));
+  check(
+    'eating a puffed pufferfish stings',
+    sting.eaten && sting.source === 'pufferfish',
+    JSON.stringify(sting),
+  );
+  await page.waitForFunction(
+    () => !window.__PHASER_GAME__.scene.getScene('Game').seal.isInvulnerable,
+    null,
+    { timeout: 5000 },
+  );
+  void hBefore;
+
+  // Orcas hunt even a max-size seal; anglerfish flee from it.
+  await inGame(page, (s) => {
+    window.__orca = s.predators.spawnAt('orca', s.seal.x - 380, s.seal.y, 0);
+  });
+  await page.waitForTimeout(400);
+  const orcaState = await page.evaluate(() => window.__orca.motion.state);
+  check(
+    'orca hunts even a max-size seal',
+    orcaState === 'notice' || orcaState === 'chase',
+    orcaState,
+  );
+  await inGame(page, (s) => {
+    window.__orca.despawn();
+    window.__angler = s.predators.spawnAt('anglerfish', s.seal.x + 200, s.seal.y, Math.PI);
+  });
+  await page.waitForTimeout(400);
+  const anglerState = await page.evaluate(() => window.__angler.motion.state);
+  check('anglerfish flees a seal big enough to eat it', anglerState === 'flee', anglerState);
+
+  // Pickups: chest bursts into coins, magnet orb powers up.
+  const before = await inGame(page, (s) => ({ score: s.score, coins: s.runCoins }));
+  await inGame(page, (s) => {
+    s.pickups.spawnAt('chest', s.seal.x + 30, s.seal.y);
+  });
+  await page.waitForTimeout(1500);
+  const afterChest = await inGame(page, (s) => ({ score: s.score, coins: s.runCoins }));
+  check(
+    'treasure chest pays out coins and score',
+    afterChest.score >= before.score + 150 && afterChest.coins >= before.coins + 10,
+    `coins ${before.coins} -> ${afterChest.coins}`,
+  );
+  await inGame(page, (s) => {
+    s.pickups.spawnAt('magnet', s.seal.x + 20, s.seal.y);
+  });
+  await page.waitForTimeout(300);
+  const magnet = await inGame(page, (s) => s.magnetLeft);
+  check('magnet orb gives a coin magnet', magnet > 5, `${magnet.toFixed(1)}s`);
+
+  // The abyss: dark, lit by glows; crabs walk the seabed.
+  // Teleport first and let the camera arrive; things spawned far from the camera are
+  // recycled immediately (as they should be in real play).
+  await inGame(page, (s) => {
+    s.seal.motion.y = 6150;
+  });
+  await page.waitForTimeout(1800);
+  await inGame(page, (s) => {
+    s.spawner.spawnAt('crab', s.seal.x + 160, 6380, Math.PI);
+    s.spawner.spawnAt('lanternfish', s.seal.x - 200, 6050, 0);
+    s.predators.spawnAt('anglerfish', s.seal.x + 380, 6000, Math.PI);
+    s.pickups.spawnAt('chest', s.seal.x - 300, 6376);
+  });
+  await page.waitForTimeout(1500);
+  const deep = await inGame(page, (s) => ({
+    dark: s.darkness.level,
+    crabs: s.spawner.alive
+      .filter((c) => c.active && c.def.id === 'crab')
+      .map((c) => Math.round(c.y)),
+  }));
+  check('the abyss is dark', deep.dark > 0.6, `darkness=${deep.dark.toFixed(2)}`);
+  check(
+    'crabs walk on the seabed',
+    deep.crabs.length > 0 && deep.crabs.every((y) => y >= 6370 && y <= 6384),
+    `y=${deep.crabs.join(',')}`,
+  );
+  await page.screenshot({ path: `${OUT}/19-abyss.png` });
+  await ctx.close();
+}
+
 async function mobile(browser) {
   const ctx = await browser.newContext({
     viewport: { width: 915, height: 412 },
@@ -928,6 +1074,7 @@ try {
   await desktop(browser);
   await danger(browser);
   await phase4(browser);
+  await phase5(browser);
   await gameplay(browser);
   await mobile(browser);
 } catch (err) {

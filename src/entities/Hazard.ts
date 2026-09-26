@@ -1,9 +1,11 @@
 // Pooled hazard sprite (jellyfish, sea mine). Drifts slowly and bobs; hurts on contact.
+// Each hazard carries a glow drawn above the deep-water darkness so it stays visible.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import type { HazardDef } from '../config/hazards';
 import { textureScale } from '../services/Viewport';
 import { TAU } from '../utils/math';
+import { Depths } from '../config/depths';
 
 export class Hazard extends Phaser.GameObjects.Sprite {
   def!: HazardDef;
@@ -12,6 +14,7 @@ export class Hazard extends Phaser.GameObjects.Sprite {
   private dir = 1;
   /** def.scale adjusted for the texture's pixel density. */
   private displayScale = 1;
+  private glow: Phaser.GameObjects.Image | null = null;
 
   // Signature matches what Phaser.GameObjects.Group passes when creating pool members.
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
@@ -33,6 +36,15 @@ export class Hazard extends Phaser.GameObjects.Sprite {
       .setActive(true)
       .setVisible(true)
       .setPosition(x, y);
+    this.glow ??= this.scene.add
+      .image(0, 0, TextureKeys.Glow)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(Depths.Glow);
+    this.glow
+      .setTint(def.glow.color)
+      .setScale(def.glow.size * textureScale(this.scene, TextureKeys.Glow))
+      .setAlpha(0.7)
+      .setVisible(true);
     return this;
   }
 
@@ -46,11 +58,12 @@ export class Hazard extends Phaser.GameObjects.Sprite {
     const phase = this.age * TAU * d.bobFreq;
     this.x += d.driftSpeed * this.dir * dt;
     this.y = this.baseY + Math.sin(phase) * d.bobAmp;
+    const blinkOn = Math.floor(this.age * 2) % 2 === 0;
 
     if (d.explodes) {
       // Mines sway on their chain and blink their light.
       this.setRotation(Math.sin(phase) * 0.12);
-      if (Math.floor(this.age * 2) % 2 === 0) this.setTint(0xffc0b0);
+      if (blinkOn) this.setTint(0xffc0b0);
       else this.clearTint();
     } else {
       // Jellyfish pulse: squash on the upstroke.
@@ -58,9 +71,13 @@ export class Hazard extends Phaser.GameObjects.Sprite {
       const s = this.displayScale;
       this.setScale(s * (1 + pulse * 0.06), s * (1 - pulse * 0.08));
     }
+    this.glow
+      ?.setPosition(this.x, this.y - (d.explodes ? 8 : 6))
+      .setAlpha(d.glow.blink ? (blinkOn ? 0.9 : 0.25) : 0.55 + 0.15 * Math.sin(phase * 2));
   }
 
   despawn(): void {
+    this.glow?.setVisible(false);
     this.setActive(false).setVisible(false);
   }
 }

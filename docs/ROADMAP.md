@@ -81,15 +81,19 @@ Goal: a shareable build that shows the whole game concept in ~5-10 minutes.
 - [x] Deployed to a public URL for testers: https://horlesq.github.io/hungry-seal/ — GitHub Actions (`.github/workflows/deploy.yml`) typechecks, lints, unit-tests and builds every push/PR and deploys `main` to Pages
 **Exit:** a stranger can open the link, understand it, play several runs, buy upgrades, and want another run.
 
-## Phase 5 — Content expansion
+## Phase 5 — Content expansion — [~] in progress
 Goal: enough variety for a full game.
-- [ ] Deep + Abyss zones; zone transitions and lighting (darkness, glow creatures)
-- [ ] Full creature roster (see GAME_DESIGN), orca, anglerfish, penguin, turtle, pufferfish
-- [ ] Growth stages 1-5 with distinct seal visuals/scales and bite tiers
-- [ ] All 7 upgrades with cost curves; upgrade level cap and balance
-- [ ] Treasure chests, magnet pickups, power-ups
-- [ ] Predator AI variety and per-zone difficulty scaling over time
+- [x] Deep + Abyss zones: darkness that deepens with depth (light circle around the seal), glowing creatures/hazards/pickups visible through it; zone banners updated
+- [x] Creature roster: + pufferfish (puffs up, stings if eaten puffed), crab (walks the abyss seabed), lanternfish (glowing deep food); predators + orca (tier 6: always a threat, only edible in a frenzy, from 3 min) and anglerfish (deep/abyss ambusher with a glowing lure). Penguin/turtle done in Phase 4.
+- [~] Growth stages 1-5: scale, speed, bite tier, and camera zoom-out per stage done; distinct seal visuals per stage → art pass
+- [x] All 7 upgrades (+ Big Jaws growth, Coin Whiskers magnet, Feeding Frenzy charge); two-row shop
+- [x] Treasure chests on the seabed (coin burst + 150) and floating magnet orbs (12 s long-range coin magnet); frenzy remains the power-up
+- [x] Predator variety via per-predator spawn rules (schedule or home zones) and AI params (shark chaser, orca late hunter, anglerfish ambusher)
 **Exit:** a run has real progression and variety from start to abyss.
+
+Notes carried forward:
+- Reef floor (crabs in the shallows, reef decoration) still missing: the only seabed is at the abyss.
+- `spawnAt` things far from the camera are recycled by the despawn check on the next frame (by design); scripted events must spawn near the view.
 
 ## Phase 6 — Meta progression and retention
 - [ ] Skins (cosmetic) with shop tab and equip

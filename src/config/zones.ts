@@ -35,28 +35,28 @@ export const ZONES: readonly Zone[] = [
     name: 'Shallows',
     top: WORLD.surfaceY,
     color: '#2ac6d8',
-    blurb: 'Minnows, shrimp and penguins. Birds overhead!',
+    blurb: 'Minnows, shrimp, penguins and pufferfish. Birds overhead!',
   },
   {
     id: 'ocean',
     name: 'Open Ocean',
     top: 1900,
     color: '#1a86bd',
-    blurb: 'Sardines, squid, turtles... and sharks',
+    blurb: 'Sardines, squid, turtles... and sharks. Orcas later on',
   },
   {
     id: 'deep',
     name: 'The Deep',
     top: 3400,
     color: '#11427f',
-    blurb: 'Sea mines and hungry sharks. Burns energy fast',
+    blurb: 'It gets dark. Lanternfish, sea mines... and a light you should not follow',
   },
   {
     id: 'abyss',
     name: 'Abyss',
     top: 5000,
     color: '#1c1a52',
-    blurb: 'Nothing to eat down here. Yet.',
+    blurb: 'Crabs and sunken treasure on the seabed. Mind the anglerfish',
   },
 ];
 
@@ -92,6 +92,18 @@ export function zoneBand(ids: readonly ZoneId[]): { top: number; bottom: number 
     top: Math.max(top, WORLD.surfaceY),
     bottom: Math.min(bottom, WORLD.floorY),
   };
+}
+
+/** 0 (clear) .. ~0.9 (nearly black) darkness at world-y `y`: starts just above the deep. */
+export function darknessAt(y: number): number {
+  const deepTop = ZONES.find((z) => z.id === 'deep')!.top;
+  const abyssTop = ZONES.find((z) => z.id === 'abyss')!.top;
+  const start = deepTop - 600;
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t));
+  if (y <= start) return 0;
+  if (y <= deepTop) return lerp(0, 0.35, (y - start) / 600);
+  if (y <= abyssTop) return lerp(0.35, 0.75, (y - deepTop) / (abyssTop - deepTop));
+  return lerp(0.75, 0.9, (y - abyssTop) / (WORLD.floorY - abyssTop));
 }
 
 /** Depth below the surface in meters (negative when airborne). */

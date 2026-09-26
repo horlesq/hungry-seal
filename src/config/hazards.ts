@@ -25,6 +25,8 @@ export interface HazardDef {
   bobFreq: number;
   zones: readonly ZoneId[];
   weight: number;
+  /** Glow drawn above the deep-water darkness so hazards stay visible. */
+  glow: { color: number; size: number; blink: boolean };
 }
 
 export const HAZARDS: Record<HazardId, HazardDef> = {
@@ -43,6 +45,7 @@ export const HAZARDS: Record<HazardId, HazardDef> = {
     bobFreq: 0.3,
     zones: ['reef', 'ocean', 'deep'],
     weight: 3,
+    glow: { color: 0xff8ad8, size: 0.4, blink: false },
   },
   mine: {
     id: 'mine',
@@ -59,6 +62,7 @@ export const HAZARDS: Record<HazardId, HazardDef> = {
     bobFreq: 0.22,
     zones: ['ocean', 'deep', 'abyss'],
     weight: 2,
+    glow: { color: 0xff3b30, size: 0.28, blink: true },
   },
 };
 

@@ -13,9 +13,13 @@ import { maxLevel, nextCost } from '../systems/UpgradeSystem';
 import { Button } from '../ui/Button';
 import { DESIGN_HEIGHT } from '../utils/viewport';
 
-const CARD_W = 280;
-const CARD_H = 340;
-const CARD_GAP = 20;
+// Two rows of compact cards (4 + 3) so all upgrades fit in the 1280x720 design area.
+const CARD_W = 270;
+const CARD_H = 240;
+const CARD_GAP = 16;
+const PER_ROW = 4;
+const ROW_Y = [225, 490];
+const PIP_Y = -14;
 
 interface Card {
   def: UpgradeDef;
@@ -47,9 +51,9 @@ export class ShopScene extends Phaser.Scene {
     bg.fillRect(0, 0, v.viewWidth, v.viewHeight);
 
     this.add
-      .text(cx, top + 70, 'UPGRADES', {
+      .text(cx, top + 58, 'UPGRADES', {
         fontFamily: UI_FONT,
-        fontSize: '64px',
+        fontSize: '56px',
         fontStyle: 'bold',
         color: '#ffffff',
         stroke: '#0b3a66',
@@ -73,22 +77,25 @@ export class ShopScene extends Phaser.Scene {
       .setScale(1.3 * textureScale(this, TextureKeys.Coin))
       .setName('coinIcon');
 
-    const totalW = UPGRADES.length * CARD_W + (UPGRADES.length - 1) * CARD_GAP;
     UPGRADES.forEach((def, i) => {
-      const x = cx - totalW / 2 + CARD_W / 2 + i * (CARD_W + CARD_GAP);
-      this.cards.push(this.createCard(def, x, top + 330));
+      const row = Math.floor(i / PER_ROW);
+      const inRow = Math.min(PER_ROW, UPGRADES.length - row * PER_ROW);
+      const rowW = inRow * CARD_W + (inRow - 1) * CARD_GAP;
+      const col = i % PER_ROW;
+      const x = cx - rowW / 2 + CARD_W / 2 + col * (CARD_W + CARD_GAP);
+      this.cards.push(this.createCard(def, x, top + ROW_Y[row]));
     });
 
-    const back = new Button(this, cx - 170, top + 640, {
-      width: 240,
-      height: 70,
+    const back = new Button(this, cx - 160, top + 668, {
+      width: 230,
+      height: 60,
       label: 'BACK',
       color: 0x5d7fa6,
       onClick: () => this.leave(SceneKeys.Menu),
     });
-    const play = new Button(this, cx + 170, top + 640, {
-      width: 240,
-      height: 70,
+    const play = new Button(this, cx + 160, top + 668, {
+      width: 230,
+      height: 60,
       label: 'PLAY',
       color: 0x33c46b,
       onClick: () => this.leave(SceneKeys.Game),
@@ -112,34 +119,34 @@ export class ShopScene extends Phaser.Scene {
       .lineStyle(3, 0x6ff3ff, 0.8)
       .strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 24);
     const name = this.add
-      .text(0, -CARD_H / 2 + 38, def.name, {
+      .text(0, -CARD_H / 2 + 26, def.name, {
         fontFamily: UI_FONT,
-        fontSize: '30px',
+        fontSize: '26px',
         fontStyle: 'bold',
         color: '#ffffff',
       })
       .setOrigin(0.5);
     const desc = this.add
-      .text(0, -CARD_H / 2 + 78, def.description, {
+      .text(0, -CARD_H / 2 + 48, def.description, {
         fontFamily: UI_FONT,
-        fontSize: '18px',
+        fontSize: '16px',
         color: '#bfe3f2',
         align: 'center',
-        wordWrap: { width: CARD_W - 30 },
+        wordWrap: { width: CARD_W - 24 },
       })
       .setOrigin(0.5, 0);
     const pips = this.add.graphics();
     const now = this.add
-      .text(0, 20, '', { fontFamily: UI_FONT, fontSize: '20px', color: '#fff27a' })
+      .text(0, 20, '', { fontFamily: UI_FONT, fontSize: '18px', color: '#fff27a' })
       .setOrigin(0.5);
     const next = this.add
-      .text(0, 52, '', { fontFamily: UI_FONT, fontSize: '18px', color: '#9fd9ee' })
+      .text(0, 44, '', { fontFamily: UI_FONT, fontSize: '15px', color: '#9fd9ee' })
       .setOrigin(0.5);
-    const buy = new Button(this, 0, CARD_H / 2 - 50, {
+    const buy = new Button(this, 0, CARD_H / 2 - 34, {
       width: CARD_W - 50,
-      height: 62,
+      height: 48,
       label: '',
-      fontSize: 26,
+      fontSize: 22,
       color: 0xf2b134,
       onClick: () => this.buy(def),
     });
@@ -171,11 +178,11 @@ export class ShopScene extends Phaser.Scene {
 
       const g = card.pips;
       g.clear();
-      const spacing = 36;
+      const spacing = 30;
       for (let i = 0; i < max; i++) {
         const px = (i - (max - 1) / 2) * spacing;
-        g.fillStyle(i < level ? 0x6ff3ff : 0x1c4a6e, 1).fillCircle(px, -20, 12);
-        g.lineStyle(3, 0xffffff, 0.8).strokeCircle(px, -20, 12);
+        g.fillStyle(i < level ? 0x6ff3ff : 0x1c4a6e, 1).fillCircle(px, PIP_Y, 10);
+        g.lineStyle(3, 0xffffff, 0.8).strokeCircle(px, PIP_Y, 10);
       }
       card.now.setText(level > 0 ? card.def.effect(level) : 'Not upgraded');
       card.next.setText(cost === null ? 'Fully upgraded!' : `Next: ${card.def.effect(level + 1)}`);

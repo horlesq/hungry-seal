@@ -18,6 +18,8 @@ const P: CreatureMotionParams = {
   flee: true,
   drift: false,
   jet: false,
+  walk: false,
+  puff: false,
 };
 
 const DT = 1 / 60;
@@ -131,6 +133,35 @@ describe('creature AI', () => {
       maxY = Math.max(maxY, m.y);
     }
     expect(maxY).toBeLessThanOrEqual(628);
+  });
+
+  it('walkers stay on the bottom of their band and move sideways', () => {
+    const walker = { ...P, walk: true, flee: true };
+    const m = createCreatureMotion(0, 5000, 0.8);
+    const c = ctx({ bandTop: 6360, bandBottom: 6382, hardTop: 700, hardBottom: 6384 });
+    for (let t = 0; t < 3; t += DT) stepCreatureMotion(m, walker, c, DT);
+    expect(m.y).toBe(6382);
+    expect(m.vy).toBe(0);
+    // Flees sideways from a seal on its left.
+    c.threatX = m.x - 80;
+    c.threatY = m.y;
+    c.threatActive = true;
+    const x0 = m.x;
+    for (let t = 0; t < 1; t += DT) stepCreatureMotion(m, walker, c, DT);
+    expect(m.x).toBeGreaterThan(x0);
+    expect(m.y).toBe(6382);
+  });
+
+  it('puffers inflate and slow down near the seal, then deflate', () => {
+    const puffer = { ...P, puff: true, flee: false };
+    const m = createCreatureMotion(0, 1500, 0);
+    const c = ctx({ threatX: 100, threatY: 1500 });
+    for (let t = 0; t < 1; t += DT) stepCreatureMotion(m, puffer, c, DT);
+    expect(m.puffed).toBe(true);
+    expect(m.speed).toBeLessThan(P.speed * 0.5);
+    c.threatX = 5000;
+    for (let t = 0; t < 3; t += DT) stepCreatureMotion(m, puffer, c, DT);
+    expect(m.puffed).toBe(false);
   });
 
   it('never leaves the water column', () => {

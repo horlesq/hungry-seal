@@ -14,10 +14,16 @@ export interface RunModifiers {
   boostDrainMult: number;
   /** Multiplier on boost stamina regen (> 1 = refills faster). */
   boostRegenMult: number;
+  /** Multiplier on growth points per meal. */
+  growthMult: number;
+  /** Multiplier on the coin magnet radius. */
+  magnetMult: number;
+  /** Multiplier on frenzy meter gain per meal. */
+  frenzyChargeMult: number;
 }
 
 export function emptyUpgrades(): UpgradeLevels {
-  return { speed: 0, belly: 0, metabolism: 0, boost: 0 };
+  return { speed: 0, belly: 0, metabolism: 0, boost: 0, jaws: 0, magnet: 0, frenzy: 0 };
 }
 
 export function runModifiers(levels: UpgradeLevels): RunModifiers {
@@ -28,6 +34,9 @@ export function runModifiers(levels: UpgradeLevels): RunModifiers {
     drainMult: Math.max(0.2, 1 - levels.metabolism * e.metabolismPerLevel),
     boostDrainMult: 1 / (1 + levels.boost * e.boostPerLevel),
     boostRegenMult: 1 + levels.boost * e.boostPerLevel,
+    growthMult: 1 + levels.jaws * e.jawsPerLevel,
+    magnetMult: 1 + levels.magnet * e.magnetPerLevel,
+    frenzyChargeMult: 1 + levels.frenzy * e.frenzyPerLevel,
   };
 }
 

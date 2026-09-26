@@ -17,6 +17,10 @@ export interface CreatureMotionParams {
   flee: boolean;
   drift: boolean;
   jet: boolean;
+  /** Walks along the bottom of its band (the seabed) instead of swimming. */
+  walk: boolean;
+  /** Puffs up (and slows down) when the seal gets close, instead of fleeing. */
+  puff: boolean;
 }
 
 export interface CreatureMotion {
@@ -35,6 +39,9 @@ export interface CreatureMotion {
   fleeJitter: number;
   /** Seconds until the next jet burst (jetters only). */
   jetTimer: number;
+  /** Puffers: currently inflated, and how long it stays so after the seal leaves. */
+  puffed: boolean;
+  puffTimer: number;
   age: number;
 }
 
@@ -61,6 +68,9 @@ const FLEE_MEMORY = 0.9;
 const SCHOOL_PULL = 2.2;
 const FLEE_TURN_BOOST = 1.6;
 const DRIFT_BOB = 18;
+/** Puffers inflate when the seal is this close, and stay inflated this long after. */
+export const PUFF_RADIUS = 170;
+const PUFF_HOLD = 1.6;
 
 export function motionParamsFor(def: CreatureDef): CreatureMotionParams {
   const has = (b: BehaviorId) => def.behaviors.includes(b);
@@ -73,6 +83,8 @@ export function motionParamsFor(def: CreatureDef): CreatureMotionParams {
     flee: has('flee'),
     drift: has('drift'),
     jet: has('jet'),
+    walk: has('walk'),
+    puff: has('puff'),
   };
 }
 
@@ -89,6 +101,8 @@ export function createCreatureMotion(x: number, y: number, heading: number): Cre
     fleeTimer: 0,
     fleeJitter: 0,
     jetTimer: 0,
+    puffed: false,
+    puffTimer: 0,
     age: 0,
   };
 }
@@ -148,14 +162,29 @@ export function stepCreatureMotion(
     targetSpeed = p.drift ? p.speed * (0.55 + 0.45 * Math.sin(m.age * 2.1)) : p.speed;
   }
 
-  // Stay inside the preferred depth band.
-  const right = Math.cos(target) >= 0;
-  if (m.y < ctx.bandTop + BAND_MARGIN && Math.sin(target) < 0.35) {
-    target = right ? 0.5 : Math.PI - 0.5;
-    if (!fleeing && !ctx.leader) m.targetHeading = target;
-  } else if (m.y > ctx.bandBottom - BAND_MARGIN && Math.sin(target) > -0.35) {
-    target = right ? -0.5 : -(Math.PI - 0.5);
-    if (!fleeing && !ctx.leader) m.targetHeading = target;
+  // Puffers blow up (and nearly stop) when the seal comes close, whether or not it can eat
+  // them; they stay puffed for a moment after it leaves.
+  if (p.puff) {
+    const near = Math.hypot(m.x - ctx.threatX, m.y - ctx.threatY) < PUFF_RADIUS;
+    if (near) m.puffTimer = PUFF_HOLD;
+    else m.puffTimer = Math.max(0, m.puffTimer - dt);
+    m.puffed = m.puffTimer > 0;
+    if (m.puffed) targetSpeed = p.speed * 0.25;
+  }
+
+  if (p.walk) {
+    // Walkers stay on the bottom of their band and only move left/right.
+    target = Math.cos(target) >= 0 ? 0 : Math.PI;
+  } else {
+    // Stay inside the preferred depth band.
+    const right = Math.cos(target) >= 0;
+    if (m.y < ctx.bandTop + BAND_MARGIN && Math.sin(target) < 0.35) {
+      target = right ? 0.5 : Math.PI - 0.5;
+      if (!fleeing && !ctx.leader) m.targetHeading = target;
+    } else if (m.y > ctx.bandBottom - BAND_MARGIN && Math.sin(target) > -0.35) {
+      target = right ? -0.5 : -(Math.PI - 0.5);
+      if (!fleeing && !ctx.leader) m.targetHeading = target;
+    }
   }
 
   const turn = p.turnRate * (fleeing ? FLEE_TURN_BOOST : 1) * dt;
@@ -172,6 +201,12 @@ export function stepCreatureMotion(
   m.vx = Math.cos(m.heading) * m.speed;
   m.vy = Math.sin(m.heading) * m.speed;
   if (p.drift && !fleeing) m.vy += Math.sin(m.age * 3.3) * DRIFT_BOB;
+
+  if (p.walk) {
+    m.vx = Math.cos(m.heading) >= 0 ? m.speed : -m.speed;
+    m.vy = 0;
+    m.y = ctx.bandBottom;
+  }
 
   m.x += m.vx * dt;
   m.y += m.vy * dt;

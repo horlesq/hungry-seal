@@ -32,7 +32,32 @@ const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   [TextureKeys.Penguin]: { width: 60, height: 34, draw: drawPenguin, res: HI },
   [TextureKeys.Turtle]: { width: 86, height: 58, draw: drawTurtle, res: HI },
   [TextureKeys.Seabird]: { width: 72, height: 44, draw: drawSeabird, res: HI },
+  [TextureKeys.Pufferfish]: { width: 40, height: 32, draw: drawPufferfish, res: HI },
+  [TextureKeys.PufferfishPuffed]: {
+    width: 40,
+    height: 40,
+    draw: drawPufferfishPuffed,
+    res: HI,
+  },
+  [TextureKeys.Crab]: { width: 52, height: 36, draw: drawCrab, res: HI },
+  [TextureKeys.Lanternfish]: { width: 38, height: 20, draw: drawLanternfish, res: HI },
+  [TextureKeys.Darkness]: { width: 256, height: 256, draw: drawDarkness },
+  [TextureKeys.Chest]: {
+    width: 64,
+    height: 52,
+    draw: (c, w, h) => drawChest(c, w, h, false),
+    res: HI,
+  },
+  [TextureKeys.ChestOpen]: {
+    width: 64,
+    height: 52,
+    draw: (c, w, h) => drawChest(c, w, h, true),
+    res: HI,
+  },
+  [TextureKeys.MagnetOrb]: { width: 40, height: 40, draw: drawMagnetOrb, res: HI },
   [TextureKeys.Shark]: { width: 220, height: 104, draw: drawShark, res: HI },
+  [TextureKeys.Orca]: { width: 250, height: 120, draw: drawOrca, res: HI },
+  [TextureKeys.Anglerfish]: { width: 130, height: 96, draw: drawAnglerfish, res: HI },
   [TextureKeys.Jellyfish]: { width: 60, height: 80, draw: drawJellyfish, res: HI },
   [TextureKeys.Mine]: { width: 68, height: 68, draw: drawMine, res: HI },
   [TextureKeys.Coin]: { width: 30, height: 30, draw: drawCoin, res: HI },
@@ -601,6 +626,416 @@ function drawSeabird(ctx: Ctx, w: number, h: number): void {
   ctx.fillStyle = '#10161c';
   ctx.beginPath();
   ctx.arc(w * 0.82, cy - 5, 1.6, 0, TAU);
+  ctx.fill();
+}
+
+/** Round yellow pufferfish facing right. */
+function drawPufferfish(ctx: Ctx, w: number, h: number): void {
+  const cx = w * 0.5;
+  const cy = h * 0.5;
+  const outline = '#6a4a10';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2;
+  // Tail.
+  ctx.fillStyle = '#f2b134';
+  ctx.beginPath();
+  ctx.moveTo(8, cy);
+  ctx.lineTo(1, cy - 7);
+  ctx.lineTo(1, cy + 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Body.
+  const grad = ctx.createLinearGradient(0, 2, 0, h - 2);
+  grad.addColorStop(0, '#f7c948');
+  grad.addColorStop(1, '#fff0c2');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(cx + 2, cy, 14, 12, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(140, 90, 20, 0.55)';
+  for (const [x, y] of [
+    [cx - 4, cy - 5],
+    [cx + 2, cy - 7],
+    [cx - 1, cy - 1],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 1.6, 0, TAU);
+    ctx.fill();
+  }
+  // Eye.
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx + 9, cy - 3, 3.6, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(cx + 9.6, cy - 3, 2, 0, TAU);
+  ctx.fill();
+}
+
+/** The same pufferfish blown up into a spiky ball (displayed bigger too). */
+function drawPufferfishPuffed(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = 13;
+  ctx.lineJoin = 'round';
+  // Spikes.
+  ctx.fillStyle = '#c98a1c';
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * TAU;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a - 0.14) * r, cy + Math.sin(a - 0.14) * r);
+    ctx.lineTo(cx + Math.cos(a) * (r + 6), cy + Math.sin(a) * (r + 6));
+    ctx.lineTo(cx + Math.cos(a + 0.14) * r, cy + Math.sin(a + 0.14) * r);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const grad = ctx.createRadialGradient(cx - 4, cy - 4, 2, cx, cy, r);
+  grad.addColorStop(0, '#fff3c8');
+  grad.addColorStop(1, '#f2b134');
+  ctx.fillStyle = grad;
+  ctx.strokeStyle = '#6a4a10';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // Wide startled eyes and a tiny "o" mouth.
+  for (const dx of [-4, 5]) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx + dx, cy - 3, 3.4, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#10161c';
+    ctx.beginPath();
+    ctx.arc(cx + dx + 0.5, cy - 3, 1.6, 0, TAU);
+    ctx.fill();
+  }
+  ctx.strokeStyle = '#6a4a10';
+  ctx.beginPath();
+  ctx.arc(cx + 1, cy + 5, 1.8, 0, TAU);
+  ctx.stroke();
+}
+
+/** Red crab, claws up, seen from the side (drawn upright; the game flips it). */
+function drawCrab(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h * 0.62;
+  const outline = '#5a1410';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Legs.
+  ctx.strokeStyle = '#b8342a';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 3; i++) {
+    for (const s of [-1, 1]) {
+      const x = cx + s * (6 + i * 5);
+      ctx.beginPath();
+      ctx.moveTo(x, cy + 4);
+      ctx.lineTo(x + s * 5, cy + 9);
+      ctx.lineTo(x + s * 6, h - 1);
+      ctx.stroke();
+    }
+  }
+  // Claws.
+  ctx.fillStyle = '#e0473a';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2;
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 10, cy - 4);
+    ctx.lineTo(cx + s * 17, cy - 12);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 19, cy - 15, 6, 5, s * 0.5, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#5a1410';
+    ctx.beginPath();
+    ctx.moveTo(cx + s * 19, cy - 15);
+    ctx.lineTo(cx + s * 25, cy - 20);
+    ctx.lineTo(cx + s * 23, cy - 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#e0473a';
+  }
+  // Shell.
+  const grad = ctx.createLinearGradient(0, cy - 10, 0, cy + 8);
+  grad.addColorStop(0, '#f06a4f');
+  grad.addColorStop(1, '#b8342a');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 14, 9, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // Eyes on stalks (facing right).
+  ctx.strokeStyle = outline;
+  for (const dx of [4, 9]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + dx, cy - 8);
+    ctx.lineTo(cx + dx, cy - 14);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx + dx, cy - 15, 2.6, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#10161c';
+    ctx.beginPath();
+    ctx.arc(cx + dx + 0.6, cy - 15, 1.3, 0, TAU);
+    ctx.fill();
+  }
+}
+
+/** Small dark fish with glowing dots along its side. */
+function drawLanternfish(ctx: Ctx, w: number, h: number): void {
+  drawFish(ctx, w, h, {
+    back: '#1c2c5a',
+    belly: '#3d5a8c',
+    fin: '#2a3f73',
+    outline: '#0a1128',
+  });
+  ctx.fillStyle = '#a8fcff';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.arc(w * 0.32 + i * w * 0.1, h * 0.62, 1.4, 0, TAU);
+    ctx.fill();
+  }
+}
+
+/** Treasure chest, closed or open with glinting gold inside. */
+function drawChest(ctx: Ctx, w: number, h: number, open: boolean): void {
+  const outline = '#3a2208';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2.5;
+  const bx = 6;
+  const by = h * 0.45;
+  const bw = w - 12;
+  const bh = h - by - 3;
+  if (open) {
+    // Lid swung back, coins showing.
+    ctx.fillStyle = '#8a5a26';
+    ctx.beginPath();
+    ctx.moveTo(bx + 4, by);
+    ctx.lineTo(bx - 2, 4);
+    ctx.lineTo(bx + bw + 2, 4);
+    ctx.lineTo(bx + bw - 4, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffd23c';
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.arc(bx + 8 + i * 8, by + 2 - (i % 2) * 3, 5, 0, TAU);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#9c6a30';
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.quadraticCurveTo(w / 2, by - 22, bx + bw, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  // Box with gold bands and lock.
+  ctx.fillStyle = '#7a4a1c';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeRect(bx, by, bw, bh);
+  ctx.fillStyle = '#e8b830';
+  ctx.fillRect(bx + 8, by, 5, bh);
+  ctx.fillRect(bx + bw - 13, by, 5, bh);
+  ctx.fillRect(w / 2 - 5, by + 3, 10, 10);
+  ctx.strokeRect(w / 2 - 5, by + 3, 10, 10);
+}
+
+/** Red horseshoe magnet inside a bubble. */
+function drawMagnetOrb(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h / 2;
+  const bubble = ctx.createRadialGradient(cx - 5, cy - 5, 2, cx, cy, w / 2);
+  bubble.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+  bubble.addColorStop(1, 'rgba(160, 230, 255, 0.35)');
+  ctx.fillStyle = bubble;
+  ctx.beginPath();
+  ctx.arc(cx, cy, w / 2 - 2, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Magnet.
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = '#e8352b';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 1, 8, Math.PI, 0);
+  ctx.moveTo(cx - 8, cy - 1);
+  ctx.lineTo(cx - 8, cy + 8);
+  ctx.moveTo(cx + 8, cy - 1);
+  ctx.lineTo(cx + 8, cy + 8);
+  ctx.stroke();
+  ctx.strokeStyle = '#e8eef4';
+  ctx.beginPath();
+  ctx.moveTo(cx - 8, cy + 6);
+  ctx.lineTo(cx - 8, cy + 10);
+  ctx.moveTo(cx + 8, cy + 6);
+  ctx.lineTo(cx + 8, cy + 10);
+  ctx.stroke();
+}
+
+/** Soft-edged darkness with a clear circle in the middle (the seal's light). */
+function drawDarkness(ctx: Ctx, w: number, h: number): void {
+  const r = w / 2;
+  const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, r);
+  // Displayed at 3600 world units: clear to ~110, fully dark by ~360 around the seal.
+  grad.addColorStop(0, 'rgba(2, 4, 14, 0)');
+  grad.addColorStop(0.06, 'rgba(2, 4, 14, 0)');
+  grad.addColorStop(0.2, 'rgba(2, 4, 14, 1)');
+  grad.addColorStop(1, 'rgba(2, 4, 14, 1)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** Orca facing right: black body, white belly and eye patch, tall dorsal fin. */
+function drawOrca(ctx: Ctx, w: number, h: number): void {
+  const cy = h * 0.55;
+  const outline = '#0a0e12';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 3;
+  // Flukes.
+  ctx.fillStyle = '#15191e';
+  ctx.beginPath();
+  ctx.moveTo(46, cy);
+  ctx.quadraticCurveTo(22, cy - 12, 6, cy - 32);
+  ctx.quadraticCurveTo(20, cy - 4, 18, cy + 2);
+  ctx.quadraticCurveTo(20, cy + 8, 6, cy + 30);
+  ctx.quadraticCurveTo(24, cy + 12, 46, cy + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Dorsal fin.
+  ctx.beginPath();
+  ctx.moveTo(108, cy - 30);
+  ctx.quadraticCurveTo(112, cy - 72, 126, cy - 76);
+  ctx.quadraticCurveTo(124, cy - 46, 140, cy - 30);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Body.
+  const body = new Path2D();
+  body.moveTo(42, cy);
+  body.bezierCurveTo(80, cy - 40, 180, cy - 44, 226, cy - 16);
+  body.quadraticCurveTo(w - 2, cy - 2, w - 6, cy + 8);
+  body.bezierCurveTo(230, cy + 32, 160, cy + 42, 110, cy + 36);
+  body.bezierCurveTo(76, cy + 30, 54, cy + 12, 42, cy);
+  body.closePath();
+  ctx.fillStyle = '#1b2026';
+  ctx.fill(body);
+  ctx.save();
+  ctx.clip(body);
+  // White belly and eye patch.
+  ctx.fillStyle = '#f2f5f8';
+  ctx.beginPath();
+  ctx.ellipse(165, cy + 30, 72, 18, -0.05, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(206, cy - 14, 15, 7, -0.25, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(200, 210, 220, 0.35)';
+  ctx.beginPath();
+  ctx.ellipse(118, cy - 20, 20, 7, 0, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+  ctx.stroke(body);
+  // Pectoral fin.
+  ctx.fillStyle = '#15191e';
+  ctx.beginPath();
+  ctx.ellipse(170, cy + 30, 20, 9, 0.6, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // Eye and grin.
+  ctx.fillStyle = '#0a0e12';
+  ctx.beginPath();
+  ctx.arc(214, cy - 6, 3.2, 0, TAU);
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(w - 8, cy + 10);
+  ctx.quadraticCurveTo(222, cy + 18, 200, cy + 12);
+  ctx.stroke();
+}
+
+/** Anglerfish facing right: lumpy dark body, huge toothy mouth, lure on a stalk. */
+function drawAnglerfish(ctx: Ctx, w: number, h: number): void {
+  const cx = w * 0.46;
+  const cy = h * 0.58;
+  const outline = '#10060f';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // Lure stalk.
+  ctx.strokeStyle = '#5a3a55';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx + 20, cy - 32);
+  ctx.quadraticCurveTo(cx + 30, 2, w - 10, 12);
+  ctx.stroke();
+  ctx.fillStyle = '#e8ffff';
+  ctx.beginPath();
+  ctx.arc(w - 9, 12, 5, 0, TAU);
+  ctx.fill();
+  // Tail.
+  ctx.fillStyle = '#3d2438';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(22, cy);
+  ctx.lineTo(4, cy - 18);
+  ctx.lineTo(8, cy);
+  ctx.lineTo(4, cy + 18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Body.
+  const body = new Path2D();
+  body.ellipse(cx, cy, w * 0.36, h * 0.36, 0, 0, TAU);
+  const grad = ctx.createRadialGradient(cx - 10, cy - 12, 4, cx, cy, w * 0.38);
+  grad.addColorStop(0, '#6a4462');
+  grad.addColorStop(1, '#2a1627');
+  ctx.fillStyle = grad;
+  ctx.fill(body);
+  ctx.stroke(body);
+  // Mouth with teeth.
+  ctx.fillStyle = '#12050f';
+  ctx.beginPath();
+  ctx.moveTo(w - 16, cy - 4);
+  ctx.quadraticCurveTo(cx + 12, cy + 34, cx - 6, cy + 16);
+  ctx.quadraticCurveTo(cx + 20, cy + 10, w - 16, cy - 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#f4f0e6';
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const x = cx + 2 + t * (w - 18 - cx - 2);
+    const y = cy + 14 - t * 16;
+    ctx.beginPath();
+    ctx.moveTo(x - 2.5, y);
+    ctx.lineTo(x, y + 7);
+    ctx.lineTo(x + 2.5, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Small beady eye.
+  ctx.fillStyle = '#d9f7ff';
+  ctx.beginPath();
+  ctx.arc(cx + 18, cy - 14, 5, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#10060f';
+  ctx.beginPath();
+  ctx.arc(cx + 19, cy - 14, 2.5, 0, TAU);
   ctx.fill();
 }
 

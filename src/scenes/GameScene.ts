@@ -14,6 +14,7 @@ import {
   GROWTH,
   HITSTOP,
   HUNGER,
+  PICKUPS,
   SEAL_MOTION,
 } from '../config/balance';
 import { RegistryKeys, SceneKeys } from '../config/keys';
@@ -27,8 +28,10 @@ import type { SealMotionEvent } from '../entities/sealMotion';
 import { audio } from '../services/AudioManager';
 import { EventBus, type DamageSource, type DeathCause, type RunResult } from '../services/EventBus';
 import { saves } from '../services/SaveService';
-import { fitWorldCamera, onResize, sharpenTexts } from '../services/Viewport';
+import { fitWorldCamera, getViewport, onResize, sharpenTexts } from '../services/Viewport';
 import { CoinField } from '../systems/CoinField';
+import { Darkness } from '../systems/Darkness';
+import { Pickups, type PickupEvent } from '../systems/Pickups';
 import { ComboSystem } from '../systems/ComboSystem';
 import { Effects } from '../systems/Effects';
 import { canEat, circlesOverlap } from '../systems/feeding';
@@ -40,7 +43,7 @@ import { InputController } from '../systems/InputController';
 import { Predators, type SealInfo } from '../systems/Predators';
 import { Spawner } from '../systems/Spawner';
 import { Tutorial, type HintId } from '../systems/Tutorial';
-import { runModifiers } from '../systems/UpgradeSystem';
+import { runModifiers, type RunModifiers } from '../systems/UpgradeSystem';
 import { WorldBackground } from '../systems/WorldBackground';
 import { clamp, damp } from '../utils/math';
 
@@ -82,6 +85,8 @@ export class GameScene extends Phaser.Scene {
   private growth!: GrowthSystem;
   private combo!: ComboSystem;
   private frenzy!: FrenzySystem;
+  /** Shop upgrades for this run. */
+  private mods!: RunModifiers;
   private tutorial: Tutorial | null = null;
   private hintShown: string | null = null;
   private sharkNoticed = false;
@@ -105,6 +110,13 @@ export class GameScene extends Phaser.Scene {
   /** Seconds of frozen simulation left (hit-stop). */
   private hitStop = 0;
   private lastHit: { source: DamageSource; at: number } | null = null;
+  /** Camera zoom factor from the growth stage (1 = stage 1). */
+  private stageZoom = 1;
+  private darkness!: Darkness;
+  private pickups!: Pickups;
+  /** Seconds of magnet-orb power left. */
+  private magnetLeft = 0;
+  private magnetShown = -1;
 
   private readonly lookAhead = new Phaser.Math.Vector2();
   private readonly tail = new Phaser.Math.Vector2();
@@ -133,9 +145,13 @@ export class GameScene extends Phaser.Scene {
     this.hitStop = 0;
     this.lastHit = null;
     this.lookAhead.set(0, 0);
+    this.stageZoom = 1;
+    this.magnetLeft = 0;
+    this.magnetShown = -1;
 
     // Shop upgrades shape this run.
     const mods = runModifiers(saves.data.upgrades);
+    this.mods = mods;
     this.hunger = new HungerSystem({
       ...HUNGER,
       max: HUNGER.max + mods.extraHunger,
@@ -155,6 +171,8 @@ export class GameScene extends Phaser.Scene {
     this.spawner = new Spawner(this);
     this.hazards = new HazardField(this);
     this.coins = new CoinField(this);
+    this.pickups = new Pickups(this);
+    this.darkness = new Darkness(this);
     this.seal = new Seal(this, 0, WORLD.surfaceY + 260, mods);
     this.predators = new Predators(this);
     this.controls = new InputController(this);
@@ -248,7 +266,7 @@ export class GameScene extends Phaser.Scene {
         radius: this.seal.radius,
       },
       !this.dead,
-      this.frenzy.active ? FRENZY.magnetRadius : COINS.magnetRadius,
+      this.magnetRadius,
     );
     if (collected > 0) {
       this.runCoins += collected;
@@ -256,6 +274,16 @@ export class GameScene extends Phaser.Scene {
       audio.play(SoundKeys.Coin);
       this.hudDirty = true;
     }
+    const sealBody = {
+      x: this.seal.x,
+      y: this.seal.y,
+      vx: this.threat.vx,
+      vy: this.threat.vy,
+      radius: this.seal.radius,
+    };
+    for (const e of this.pickups.update(dt, cam, sealBody, !this.dead)) this.onPickup(e);
+    this.magnetLeft = Math.max(0, this.magnetLeft - dt);
+    this.darkness.update(dt, this.seal.x, this.seal.y);
 
     if (!this.dead) {
       this.checkFeeding(time);
@@ -279,6 +307,31 @@ export class GameScene extends Phaser.Scene {
     this.threat.inWater = m.inWater;
     // A dead seal scares nobody and can't be hunted; a frenzied one scares everything.
     this.threat.stage = this.dead ? 0 : this.biteStage;
+  }
+
+  /** Coin magnet reach: the upgraded base, or the frenzy's big pull. */
+  private get magnetRadius(): number {
+    let r = COINS.magnetRadius * this.mods.magnetMult;
+    if (this.frenzy.active) r = Math.max(r, FRENZY.magnetRadius);
+    if (this.magnetLeft > 0) r = Math.max(r, PICKUPS.magnetRadius);
+    return r;
+  }
+
+  private onPickup(e: PickupEvent): void {
+    if (e.kind === 'chest') {
+      const [min, max] = PICKUPS.chestCoins;
+      this.coins.drop(e.x, e.y - 12, Phaser.Math.Between(min, max));
+      this.score += PICKUPS.chestScore;
+      this.effects.growBurst(e.x, e.y);
+      this.effects.floatText(e.x, e.y - 50, 'TREASURE!', '#ffd23c', 40);
+      audio.play(SoundKeys.Buy);
+    } else {
+      this.magnetLeft = PICKUPS.magnetDuration;
+      this.effects.coinPickup(e.x, e.y);
+      this.effects.floatText(e.x, e.y - 40, 'COIN MAGNET!', '#ff8a7a', 34);
+      audio.play(SoundKeys.Grow);
+    }
+    this.hudDirty = true;
   }
 
   /** Bite tier for eating checks: the growth stage, or anything during a frenzy. */
@@ -354,8 +407,8 @@ export class GameScene extends Phaser.Scene {
     this.eaten++;
     this.seal.chomp();
     this.effects.floatText(x, y - 24, `+${points}`);
-    if (this.growth.add(reward.growth) > 0) this.onGrow();
-    if (this.frenzy.feed(comboMult)) this.startFrenzy();
+    if (this.growth.add(reward.growth * this.mods.growthMult) > 0) this.onGrow();
+    if (this.frenzy.feed(comboMult * this.mods.frenzyChargeMult)) this.startFrenzy();
     this.hudDirty = true;
     return points;
   }
@@ -376,6 +429,17 @@ export class GameScene extends Phaser.Scene {
 
   private eat(c: Creature): void {
     const def = c.def;
+    // A puffed-up pufferfish still gets eaten, but the spikes hurt.
+    if (c.puffed && !this.frenzy.active && !this.seal.isInvulnerable) {
+      this.hurt(
+        'pufferfish',
+        c.x,
+        c.y,
+        FEEDING.pufferDamage,
+        FEEDING.pufferKnockback,
+        FEEDING.pufferStun,
+      );
+    }
     const big = def.tier >= 2;
     this.effects.chomp(c.x, c.y, big);
     audio.play(big ? SoundKeys.ChompBig : SoundKeys.Chomp);
@@ -557,6 +621,10 @@ export class GameScene extends Phaser.Scene {
     this.lookAhead.y = damp(this.lookAhead.y, ty, CAMERA.lookAheadRate, dt);
     // Follow offset is subtracted from the target position.
     this.cameras.main.setFollowOffset(-this.lookAhead.x, -this.lookAhead.y);
+    // Ease the camera back as the seal grows (on top of the screen-fit zoom).
+    const target = GROWTH.stages[this.seal.stage - 1].zoom;
+    this.stageZoom = damp(this.stageZoom, target, 1.2, dt);
+    this.cameras.main.setZoom(getViewport().zoom * this.stageZoom);
   }
 
   private updateTrail(dt: number): void {
@@ -589,6 +657,11 @@ export class GameScene extends Phaser.Scene {
         remaining: this.combo.remaining,
       });
       this.comboShown = count;
+    }
+    const magnet = Math.ceil(this.magnetLeft);
+    if (magnet !== this.magnetShown) {
+      this.magnetShown = magnet;
+      EventBus.emit('run:magnet', magnet);
     }
     const f = this.frenzy;
     if (

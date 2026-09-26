@@ -1,6 +1,8 @@
 // Typed, game-wide event bus used for scene-to-scene communication (e.g. Game -> HUD).
 // Subscribers must unsubscribe on scene shutdown; `on` returns the unsubscribe function.
 import Phaser from 'phaser';
+import type { HazardId } from '../config/hazards';
+import type { PredatorId } from '../config/predators';
 
 export type InputSource = 'keyboard' | 'mouse' | 'touch';
 
@@ -22,7 +24,7 @@ export interface GrowthState {
   progress: number;
 }
 
-export type DamageSource = 'jellyfish' | 'mine' | 'shark';
+export type DamageSource = HazardId | PredatorId | 'pufferfish';
 export type DeathCause = 'starved' | DamageSource;
 
 export interface ComboState {
@@ -92,6 +94,8 @@ export interface GameEvents {
   'run:coins': [coins: number];
   'run:combo': [state: ComboState];
   'run:frenzy': [state: FrenzyState];
+  /** Whole seconds of coin-magnet power left (0 = none). */
+  'run:magnet': [seconds: number];
   'run:over': [result: RunResult];
   'seal:hurt': [info: { source: DamageSource; damage: number }];
   /** First-run hint text to show at the bottom of the screen (null = hide). */
