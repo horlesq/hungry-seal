@@ -24,6 +24,7 @@ export const WATER_TOP = WORLD.surfaceY + 16;
 export const WATER_BOTTOM = WORLD.floorY - 16;
 /** Birds only spawn while the view is within this distance of the water line. */
 const SKY_SPAWN_RANGE = 500;
+const STARTERS = SWIMMERS.filter((d) => d.tier === 1);
 
 export interface Threat {
   x: number;
@@ -77,7 +78,8 @@ export class Spawner {
         WATER_BOTTOM - 30,
       );
       if (Math.hypot(x - seal.x, y - seal.y) < SPAWN.initialMinDistance) continue;
-      const def = pickForZone(SWIMMERS, y, this.random);
+      // Friendly opening: only prey a brand-new seal can eat. Bigger creatures swim in later.
+      const def = pickForZone(STARTERS, y, this.random);
       if (!def) continue;
       this.spawnGroup(def, x, y, this.random() < 0.5 ? 0 : Math.PI);
       placed++;
