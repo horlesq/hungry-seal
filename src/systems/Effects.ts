@@ -3,8 +3,9 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { EFFECTS } from '../config/balance';
-import { GAME_WIDTH, GAME_HEIGHT, UI_FONT } from '../config/layout';
+import { UI_FONT } from '../config/layout';
 import { WORLD } from '../config/zones';
+import { textureScale } from '../services/Viewport';
 import { clamp } from '../utils/math';
 
 const SPLASH_RINGS = 4;
@@ -18,12 +19,19 @@ export class Effects {
   private readonly zaps: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly rings: Phaser.GameObjects.Image[] = [];
   private readonly texts: Phaser.GameObjects.Text[] = [];
+  private readonly ringScale: number;
   private nextRing = 0;
   private nextText = 0;
   private trailTimer = 0;
   private ambientTimer = 0;
 
   constructor(private readonly scene: Phaser.Scene) {
+    // Particle scales are in design units; divide out each texture's pixel density.
+    const tsBubble = textureScale(scene, TextureKeys.Bubble);
+    const tsDrop = textureScale(scene, TextureKeys.Droplet);
+    const tsSpark = textureScale(scene, TextureKeys.Spark);
+    this.ringScale = textureScale(scene, TextureKeys.Ring);
+
     // Bubbles die when they reach the air.
     const inAir = { contains: (_x: number, y: number) => y < WORLD.surfaceY + 4 };
 
@@ -32,7 +40,7 @@ export class Effects {
       lifespan: { min: 1400, max: 2600 },
       speedX: { min: -18, max: 18 },
       speedY: { min: -130, max: -70 },
-      scale: { start: 0.32, end: 0.6 },
+      scale: { start: 0.32 * tsBubble, end: 0.6 * tsBubble },
       alpha: { start: 0.85, end: 0 },
       maxParticles: 220,
       deathZone: { type: 'onEnter', source: inAir },
@@ -46,7 +54,7 @@ export class Effects {
       angle: { min: -150, max: -30 },
       speed: { min: 120, max: 420 },
       gravityY: 1100,
-      scale: { start: 1.1, end: 0.4 },
+      scale: { start: 1.1 * tsDrop, end: 0.4 * tsDrop },
       alpha: { start: 1, end: 0.6 },
       maxParticles: 160,
       deathZone: { type: 'onEnter', source: inWater },
@@ -57,7 +65,7 @@ export class Effects {
       emitting: false,
       lifespan: { min: 250, max: 480 },
       speed: { min: 90, max: 260 },
-      scale: { start: 0.9, end: 0 },
+      scale: { start: 0.9 * tsSpark, end: 0 },
       alpha: { start: 1, end: 0 },
       rotate: { min: 0, max: 360 },
       tint: [0xfff27a, 0xffffff, 0xffc36b],
@@ -69,7 +77,7 @@ export class Effects {
       emitting: false,
       lifespan: { min: 450, max: 800 },
       speed: { min: 160, max: 520 },
-      scale: { start: 1.6, end: 0 },
+      scale: { start: 1.6 * tsSpark, end: 0 },
       alpha: { start: 1, end: 0 },
       rotate: { min: 0, max: 360 },
       tint: [0xff9a3c, 0xffd23c, 0xff5a2a, 0xffffff],
@@ -81,7 +89,7 @@ export class Effects {
       emitting: false,
       lifespan: { min: 200, max: 420 },
       speed: { min: 100, max: 320 },
-      scale: { start: 0.9, end: 0 },
+      scale: { start: 0.9 * tsSpark, end: 0 },
       alpha: { start: 1, end: 0 },
       rotate: { min: 0, max: 360 },
       tint: [0x9ff6ff, 0xffffff, 0xd48cff],
@@ -190,11 +198,11 @@ export class Effects {
       .setPosition(x, WORLD.surfaceY)
       .setVisible(true)
       .setAlpha(0.9)
-      .setScale(0.4 * intensity + 0.3, 0.5);
+      .setScale((0.4 * intensity + 0.3) * this.ringScale, 0.5 * this.ringScale);
     this.scene.tweens.add({
       targets: ring,
-      scaleX: 1.4 * intensity + 0.6,
-      scaleY: 0.9,
+      scaleX: (1.4 * intensity + 0.6) * this.ringScale,
+      scaleY: 0.9 * this.ringScale,
       alpha: 0,
       duration: 650,
       ease: 'Quad.Out',
@@ -217,8 +225,9 @@ export class Effects {
     if (this.ambientTimer > 0) return;
     this.ambientTimer = 1 / EFFECTS.ambientBubblesPerSec;
 
-    const x = camera.scrollX + Phaser.Math.Between(-100, GAME_WIDTH + 100);
-    const y = camera.scrollY + Phaser.Math.Between(GAME_HEIGHT * 0.4, GAME_HEIGHT + 60);
+    const v = camera.worldView;
+    const x = v.x + Phaser.Math.FloatBetween(-100, v.width + 100);
+    const y = v.y + Phaser.Math.FloatBetween(v.height * 0.4, v.height + 60);
     if (y > WORLD.surfaceY + 40 && y < WORLD.floorY) {
       this.bubbles.emitParticleAt(x, y, Phaser.Math.Between(1, 3));
     }

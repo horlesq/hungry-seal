@@ -23,6 +23,7 @@ import { Seal } from '../entities/Seal';
 import type { SealMotionEvent } from '../entities/sealMotion';
 import { EventBus, type DamageSource, type DeathCause, type RunResult } from '../services/EventBus';
 import { saves } from '../services/SaveService';
+import { fitWorldCamera, onResize, sharpenTexts } from '../services/Viewport';
 import { CoinField } from '../systems/CoinField';
 import { ComboSystem } from '../systems/ComboSystem';
 import { Effects } from '../systems/Effects';
@@ -114,6 +115,12 @@ export class GameScene extends Phaser.Scene {
     this.debugGfx = this.add.graphics().setDepth(50);
 
     const cam = this.cameras.main;
+    // Zoomed so the 1280x720 design area fits; wide/tall screens see more world.
+    fitWorldCamera(cam);
+    onResize(this, () => {
+      fitWorldCamera(cam);
+      sharpenTexts(this);
+    });
     // Endless horizontally, bounded between the sky and the seabed.
     cam.setBounds(-1e7, WORLD.ceilingY, 2e7, WORLD.height - WORLD.ceilingY);
     cam.centerOn(this.seal.x, this.seal.y);
@@ -128,6 +135,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.dead) this.scene.start(SceneKeys.Menu);
     });
 
+    sharpenTexts(this);
     this.scene.launch(SceneKeys.Hud);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scene.stop(SceneKeys.Hud);

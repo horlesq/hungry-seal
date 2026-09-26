@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { RegistryKeys, SceneKeys } from '../config/keys';
-import { GAME_HEIGHT, GAME_WIDTH, TOUCH_UI, UI_FONT } from '../config/layout';
+import { boostButtonCenter, TOUCH_UI, UI_FONT } from '../config/layout';
 import {
   EventBus,
   subscribeForScene,
@@ -15,6 +15,7 @@ import {
   type HungerState,
   type InputSource,
 } from '../services/EventBus';
+import { fitUiCamera, onResize, sharpenTexts, textureScale } from '../services/Viewport';
 
 const BAR = { x: 84, y: 20, w: 330, h: 26 };
 const GROW = { x: 84, y: 52, w: 330, h: 10 };
@@ -26,8 +27,10 @@ export class HudScene extends Phaser.Scene {
   private growthBar!: Phaser.GameObjects.Graphics;
   private stageText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
+  private rightRoot!: Phaser.GameObjects.Container;
   private coinText!: Phaser.GameObjects.Text;
   private coinIcon!: Phaser.GameObjects.Image;
+  private coins = 0;
   private comboRoot!: Phaser.GameObjects.Container;
   private comboText!: Phaser.GameObjects.Text;
   private comboCount!: Phaser.GameObjects.Text;
@@ -55,14 +58,14 @@ export class HudScene extends Phaser.Scene {
     this.lowHunger = false;
     this.hurtFlash = 0;
     this.lastMultiplier = 1;
+    this.coins = 0;
 
     // Behind the rest of the HUD so bars stay readable.
-    this.vignette = this.add
-      .image(0, 0, TextureKeys.Vignette)
-      .setOrigin(0)
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setAlpha(0);
+    this.vignette = this.add.image(0, 0, TextureKeys.Vignette).setOrigin(0).setAlpha(0);
     this.root = this.add.container(0, 0);
+    // Right-edge anchored group (score, coins): moved to the view's right edge in layout().
+    this.rightRoot = this.add.container(0, 0);
+    this.root.add(this.rightRoot);
     this.createStatusPanel();
     this.createScore();
     this.createCombo();
@@ -91,6 +94,21 @@ export class HudScene extends Phaser.Scene {
       EventBus.on('debug:toggle', (on) => this.debugText.setVisible(on)),
       EventBus.on('debug:info', this.onDebugInfo, this),
     ]);
+
+    this.layout();
+    onResize(this, () => this.layout());
+  }
+
+  /** Anchors everything to the current view edges (the view grows on wide/tall screens). */
+  private layout(): void {
+    const v = fitUiCamera(this);
+    this.vignette.setDisplaySize(v.viewWidth, v.viewHeight);
+    this.rightRoot.x = v.viewWidth;
+    this.comboRoot.x = v.viewWidth / 2;
+    const b = boostButtonCenter(v.viewWidth, v.viewHeight);
+    this.boostButton.setPosition(b.x, b.y);
+    sharpenTexts(this);
+    this.onCoins(this.coins);
   }
 
   override update(time: number, delta: number): void {
@@ -108,7 +126,9 @@ export class HudScene extends Phaser.Scene {
   }
 
   private createStatusPanel(): void {
-    const icon = this.add.image(44, 40, TextureKeys.Seal).setScale(0.36);
+    const icon = this.add
+      .image(44, 40, TextureKeys.Seal)
+      .setScale(0.36 * textureScale(this, TextureKeys.Seal));
     const label = this.add.text(BAR.x + 10, BAR.y + BAR.h / 2, 'HUNGER', {
       fontFamily: UI_FONT,
       fontSize: '15px',
@@ -134,7 +154,7 @@ export class HudScene extends Phaser.Scene {
 
   private createScore(): void {
     const label = this.add
-      .text(GAME_WIDTH - 24, 14, 'SCORE', {
+      .text(-24, 14, 'SCORE', {
         fontFamily: UI_FONT,
         fontSize: '16px',
         fontStyle: 'bold',
@@ -144,7 +164,7 @@ export class HudScene extends Phaser.Scene {
       })
       .setOrigin(1, 0);
     this.scoreText = this.add
-      .text(GAME_WIDTH - 24, 32, '0', {
+      .text(-24, 32, '0', {
         fontFamily: UI_FONT,
         fontSize: '40px',
         fontStyle: 'bold',
@@ -154,7 +174,7 @@ export class HudScene extends Phaser.Scene {
       })
       .setOrigin(1, 0);
     this.coinText = this.add
-      .text(GAME_WIDTH - 24, 84, '0', {
+      .text(-24, 84, '0', {
         fontFamily: UI_FONT,
         fontSize: '26px',
         fontStyle: 'bold',
@@ -163,12 +183,15 @@ export class HudScene extends Phaser.Scene {
         strokeThickness: 6,
       })
       .setOrigin(1, 0);
-    this.coinIcon = this.add.image(0, 0, TextureKeys.Coin).setScale(0.9);
+    this.coinIcon = this.add
+      .image(0, 0, TextureKeys.Coin)
+      .setScale(0.9 * textureScale(this, TextureKeys.Coin));
     this.onCoins(0);
-    this.root.add([label, this.scoreText, this.coinIcon, this.coinText]);
+    this.rightRoot.add([label, this.scoreText, this.coinIcon, this.coinText]);
   }
 
   private onCoins(coins: number): void {
+    this.coins = coins;
     this.coinText.setText(String(coins));
     // Keep the icon just left of the right-aligned number as it grows.
     this.coinIcon.setPosition(this.coinText.x - this.coinText.width - 18, 101);
@@ -198,7 +221,7 @@ export class HudScene extends Phaser.Scene {
       .setOrigin(0.5, 0.5);
     this.comboBar = this.add.graphics();
     this.comboRoot = this.add
-      .container(GAME_WIDTH / 2, 40, [this.comboBar, this.comboText, this.comboCount])
+      .container(0, 40, [this.comboBar, this.comboText, this.comboCount])
       .setVisible(false);
   }
 
@@ -281,6 +304,7 @@ export class HudScene extends Phaser.Scene {
   private createBoostButton(): void {
     const b = TOUCH_UI.boostButton;
     const bg = this.add.graphics();
+    // Positioned in layout().
     bg.fillStyle(0x03203a, 0.45).fillCircle(0, 0, b.radius);
     bg.lineStyle(4, 0xffffff, 0.8).strokeCircle(0, 0, b.radius);
     const label = this.add
@@ -292,7 +316,7 @@ export class HudScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.boostRing = this.add.graphics();
-    this.boostButton = this.add.container(b.x, b.y, [bg, this.boostRing, label]);
+    this.boostButton = this.add.container(0, 0, [bg, this.boostRing, label]);
     this.boostButton.setVisible(this.sys.game.device.input.touch);
     this.drawBoostRing();
   }

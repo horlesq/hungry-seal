@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { COINS } from '../config/balance';
+import { textureScale } from '../services/Viewport';
 
 export class Coin extends Phaser.GameObjects.Image {
   /** True for coins floating in the world (clusters), false for coins dropped by prey. */
@@ -73,7 +74,8 @@ export class Coin extends Phaser.GameObjects.Image {
     }
 
     // Spin (fake 3D) and blink before expiring.
-    this.setScale(Math.max(0.15, Math.abs(Math.cos(this.age * 3))), 1);
+    const ts = textureScale(this.scene, TextureKeys.Coin);
+    this.setScale(Math.max(0.15, Math.abs(Math.cos(this.age * 3))) * ts, ts);
     this.setAlpha(this.life < 2.5 && Math.floor(this.life * 8) % 2 === 0 ? 0.3 : 1);
     return true;
   }

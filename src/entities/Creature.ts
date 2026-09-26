@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import type { CreatureDef } from '../config/creatures';
 import { zoneBand } from '../config/zones';
+import { textureScale } from '../services/Viewport';
 import {
   createCreatureMotion,
   motionParamsFor,
@@ -36,6 +37,8 @@ export class Creature extends Phaser.GameObjects.Sprite {
   /** Seconds until this creature can bump the seal again. */
   bumpCooldown = 0;
   private facing = 1;
+  /** def.scale adjusted for the texture's pixel density. */
+  private displayScale = 1;
 
   // Signature matches what Phaser.GameObjects.Group passes when creating pool members.
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
@@ -53,6 +56,7 @@ export class Creature extends Phaser.GameObjects.Sprite {
     this.slotY = 0;
     this.bumpCooldown = 0;
     this.facing = Math.cos(heading) >= 0 ? 1 : -1;
+    this.displayScale = def.scale * textureScale(this.scene, def.texture);
     this.setTexture(def.texture)
       .setActive(true)
       .setVisible(true)
@@ -90,6 +94,6 @@ export class Creature extends Phaser.GameObjects.Sprite {
     const target = cos > 0.1 ? 1 : cos < -0.1 ? -1 : this.facing >= 0 ? 1 : -1;
     this.facing += (target - this.facing) * Math.min(1, dt * 14);
     this.setRotation(m.heading);
-    this.setScale(this.def.scale, this.def.scale * this.facing);
+    this.setScale(this.displayScale, this.displayScale * this.facing);
   }
 }

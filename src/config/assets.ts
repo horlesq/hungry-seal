@@ -31,12 +31,17 @@ export const TextureKeys = {
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
 
+/**
+ * `resolution` = pixels per design unit of the file (default 1). Author art at ~2x its
+ * on-screen size and set `resolution: 2` so it stays sharp when the camera zooms in.
+ */
 export type AssetEntry =
-  | { type: 'image'; key: TextureKey; url?: string }
+  | { type: 'image'; key: TextureKey; url?: string; resolution?: number }
   | {
       type: 'spritesheet';
       key: TextureKey;
       url?: string;
+      resolution?: number;
       frameWidth: number;
       frameHeight: number;
     };

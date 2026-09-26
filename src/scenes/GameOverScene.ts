@@ -3,8 +3,9 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { SceneKeys } from '../config/keys';
-import { GAME_HEIGHT, GAME_WIDTH, UI_FONT } from '../config/layout';
+import { UI_FONT } from '../config/layout';
 import type { DeathCause, RunResult } from '../services/EventBus';
+import { fitUiCamera, onResize, sharpenTexts, textureScale } from '../services/Viewport';
 
 /** Ignore input briefly so a finger still held from the run doesn't skip the screen. */
 const INPUT_DELAY = 700;
@@ -25,16 +26,17 @@ export class GameOverScene extends Phaser.Scene {
 
   create(result: RunResult): void {
     this.leaving = false;
-    const cx = GAME_WIDTH / 2;
+    const v = fitUiCamera(this);
+    const cx = v.viewWidth / 2;
     const t = TITLES[result.cause];
 
-    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x020c18, 1).setOrigin(0);
+    const dim = this.add.rectangle(0, 0, v.viewWidth, v.viewHeight, 0x020c18, 1).setOrigin(0);
     dim.setAlpha(0);
     this.tweens.add({ targets: dim, alpha: 0.6, duration: 400 });
 
     const W = 620;
     const H = 560;
-    const panel = this.add.container(cx, GAME_HEIGHT / 2);
+    const panel = this.add.container(cx, v.viewHeight / 2);
     const bg = this.add.graphics();
     bg.fillStyle(0x06284a, 0.92).fillRoundedRect(-W / 2, -H / 2, W, H, 28);
     bg.lineStyle(4, 0x6ff3ff, 0.9).strokeRoundedRect(-W / 2, -H / 2, W, H, 28);
@@ -106,7 +108,7 @@ export class GameOverScene extends Phaser.Scene {
     panel.add(
       this.add
         .image(-238, scoreY + 92, TextureKeys.Coin)
-        .setScale(0.8)
+        .setScale(0.8 * textureScale(this, TextureKeys.Coin))
         .setOrigin(1, 0.5),
     );
 
@@ -131,6 +133,12 @@ export class GameOverScene extends Phaser.Scene {
 
     panel.setScale(0.8).setAlpha(0);
     this.tweens.add({ targets: panel, scale: 1, alpha: 1, duration: 350, ease: 'Back.Out' });
+
+    sharpenTexts(this);
+    // Rebuild for the new size (skipping the entrance animation is not worth the complexity).
+    onResize(this, () => {
+      if (!this.leaving) this.scene.restart(result);
+    });
 
     this.time.delayedCall(INPUT_DELAY, () => {
       this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.retry());

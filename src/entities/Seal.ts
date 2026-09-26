@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
+import { textureScale } from '../services/Viewport';
 import { damp } from '../utils/math';
 import {
   applyKnockback,
@@ -24,6 +25,8 @@ export class Seal extends Phaser.GameObjects.Sprite {
   dead = false;
   private params: SealMotionParams = SEAL_MOTION;
   private baseScale: number = STAGE1_SCALE;
+  /** 1 / pixel density of the seal texture (display size stays in design units). */
+  private readonly texScale: number;
   /** -1 = facing left, 1 = facing right; animated through 0 for the roll effect. */
   private facing = 1;
   private wigglePhase = 0;
@@ -38,6 +41,7 @@ export class Seal extends Phaser.GameObjects.Sprite {
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, TextureKeys.Seal);
+    this.texScale = textureScale(scene, TextureKeys.Seal);
     this.motion = createSealMotionState(x, y);
     scene.add.existing(this);
     this.setDepth(10);
@@ -168,7 +172,7 @@ export class Seal extends Phaser.GameObjects.Sprite {
     // left. Passing the scale through 0 reads as a quick barrel roll.
     this.setRotation(m.heading + wiggle * this.facing);
     const stretch = 1 + SEAL_VISUAL.stretch * speedFrac;
-    const base = this.baseScale * (1 + this.pop);
+    const base = this.baseScale * this.texScale * (1 + this.pop);
     this.setScale(base * stretch, base * (2 - stretch) * this.facing);
 
     // Hit feedback: white flash, electric tint while stunned, blinking while invulnerable.

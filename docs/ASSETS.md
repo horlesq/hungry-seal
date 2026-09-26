@@ -16,7 +16,7 @@ Close to Hungry Shark Evolution: bright saturated colors, chunky rounded shapes,
 ## Technical rules
 - Everything loaded via the manifest in `src/config/assets.ts` (key -> path -> type). Code uses keys only.
 - Sprites: PNG, power-of-two atlases preferred, packed with a texture atlas tool (free-tex-packer or similar). Target atlas <= 2048x2048 for mobile.
-- Base creature art authored at ~2x display size for crisp scaling; seal at multiple growth stages can be one sprite scaled plus per-stage tweaks.
+- Base creature art authored at ~2x display size for crisp scaling, declared with `resolution: 2` in the manifest (the game renders at native resolution and zooms cameras, so 1x art looks soft on big/hi-DPI screens). Code keeps display sizes in design units via `textureScale()`. Seal at multiple growth stages can be one sprite scaled plus per-stage tweaks.
 - Animation: frame-based swim/bite cycles (4-8 frames) or simple tween-based squash/stretch for prey.
 - Audio: OGG + MP3 fallback, short SFX < 1s, music loops seamless; normalize levels.
 - Placeholders: Phase 0 includes a generator producing colored shape textures under the same keys as final assets, so swapping is a manifest/file change only.

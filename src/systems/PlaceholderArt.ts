@@ -1,6 +1,10 @@
 // Generates placeholder textures with Canvas 2D under the same keys as the final art.
 // Real files listed in the asset manifest always win: a placeholder is only painted when
 // no texture exists for that key after loading.
+//
+// Painters draw in design units; sprites/effects are rasterized at 2x pixel density (stored
+// as `texture.customData.resolution`, read back via `textureScale()`), so they stay sharp
+// when the camera zooms in on big or high-DPI screens. Soft background layers stay at 1x.
 import Phaser from 'phaser';
 import { TextureKeys, type TextureKey } from '../config/assets';
 import { TAU } from '../utils/math';
@@ -8,30 +12,35 @@ import { createRng, randRange, type Rng } from '../utils/rng';
 
 type Ctx = CanvasRenderingContext2D;
 
+/** Pixel density for crisp art (sprites, effects, UI). */
+const HI = 2;
+
 interface Painter {
   width: number;
   height: number;
   draw: (ctx: Ctx, w: number, h: number) => void;
+  /** Pixels per design unit (default 1). */
+  res?: number;
 }
 
 const PAINTERS: Partial<Record<TextureKey, Painter>> = {
-  [TextureKeys.Seal]: { width: 176, height: 88, draw: drawSeal },
-  [TextureKeys.Minnow]: { width: 48, height: 26, draw: drawMinnow },
-  [TextureKeys.Shrimp]: { width: 44, height: 32, draw: drawShrimp },
-  [TextureKeys.Sardine]: { width: 60, height: 26, draw: drawSardine },
-  [TextureKeys.Shark]: { width: 220, height: 104, draw: drawShark },
-  [TextureKeys.Jellyfish]: { width: 60, height: 80, draw: drawJellyfish },
-  [TextureKeys.Mine]: { width: 68, height: 68, draw: drawMine },
-  [TextureKeys.Coin]: { width: 30, height: 30, draw: drawCoin },
-  [TextureKeys.Spark]: { width: 24, height: 24, draw: drawSpark },
+  [TextureKeys.Seal]: { width: 176, height: 88, draw: drawSeal, res: HI },
+  [TextureKeys.Minnow]: { width: 48, height: 26, draw: drawMinnow, res: HI },
+  [TextureKeys.Shrimp]: { width: 44, height: 32, draw: drawShrimp, res: HI },
+  [TextureKeys.Sardine]: { width: 60, height: 26, draw: drawSardine, res: HI },
+  [TextureKeys.Shark]: { width: 220, height: 104, draw: drawShark, res: HI },
+  [TextureKeys.Jellyfish]: { width: 60, height: 80, draw: drawJellyfish, res: HI },
+  [TextureKeys.Mine]: { width: 68, height: 68, draw: drawMine, res: HI },
+  [TextureKeys.Coin]: { width: 30, height: 30, draw: drawCoin, res: HI },
+  [TextureKeys.Spark]: { width: 24, height: 24, draw: drawSpark, res: HI },
   [TextureKeys.Vignette]: { width: 256, height: 144, draw: drawVignette },
-  [TextureKeys.Arrow]: { width: 56, height: 56, draw: drawArrow },
-  [TextureKeys.Bubble]: { width: 32, height: 32, draw: drawBubble },
-  [TextureKeys.Droplet]: { width: 16, height: 16, draw: drawDroplet },
-  [TextureKeys.Ring]: { width: 128, height: 32, draw: drawRing },
+  [TextureKeys.Arrow]: { width: 56, height: 56, draw: drawArrow, res: HI },
+  [TextureKeys.Bubble]: { width: 32, height: 32, draw: drawBubble, res: HI },
+  [TextureKeys.Droplet]: { width: 16, height: 16, draw: drawDroplet, res: HI },
+  [TextureKeys.Ring]: { width: 128, height: 32, draw: drawRing, res: HI },
   [TextureKeys.Glow]: { width: 256, height: 256, draw: drawGlow },
   [TextureKeys.LightRays]: { width: 1024, height: 640, draw: drawLightRays },
-  [TextureKeys.Surface]: { width: 256, height: 64, draw: drawSurface },
+  [TextureKeys.Surface]: { width: 256, height: 64, draw: drawSurface, res: HI },
   [TextureKeys.Clouds]: { width: 1024, height: 256, draw: drawClouds },
   [TextureKeys.SeabedFar]: { width: 1024, height: 480, draw: drawSeabedFar },
   [TextureKeys.SeabedNear]: { width: 1024, height: 420, draw: drawSeabedNear },
@@ -44,10 +53,15 @@ export function ensurePlaceholderTextures(scene: Phaser.Scene): string[] {
   const generated: string[] = [];
   for (const [key, painter] of Object.entries(PAINTERS) as Array<[TextureKey, Painter]>) {
     if (scene.textures.exists(key)) continue;
-    const texture = scene.textures.createCanvas(key, painter.width, painter.height);
+    const res = painter.res ?? 1;
+    const texture = scene.textures.createCanvas(key, painter.width * res, painter.height * res);
     if (!texture) continue;
+    texture.context.save();
+    texture.context.scale(res, res);
     painter.draw(texture.context, painter.width, painter.height);
+    texture.context.restore();
     texture.refresh();
+    (texture.customData as { resolution?: number }).resolution = res;
     generated.push(key);
   }
   return generated;

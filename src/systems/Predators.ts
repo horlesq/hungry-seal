@@ -3,9 +3,9 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { DANGER, SPAWN } from '../config/balance';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config/layout';
 import { PREDATORS, type PredatorDef, type PredatorId } from '../config/predators';
 import { zoneBand } from '../config/zones';
+import { textureScale } from '../services/Viewport';
 import { Predator } from '../entities/Predator';
 import { stepPredator, type PredatorContext, type PredatorEvent } from '../entities/predatorAI';
 import { predatorsAllowed } from './danger';
@@ -42,7 +42,11 @@ export class Predators {
     this.group = scene.add.group({ classType: Predator, maxSize: POOL_SIZE });
     for (let i = 0; i < POOL_SIZE; i++) {
       this.arrows.push(
-        scene.add.image(0, 0, TextureKeys.Arrow).setScrollFactor(0).setDepth(40).setVisible(false),
+        scene.add
+          .image(0, 0, TextureKeys.Arrow)
+          .setScale(textureScale(scene, TextureKeys.Arrow))
+          .setDepth(40)
+          .setVisible(false),
       );
     }
     this.ctx = {
@@ -125,18 +129,17 @@ export class Predators {
 
   /** Red arrows at the screen edge pointing at hunting predators that are off-screen. */
   private updateArrows(camera: Phaser.Cameras.Scene2D.Camera): void {
+    // Arrows live in world space, pinned just inside the edge of the camera's view.
     const view = camera.worldView;
     let used = 0;
     for (const p of this.alive) {
       if (!p.isHunting || view.contains(p.x, p.y)) continue;
       const arrow = this.arrows[used++];
-      const sx = p.x - view.x;
-      const sy = p.y - view.y;
-      const angle = Math.atan2(sy - GAME_HEIGHT / 2, sx - GAME_WIDTH / 2);
+      const angle = Math.atan2(p.y - view.centerY, p.x - view.centerX);
       arrow
         .setPosition(
-          Phaser.Math.Clamp(sx, ARROW_INSET, GAME_WIDTH - ARROW_INSET),
-          Phaser.Math.Clamp(sy, ARROW_INSET, GAME_HEIGHT - ARROW_INSET),
+          Phaser.Math.Clamp(p.x, view.x + ARROW_INSET, view.right - ARROW_INSET),
+          Phaser.Math.Clamp(p.y, view.y + ARROW_INSET, view.bottom - ARROW_INSET),
         )
         .setRotation(angle)
         .setVisible(true)

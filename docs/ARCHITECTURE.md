@@ -21,10 +21,10 @@ hungry-seal/
     playtest.mjs        headless browser smoke playtest (npm run playtest)
     balance-bot.mjs     bot plays a run and logs hunger/score/stage (npm run balance)
   src/
-    main.ts             Phaser.Game bootstrap; exposes window.__PHASER_GAME__ in dev
+    main.ts             Phaser.Game bootstrap, window resize -> applyViewport; window.__PHASER_GAME__ in dev
     config/
       game.ts           Phaser config, scale, physics
-      layout.ts         GAME_WIDTH/HEIGHT, touch UI layout, UI font
+      layout.ts         edge-anchored touch UI layout (boostButtonCenter), UI font
       keys.ts           scene keys, registry keys
       balance.ts        movement, camera, input, hunger, growth, feeding, spawn, effects tuning
       zones.ts          WORLD bounds (surface, floor), depth zones + colors, zoneBand()
@@ -70,10 +70,12 @@ hungry-seal/
       EventBus.ts          typed events between scenes/systems
       saveData.ts          PURE save schema, defaults, migrateSave, recordRun (+ save.test.ts)
       SaveService.ts       localStorage wrapper (guarded; in-memory fallback), `saves` singleton
+      Viewport.ts          current viewport, canvas resize, fitUiCamera/fitWorldCamera, sharpenTexts, textureScale
     ui/                 (planned) reusable UI widgets (bars, buttons, panels)
     utils/
       math.ts           clamp, lerp, angle helpers, frame-rate independent damp (+ tests)
       rng.ts            seeded mulberry32 RNG (+ tests)
+      viewport.ts       PURE viewport math: backing size, zoom, visible design area (+ tests)
   index.html
   vite.config.ts        also holds the Vitest config
   eslint.config.js
@@ -106,8 +108,13 @@ hungry-seal/
 - The depth gradient is a generated 4x2048 canvas texture stretched over the world height, built from the zone colors in `zones.ts`.
 - Marine snow layers are full-screen TileSprites clipped to below the water line every frame.
 
-## Rendering / scale
-- Base design resolution: 1280x720 (landscape), `Scale.FIT` + `autoCenter`. Wide phones get side bars for now (Phase 9 item).
+## Rendering / scale (no letterboxing, native resolution)
+- Scale mode `NONE`, managed by us (`services/Viewport.ts`, math in `utils/viewport.ts`): the canvas backing store = window CSS size × devicePixelRatio (capped at 2), shown at CSS size via scale `zoom = 1/dpr`. `main.ts` re-applies it on window/visualViewport resize.
+- Every camera zooms by `zoom = min(backingW/1280, backingH/720)`: the 1280x720 **design area** always fits and the longer axis shows more (a 16:9 monitor minus browser chrome sees ~1455x720 design units). No bars on any aspect ratio.
+- UI scenes call `fitUiCamera()` → camera shows design space `[0..viewWidth] x [0..viewHeight]`; anchor UI to edges with `getViewport().viewWidth/viewHeight` (never fixed 1280/720) and re-layout via `onResize()` (Menu/GameOver just restart). The world camera uses `fitWorldCamera()`; world systems use `camera.worldView` for anything view-sized.
+- Text: `sharpenTexts(scene)` re-rasterizes all Text at the current zoom (call after create and on resize); text created later sets `resolution: uiTextResolution()`.
+- Textures carry a pixel density in `texture.customData.resolution` (placeholders: 2 for sprites/effects/UI, 1 for soft backgrounds; real files: manifest `resolution`). Anything that sets a sprite/particle/tile scale multiplies by `textureScale(scene, key)` so display size stays in design units.
+- Portrait phones currently get a very tall view; add a rotate-device prompt or portrait layout in Phase 9.
 - Pixel-art off; smooth textures. Use texture atlases for final art to cut draw calls.
 - Target 60 FPS on mid-range phones; profile in Phase 9.
 

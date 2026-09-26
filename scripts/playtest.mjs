@@ -141,13 +141,103 @@ const targetAlive = (page) =>
 const sceneActive = (page, key) =>
   page.waitForFunction((k) => window.__PHASER_GAME__?.scene.isActive(k), key, { timeout: 15000 });
 
-/** Converts game coordinates to page coordinates using the scaled canvas rect. */
-async function toPage(page, gx, gy) {
+/**
+ * Converts design coordinates (HUD space: 0..viewWidth x 0..viewHeight) to page coordinates.
+ * Negative values count from the right/bottom edge.
+ */
+async function toPage(page, dx, dy) {
   const r = await page.evaluate(() => {
     const b = document.querySelector('canvas').getBoundingClientRect();
-    return { left: b.left, top: b.top, width: b.width, height: b.height };
+    const v = window.__PHASER_GAME__.registry.get('viewport');
+    return {
+      left: b.left,
+      top: b.top,
+      width: b.width,
+      height: b.height,
+      vw: v.viewWidth,
+      vh: v.viewHeight,
+    };
   });
-  return { x: r.left + (gx / GAME_W) * r.width, y: r.top + (gy / GAME_H) * r.height };
+  const x = dx < 0 ? r.vw + dx : dx;
+  const y = dy < 0 ? r.vh + dy : dy;
+  return { x: r.left + (x / r.vw) * r.width, y: r.top + (y / r.vh) * r.height };
+}
+
+/** Canvas vs window: CSS box, backing pixels, and the current viewport. */
+const canvasInfo = (page) =>
+  page.evaluate(() => {
+    const c = document.querySelector('canvas');
+    const b = c.getBoundingClientRect();
+    return {
+      left: b.left,
+      top: b.top,
+      cssW: b.width,
+      cssH: b.height,
+      backingW: c.width,
+      backingH: c.height,
+      innerW: window.innerWidth,
+      innerH: window.innerHeight,
+      dpr: window.devicePixelRatio,
+      view: window.__PHASER_GAME__.registry.get('viewport'),
+    };
+  });
+
+/** The canvas fills the window exactly and renders at device pixels (capped at 2x). */
+function fillsWindow(c) {
+  const dpr = Math.min(2, c.dpr);
+  return (
+    Math.abs(c.left) < 1 &&
+    Math.abs(c.top) < 1 &&
+    Math.abs(c.cssW - c.innerW) < 1 &&
+    Math.abs(c.cssH - c.innerH) < 1 &&
+    Math.abs(c.backingW - Math.round(c.innerW * dpr)) <= 1 &&
+    Math.abs(c.backingH - Math.round(c.innerH * dpr)) <= 1
+  );
+}
+
+const fitDetail = (c) =>
+  `css ${c.cssW}x${c.cssH} @(${c.left},${c.top}) window ${c.innerW}x${c.innerH} backing ${c.backingW}x${c.backingH} dpr ${c.dpr} view ${c.view.viewWidth.toFixed(0)}x${c.view.viewHeight.toFixed(0)}`;
+
+async function screens(browser) {
+  const cases = [
+    { name: '16:9 monitor minus browser chrome', width: 1920, height: 950, dpr: 1 },
+    { name: '16:9 at 125% Windows scaling', width: 1536, height: 760, dpr: 1.25 },
+    { name: 'retina laptop', width: 1440, height: 800, dpr: 2 },
+    { name: '4:3 tablet', width: 1024, height: 768, dpr: 2 },
+  ];
+  for (const c of cases) {
+    const ctx = await browser.newContext({
+      viewport: { width: c.width, height: c.height },
+      deviceScaleFactor: c.dpr,
+    });
+    const page = await ctx.newPage();
+    watch(page, `screen ${c.width}x${c.height}@${c.dpr}`);
+    await page.goto(URL);
+    await sceneActive(page, 'Menu');
+    await page.keyboard.press('Enter');
+    await sceneActive(page, 'Game');
+    await sceneActive(page, 'Hud');
+    await page.waitForTimeout(700);
+    const info = await canvasInfo(page);
+    check(`no bars, sharp canvas: ${c.name}`, fillsWindow(info), fitDetail(info));
+    const hudInside = await page.evaluate(() => {
+      const hud = window.__PHASER_GAME__.scene.getScene('Hud');
+      const v = window.__PHASER_GAME__.registry.get('viewport');
+      const b = hud.scoreText.getBounds();
+      return b.right <= v.viewWidth + 1 && b.right > v.viewWidth - 60 && b.top >= 0;
+    });
+    check(`score pinned to the top-right: ${c.name}`, hudInside);
+    if (c.width === 1920) {
+      await page.screenshot({ path: `${OUT}/00-widescreen.png` });
+      // Live resize (e.g. restoring a maximized window) re-fits everything.
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.waitForTimeout(400);
+      const resized = await canvasInfo(page);
+      check('canvas follows a window resize', fillsWindow(resized), fitDetail(resized));
+      await page.screenshot({ path: `${OUT}/00-resized.png` });
+    }
+    await ctx.close();
+  }
 }
 
 async function desktop(browser) {
@@ -585,6 +675,8 @@ async function mobile(browser) {
   await page.goto(URL);
   await sceneActive(page, 'Menu');
   await page.waitForTimeout(400);
+  const fit = await canvasInfo(page);
+  check('touch: canvas fills the phone screen', fillsWindow(fit), fitDetail(fit));
   const center = await toPage(page, 640, 360);
   await page.touchscreen.tap(center.x, center.y);
   await sceneActive(page, 'Game');
@@ -597,14 +689,15 @@ async function mobile(browser) {
   check('touch: boost button visible', boostVisible);
 
   const s0 = await sealState(page);
-  const right = await toPage(page, 1150, 380);
+  const right = await toPage(page, -130, 380);
   await touch('touchStart', [{ ...right, id: 1 }]);
   const hold = await until(page, (s) => s.x > s0.x + 200, 4000);
   check('touch: hold steers toward finger', hold.ok, `dx=${(hold.last.x - s0.x).toFixed(0)}`);
   check('input source = touch', hold.last.source === 'touch', hold.last.source);
 
   // Second finger on the boost button while still steering with the first.
-  const boostBtn = await toPage(page, 1162, 602);
+  // Boost button centre: 118 design units in from the bottom-right corner.
+  const boostBtn = await toPage(page, -118, -118);
   await touch('touchStart', [
     { ...right, id: 1 },
     { ...boostBtn, id: 2 },
@@ -642,6 +735,7 @@ const browser = await chromium.launch({
 });
 
 try {
+  await screens(browser);
   await desktop(browser);
   await danger(browser);
   await gameplay(browser);

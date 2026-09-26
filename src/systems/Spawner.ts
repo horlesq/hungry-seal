@@ -4,8 +4,8 @@
 import Phaser from 'phaser';
 import { SPAWN } from '../config/balance';
 import { CREATURE_LIST, type CreatureDef } from '../config/creatures';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config/layout';
 import { WORLD } from '../config/zones';
+import { getViewport } from '../services/Viewport';
 import { Creature, School } from '../entities/Creature';
 import { stepCreatureMotion, type CreatureSteerContext } from '../entities/creatureAI';
 import { canEat } from './feeding';
@@ -55,12 +55,13 @@ export class Spawner {
    * camera because camera.worldView isn't updated until the first render.
    */
   populate(cx: number, cy: number, seal: Threat): void {
+    const view = getViewport();
     let placed = 0;
     for (let attempt = 0; attempt < SPAWN.initialGroups * 5; attempt++) {
       if (placed >= SPAWN.initialGroups) break;
-      const x = cx + (this.random() - 0.5) * GAME_WIDTH * 1.5;
+      const x = cx + (this.random() - 0.5) * view.viewWidth * 1.5;
       const y = Phaser.Math.Clamp(
-        cy + (this.random() - 0.5) * GAME_HEIGHT,
+        cy + (this.random() - 0.5) * view.viewHeight,
         WATER_TOP + 30,
         WATER_BOTTOM - 30,
       );

@@ -8,8 +8,9 @@
 // The most recently used device wins, so a resting mouse doesn't fight the keyboard.
 import Phaser from 'phaser';
 import { INPUT } from '../config/balance';
-import { TOUCH_UI } from '../config/layout';
+import { boostButtonCenter, TOUCH_UI } from '../config/layout';
 import { EventBus, type InputSource } from '../services/EventBus';
+import { getViewport } from '../services/Viewport';
 
 type KeyName = 'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'space' | 'shift';
 
@@ -79,9 +80,12 @@ export class InputController {
     this.boost = touchBoost || keyBoost || mouseBoost;
   }
 
+  /** `x`, `y` are canvas pixels (pointer coordinates). */
   isOnBoostButton(x: number, y: number): boolean {
-    const b = TOUCH_UI.boostButton;
-    return Math.hypot(x - b.x, y - b.y) <= b.hitRadius;
+    // The HUD camera maps design units to canvas pixels by `zoom` from the top-left.
+    const v = getViewport();
+    const c = boostButtonCenter(v.viewWidth, v.viewHeight);
+    return Math.hypot(x / v.zoom - c.x, y / v.zoom - c.y) <= TOUCH_UI.boostButton.hitRadius;
   }
 
   private steerToward(pointer: Phaser.Input.Pointer, originX: number, originY: number): void {

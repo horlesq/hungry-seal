@@ -3,7 +3,8 @@
 import Phaser from 'phaser';
 import { ASSET_MANIFEST } from '../config/assets';
 import { SceneKeys } from '../config/keys';
-import { GAME_HEIGHT, GAME_WIDTH, UI_FONT } from '../config/layout';
+import { UI_FONT } from '../config/layout';
+import { fitUiCamera, uiTextResolution } from '../services/Viewport';
 import { ensurePlaceholderTextures } from '../systems/PlaceholderArt';
 
 export class PreloadScene extends Phaser.Scene {
@@ -35,6 +36,13 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Real art declares its pixel density in the manifest (e.g. drawn at 2x = resolution 2).
+    for (const entry of ASSET_MANIFEST) {
+      if (entry.url && this.textures.exists(entry.key)) {
+        const data = this.textures.get(entry.key).customData as { resolution?: number };
+        data.resolution = entry.resolution ?? 1;
+      }
+    }
     const generated = ensurePlaceholderTextures(this);
     if (import.meta.env.DEV && generated.length > 0) {
       console.info(`[assets] placeholders generated: ${generated.join(', ')}`);
@@ -43,16 +51,18 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   private createProgressBar(): void {
+    const v = fitUiCamera(this);
     const w = 420;
     const h = 22;
-    const x = (GAME_WIDTH - w) / 2;
-    const y = GAME_HEIGHT / 2;
+    const x = (v.viewWidth - w) / 2;
+    const y = v.viewHeight / 2;
 
     this.add
-      .text(GAME_WIDTH / 2, y - 40, 'Loading...', {
+      .text(v.viewWidth / 2, y - 40, 'Loading...', {
         fontFamily: UI_FONT,
         fontSize: '26px',
         color: '#e8fbff',
+        resolution: uiTextResolution(),
       })
       .setOrigin(0.5);
     const frame = this.add.graphics();

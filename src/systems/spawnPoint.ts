@@ -1,7 +1,6 @@
 // Shared helper: pick a point just outside the camera view, biased ahead of the seal's
 // movement, clamped to a vertical band. Used by every spawner (prey, hazards, predators, coins).
 import type Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config/layout';
 import { zoneAt, type ZoneId } from '../config/zones';
 
 /** Weighted random pick among entries allowed in the zone at world-y `y`, or null. */
@@ -46,8 +45,8 @@ export function pickOffscreenPoint(
 ): { x: number; y: number } | null {
   if (opts.bottom <= opts.top) return null;
   const view = camera.worldView;
-  const halfW = GAME_WIDTH / 2;
-  const halfH = GAME_HEIGHT / 2;
+  const halfW = view.width / 2;
+  const halfH = view.height / 2;
   const moving = Math.hypot(seal.vx, seal.vy) > 40;
 
   for (let attempt = 0; attempt < (opts.attempts ?? 5); attempt++) {

@@ -2,6 +2,7 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import type { HazardDef } from '../config/hazards';
+import { textureScale } from '../services/Viewport';
 import { TAU } from '../utils/math';
 
 export class Hazard extends Phaser.GameObjects.Sprite {
@@ -9,6 +10,8 @@ export class Hazard extends Phaser.GameObjects.Sprite {
   private baseY = 0;
   private age = 0;
   private dir = 1;
+  /** def.scale adjusted for the texture's pixel density. */
+  private displayScale = 1;
 
   // Signature matches what Phaser.GameObjects.Group passes when creating pool members.
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
@@ -20,8 +23,9 @@ export class Hazard extends Phaser.GameObjects.Sprite {
     this.baseY = y;
     this.age = random() * 10;
     this.dir = random() < 0.5 ? -1 : 1;
+    this.displayScale = def.scale * textureScale(this.scene, def.texture);
     this.setTexture(def.texture)
-      .setScale(def.scale)
+      .setScale(this.displayScale)
       .setRotation(0)
       .clearTint()
       .setAlpha(1)
@@ -51,7 +55,8 @@ export class Hazard extends Phaser.GameObjects.Sprite {
     } else {
       // Jellyfish pulse: squash on the upstroke.
       const pulse = Math.sin(phase * 2);
-      this.setScale(d.scale * (1 + pulse * 0.06), d.scale * (1 - pulse * 0.08));
+      const s = this.displayScale;
+      this.setScale(s * (1 + pulse * 0.06), s * (1 - pulse * 0.08));
     }
   }
 

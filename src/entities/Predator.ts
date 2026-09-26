@@ -5,6 +5,7 @@ import { TextureKeys } from '../config/assets';
 import { UI_FONT } from '../config/layout';
 import type { PredatorDef } from '../config/predators';
 import { zoneBand } from '../config/zones';
+import { textureScale, uiTextResolution } from '../services/Viewport';
 import { createPredatorMotion, type PredatorMotion } from './predatorAI';
 
 export class Predator extends Phaser.GameObjects.Sprite {
@@ -25,6 +26,7 @@ export class Predator extends Phaser.GameObjects.Sprite {
         color: '#ff4d3d',
         stroke: '#ffffff',
         strokeThickness: 8,
+        resolution: uiTextResolution(),
       })
       .setOrigin(0.5, 1)
       .setDepth(31)
@@ -71,7 +73,8 @@ export class Predator extends Phaser.GameObjects.Sprite {
     const target = cos > 0.1 ? 1 : cos < -0.1 ? -1 : this.facing >= 0 ? 1 : -1;
     this.facing += (target - this.facing) * Math.min(1, dt * 8);
     this.setRotation(m.heading);
-    this.setScale(this.def.scale, this.def.scale * this.facing);
+    const s = this.def.scale * textureScale(this.scene, this.def.texture);
+    this.setScale(s, s * this.facing);
 
     // Telegraph: flash red and show "!" while winding up to charge.
     const warning = m.state === 'notice';
