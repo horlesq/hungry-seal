@@ -1,25 +1,36 @@
-// Run results, shown over the (still animating) game world. Retry restarts GameScene;
-// Esc goes back to the menu.
+// Run results, shown over the (still animating) game world: cause of death, the score
+// counting up, run stats, then Swim again / Upgrades / Menu.
+// Keys: arrows / Tab + Enter, S = upgrades, Esc = menu.
 import Phaser from 'phaser';
+import { SoundKeys } from '../audio/sounds';
 import { TextureKeys } from '../config/assets';
 import { SceneKeys } from '../config/keys';
-import { UI_FONT } from '../config/layout';
+import { audio } from '../services/AudioManager';
 import type { DeathCause, RunResult } from '../services/EventBus';
+import { saves } from '../services/SaveService';
 import { fitUiCamera, onResize, sharpenTexts, textureScale } from '../services/Viewport';
+import { anyAffordable } from '../systems/UpgradeSystem';
 import { Button } from '../ui/Button';
+import { FocusNav } from '../ui/FocusNav';
+import { COLORS, CSS, drawPanel, formatNumber, reducedMotion, uiText } from '../ui/theme';
+import { DESIGN_HEIGHT } from '../utils/viewport';
 
-/** Ignore input briefly so a finger still held from the run doesn't skip the screen. */
+/** Ignore input briefly so a click/finger still held from the run doesn't skip the screen. */
 const INPUT_DELAY = 700;
+const PANEL_W = 660;
+const PANEL_H = 316;
 
 const TITLES: Record<DeathCause, { title: string; subtitle: string; color: string }> = {
-  starved: { title: 'STARVED!', subtitle: 'Your seal ran out of food', color: '#ff8a5c' },
-  shark: { title: 'CHOMPED!', subtitle: 'A shark got you', color: '#ff5a4f' },
-  mine: { title: 'KABOOM!', subtitle: 'You swam into a sea mine', color: '#ffb13c' },
-  jellyfish: { title: 'STUNG!', subtitle: 'Zapped by a jellyfish', color: '#ff8ae0' },
-  orca: { title: 'CRUNCHED!', subtitle: 'An orca caught you', color: '#e8eef4' },
-  anglerfish: { title: 'LURED!', subtitle: 'Never follow the pretty light', color: '#9ffcff' },
-  pufferfish: { title: 'SPIKED!', subtitle: 'That pufferfish was puffed up', color: '#ffd23c' },
+  starved: { title: 'Starved!', subtitle: 'Your seal ran out of food', color: '#ff9a6b' },
+  shark: { title: 'Chomped!', subtitle: 'A shark got you', color: '#ff6b5f' },
+  mine: { title: 'Kaboom!', subtitle: 'You swam into a sea mine', color: '#ffb13c' },
+  jellyfish: { title: 'Stung!', subtitle: 'Zapped by a jellyfish', color: '#ff8ae0' },
+  orca: { title: 'Crunched!', subtitle: 'An orca caught you', color: '#e8eef4' },
+  anglerfish: { title: 'Lured!', subtitle: 'Never follow the pretty light', color: '#9ffcff' },
+  pufferfish: { title: 'Spiked!', subtitle: 'That pufferfish was puffed up', color: '#ffd23c' },
 };
+
+type ResultsData = RunResult & { instant?: boolean };
 
 export class GameOverScene extends Phaser.Scene {
   private leaving = false;
@@ -28,141 +39,200 @@ export class GameOverScene extends Phaser.Scene {
     super({ key: SceneKeys.GameOver });
   }
 
-  create(result: RunResult): void {
+  create(result: ResultsData): void {
     this.leaving = false;
     const v = fitUiCamera(this);
     const cx = v.viewWidth / 2;
+    const top = (v.viewHeight - DESIGN_HEIGHT) / 2;
     const t = TITLES[result.cause];
+    const animate = !result.instant && !reducedMotion();
 
-    const dim = this.add.rectangle(0, 0, v.viewWidth, v.viewHeight, 0x020c18, 1).setOrigin(0);
-    dim.setAlpha(0);
-    this.tweens.add({ targets: dim, alpha: 0.6, duration: 400 });
+    const dim = this.add.rectangle(0, 0, v.viewWidth, v.viewHeight, COLORS.trench, 0.66);
+    dim.setOrigin(0);
 
-    const W = 620;
-    const H = 640;
-    const panel = this.add.container(cx, v.viewHeight / 2);
-    const bg = this.add.graphics();
-    bg.fillStyle(0x06284a, 0.92).fillRoundedRect(-W / 2, -H / 2, W, H, 28);
-    bg.lineStyle(4, 0x6ff3ff, 0.9).strokeRoundedRect(-W / 2, -H / 2, W, H, 28);
-    const title = this.add
-      .text(0, -H / 2 + 56, t.title, {
-        fontFamily: UI_FONT,
-        fontSize: '64px',
-        fontStyle: 'bold',
-        color: t.color,
-        stroke: '#2a0d06',
-        strokeThickness: 10,
-      })
-      .setOrigin(0.5);
-    const subtitle = this.add
-      .text(0, -H / 2 + 106, t.subtitle, {
-        fontFamily: UI_FONT,
-        fontSize: '20px',
-        color: '#cfe9f5',
-      })
-      .setOrigin(0.5);
-    panel.add([bg, title, subtitle]);
-
-    // Score line, with a badge for a new best.
-    const scoreY = -H / 2 + 160;
-    panel.add(
-      this.add
-        .text(0, scoreY, String(result.score), {
-          fontFamily: UI_FONT,
-          fontSize: '48px',
-          fontStyle: 'bold',
-          color: '#ffffff',
-          stroke: '#0b3a66',
-          strokeThickness: 8,
-        })
-        .setOrigin(0.5),
+    const title = uiText(this, cx, top + 92, t.title, 'title', {
+      size: 76,
+      color: t.color,
+      outline: 12,
+      shadow: 6,
+    }).setOrigin(0.5);
+    const subtitle = uiText(this, cx, top + 150, t.subtitle, 'body', { color: CSS.mist }).setOrigin(
+      0.5,
     );
-    const bestLabel = result.newBest ? 'NEW BEST!' : `Best ${result.bestScore}`;
-    const best = this.add
-      .text(0, scoreY + 40, bestLabel, {
-        fontFamily: UI_FONT,
-        fontSize: result.newBest ? '24px' : '18px',
-        fontStyle: 'bold',
-        color: result.newBest ? '#fff27a' : '#9fc3d6',
-      })
-      .setOrigin(0.5);
-    panel.add(best);
-    if (result.newBest) {
-      this.tweens.add({ targets: best, scale: 1.15, duration: 420, yoyo: true, repeat: -1 });
-    }
 
-    const rows: Array<[string, string]> = [
-      ['Coins', `+${result.coins}   (${result.totalCoins} total)`],
-      ['Distance', `${result.distance} m`],
-      ['Deepest', `${result.maxDepth} m`],
+    // Results panel: score on top, six stats underneath.
+    const px = cx - PANEL_W / 2;
+    const py = top + 188;
+    const panel = this.add.container(0, 0);
+    const bg = drawPanel(this.add.graphics(), px, py, PANEL_W, PANEL_H, {
+      alpha: 0.92,
+      depth: 8,
+    });
+    bg.fillStyle(COLORS.foam, 0.1).fillRect(px + 32, py + 138, PANEL_W - 64, 2);
+    panel.add(bg);
+    panel.add(uiText(this, px + 36, py + 24, 'Score', 'caption'));
+    const score = uiText(
+      this,
+      px + 34,
+      py + 44,
+      animate ? '0' : formatNumber(result.score),
+      'number',
+      {
+        size: 64,
+        outline: 0,
+        shadow: 0,
+      },
+    );
+    panel.add(score);
+
+    const best = result.newBest
+      ? this.newBestChip(px + PANEL_W - 36, py + 82)
+      : uiText(this, px + PANEL_W - 36, py + 82, `Best ${formatNumber(result.bestScore)}`, 'body', {
+          color: CSS.mist,
+        }).setOrigin(1, 0.5);
+    panel.add(best);
+
+    const stats: Array<[string, string]> = [
+      ['Coins earned', `+${formatNumber(result.coins)}`],
       ['Time', formatTime(result.seconds)],
-      ['Fish eaten', String(result.eaten)],
-      ['Size reached', `${result.stage}`],
+      ['Size reached', String(result.stage)],
+      ['Distance', `${formatNumber(result.distance)} m`],
+      ['Deepest', `${formatNumber(result.maxDepth)} m`],
+      ['Fish eaten', formatNumber(result.eaten)],
     ];
-    const style = { fontFamily: UI_FONT, fontSize: '22px', color: '#ffffff' };
-    rows.forEach(([name, value], i) => {
-      const y = scoreY + 92 + i * 34;
-      panel.add(this.add.text(-220, y, name, style).setOrigin(0, 0.5));
+    const colW = (PANEL_W - 72) / 3;
+    stats.forEach(([label, value], i) => {
+      const x = px + 36 + (i % 3) * colW;
+      const y = py + 162 + Math.floor(i / 3) * 74;
+      panel.add(uiText(this, x, y, label, 'caption'));
+      const coins = i === 0;
+      if (coins) {
+        panel.add(
+          this.add
+            .image(x + 13, y + 40, TextureKeys.Coin)
+            .setScale(0.95 * textureScale(this, TextureKeys.Coin)),
+        );
+      }
       panel.add(
-        this.add
-          .text(220, y, value, { ...style, fontStyle: 'bold', color: '#fff27a' })
-          .setOrigin(1, 0.5),
+        uiText(this, coins ? x + 32 : x, y + 20, value, 'heading', {
+          size: 30,
+          color: coins ? CSS.gold : CSS.foam,
+        }),
       );
     });
-    panel.add(
-      this.add
-        .image(-238, scoreY + 92, TextureKeys.Coin)
-        .setScale(0.8 * textureScale(this, TextureKeys.Coin))
-        .setOrigin(1, 0.5),
-    );
 
-    // Buttons: swim again (Enter/Space), shop (S), menu (Esc).
-    const retry = new Button(this, 0, H / 2 - 110, {
-      width: 330,
+    // Buttons: one row under the panel.
+    const save = saves.data;
+    const rowY = top + 590;
+    const retry = new Button(this, cx - 203, rowY, {
+      width: 300,
       height: 76,
-      label: 'SWIM AGAIN',
-      fontSize: 36,
-      color: 0x33c46b,
+      label: 'Swim again',
+      variant: 'primary',
+      fontSize: 34,
       onClick: () => this.go(SceneKeys.Game),
-    });
-    const shop = new Button(this, -95, H / 2 - 38, {
-      width: 170,
-      height: 54,
-      label: 'SHOP',
-      fontSize: 24,
-      color: 0xf2b134,
+    }).setName('retry');
+    const upgrades = new Button(this, cx + 75, rowY, {
+      width: 220,
+      height: 64,
+      label: 'Upgrades',
+      variant: 'secondary',
+      fontSize: 26,
       onClick: () => this.go(SceneKeys.Shop),
-    });
-    const menu = new Button(this, 95, H / 2 - 38, {
-      width: 170,
-      height: 54,
-      label: 'MENU',
-      fontSize: 24,
-      color: 0x5d7fa6,
+    })
+      .setName('upgrades')
+      .setBadge(anyAffordable(save.upgrades, save.coins));
+    const menu = new Button(this, cx + 278, rowY, {
+      width: 150,
+      height: 64,
+      label: 'Menu',
+      variant: 'quiet',
+      fontSize: 26,
       onClick: () => this.go(SceneKeys.Menu),
-    });
-    panel.add([retry, shop, menu]);
-    const buttons = [retry, shop, menu];
+    }).setName('menu');
+    const buttons = [retry, upgrades, menu];
+    const nav = new FocusNav(this).add(...buttons);
+
+    if (animate) {
+      dim.setAlpha(0);
+      this.tweens.add({ targets: dim, alpha: 1, duration: 400 });
+      title.setScale(1.35).setAlpha(0);
+      this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 360, ease: 'Back.Out' });
+      subtitle.setAlpha(0);
+      this.tweens.add({ targets: subtitle, alpha: 1, delay: 150, duration: 300 });
+      const rest = [panel, ...buttons];
+      rest.forEach((o) => o.setAlpha(0).setY(o.y + 24));
+      this.tweens.add({
+        targets: rest,
+        alpha: 1,
+        y: '-=24',
+        delay: 180,
+        duration: 380,
+        ease: 'Quad.Out',
+      });
+      this.countUp(score, result.score, best, result.newBest);
+    }
+
     // Ignore input briefly so a click/finger still held from the run doesn't skip the screen.
     buttons.forEach((b) => b.setEnabled(false));
-
-    panel.setScale(0.8).setAlpha(0);
-    this.tweens.add({ targets: panel, scale: 1, alpha: 1, duration: 350, ease: 'Back.Out' });
-
-    sharpenTexts(this);
-    // Rebuild for the new size (skipping the entrance animation is not worth the complexity).
-    onResize(this, () => {
-      if (!this.leaving) this.scene.restart(result);
-    });
-
-    this.time.delayedCall(INPUT_DELAY, () => {
+    nav.setEnabled(false);
+    this.time.delayedCall(result.instant ? 0 : INPUT_DELAY, () => {
       buttons.forEach((b) => b.setEnabled(true));
+      nav.setEnabled(true);
+      nav.focus(retry);
       const kb = this.input.keyboard!;
-      kb.once('keydown-ENTER', () => retry.press());
-      kb.once('keydown-SPACE', () => retry.press());
-      kb.once('keydown-S', () => shop.press());
+      kb.once('keydown-S', () => upgrades.press());
       kb.once('keydown-ESC', () => menu.press());
     });
+
+    sharpenTexts(this);
+    onResize(this, () => {
+      if (!this.leaving) this.scene.restart({ ...result, instant: true });
+    });
+  }
+
+  /** Rolls the score up from zero, then pops the best-score badge. */
+  private countUp(
+    text: Phaser.GameObjects.Text,
+    score: number,
+    best: Phaser.GameObjects.Container | Phaser.GameObjects.Text,
+    newBest: boolean,
+  ): void {
+    const counter = { value: 0 };
+    best.setAlpha(0);
+    this.tweens.add({
+      targets: counter,
+      value: score,
+      delay: 350,
+      duration: Math.min(1400, 500 + score * 0.25),
+      ease: 'Cubic.Out',
+      onUpdate: () => text.setText(formatNumber(counter.value)),
+      onComplete: () => {
+        text.setText(formatNumber(score));
+        best.setAlpha(1);
+        if (!newBest) return;
+        audio.play(SoundKeys.Grow);
+        this.tweens.add({
+          targets: best,
+          scale: { from: 0.5, to: 1 },
+          duration: 320,
+          ease: 'Back.Out',
+        });
+      },
+    });
+  }
+
+  private newBestChip(right: number, y: number): Phaser.GameObjects.Container {
+    const label = uiText(this, 0, 1, 'New best!', 'heading', {
+      size: 24,
+      color: CSS.ink,
+    }).setOrigin(0.5);
+    const w = label.width + 36;
+    const h = 44;
+    const g = this.add.graphics();
+    g.fillStyle(COLORS.goldEdge, 1).fillRoundedRect(-w / 2, -h / 2 + 4, w, h, h / 2);
+    g.fillStyle(COLORS.gold, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+    return this.add.container(right - w / 2, y, [g, label]);
   }
 
   private go(target: typeof SceneKeys.Game | typeof SceneKeys.Shop | typeof SceneKeys.Menu): void {

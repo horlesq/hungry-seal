@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { UPGRADE_EFFECTS } from '../config/upgrades';
-import { buyUpgrade, emptyUpgrades, maxLevel, nextCost, runModifiers } from './UpgradeSystem';
+import {
+  anyAffordable,
+  buyUpgrade,
+  emptyUpgrades,
+  maxLevel,
+  nextCost,
+  runModifiers,
+} from './UpgradeSystem';
 
 describe('UpgradeSystem', () => {
   it('has no effect at level 0', () => {
@@ -50,5 +57,15 @@ describe('UpgradeSystem', () => {
 
   it('refuses purchases you cannot afford', () => {
     expect(buyUpgrade(emptyUpgrades(), 1, 'belly')).toEqual({ ok: false, reason: 'poor' });
+  });
+
+  it('knows when something is affordable (menu badge)', () => {
+    const cheapest = nextCost('speed', 0)!;
+    expect(anyAffordable(emptyUpgrades(), cheapest - 1)).toBe(false);
+    expect(anyAffordable(emptyUpgrades(), cheapest)).toBe(true);
+    const allMaxed = Object.fromEntries(
+      Object.keys(emptyUpgrades()).map((id) => [id, maxLevel('speed')]),
+    ) as ReturnType<typeof emptyUpgrades>;
+    expect(anyAffordable(allMaxed, 1e6)).toBe(false);
   });
 });

@@ -26,7 +26,13 @@ import { predatorBit } from '../entities/predatorAI';
 import { Seal } from '../entities/Seal';
 import type { SealMotionEvent } from '../entities/sealMotion';
 import { audio } from '../services/AudioManager';
-import { EventBus, type DamageSource, type DeathCause, type RunResult } from '../services/EventBus';
+import {
+  EventBus,
+  subscribeForScene,
+  type DamageSource,
+  type DeathCause,
+  type RunResult,
+} from '../services/EventBus';
 import { saves } from '../services/SaveService';
 import { fitWorldCamera, getViewport, onResize, sharpenTexts } from '../services/Viewport';
 import { CoinField } from '../systems/CoinField';
@@ -64,11 +70,11 @@ function hintTexts(touch: boolean): Record<HintId, string> {
       : 'Move the mouse to swim (or use WASD / arrow keys)',
     eat: 'Eat fish smaller than you! Your hunger bar drains all the time',
     boost: touch
-      ? 'Tap BOOST to dash. Leap out of the water to catch birds!'
-      : 'Hold click or Space to BOOST. Leap out of the water to catch birds!',
+      ? 'Tap Boost to dash. Leap out of the water to catch birds!'
+      : 'Hold click or Space to boost. Leap out of the water to catch birds!',
     danger: 'Watch out for jellyfish and sea mines!',
     grow: 'You grew! Bigger fish are on the menu now',
-    shark: 'SHARK! Swim away: boost, or leap out of the water!',
+    shark: 'Shark! Swim away: boost, or leap out of the water!',
   };
 }
 
@@ -117,6 +123,8 @@ export class GameScene extends Phaser.Scene {
   /** Seconds of magnet-orb power left. */
   private magnetLeft = 0;
   private magnetShown = -1;
+  /** A pause has been queued (Phaser applies it on the next update). */
+  private pausePending = false;
 
   private readonly lookAhead = new Phaser.Math.Vector2();
   private readonly tail = new Phaser.Math.Vector2();
@@ -148,6 +156,7 @@ export class GameScene extends Phaser.Scene {
     this.stageZoom = 1;
     this.magnetLeft = 0;
     this.magnetShown = -1;
+    this.pausePending = false;
 
     // Shop upgrades shape this run.
     const mods = runModifiers(saves.data.upgrades);
@@ -196,16 +205,47 @@ export class GameScene extends Phaser.Scene {
     this.spawner.populate(this.seal.x, this.seal.y, this.threat);
 
     this.setupDebug();
-    this.input.keyboard!.on('keydown-ESC', () => {
-      if (!this.dead) this.scene.start(SceneKeys.Menu);
-    });
+    this.setupPause();
 
     sharpenTexts(this);
     this.scene.launch(SceneKeys.Hud);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scene.stop(SceneKeys.Hud);
       this.scene.stop(SceneKeys.GameOver);
+      this.scene.stop(SceneKeys.Pause);
     });
+  }
+
+  /** Esc / P / the HUD button pause; so does leaving the tab or window mid-run. */
+  private setupPause(): void {
+    const kb = this.input.keyboard!;
+    kb.on('keydown-ESC', () => this.pauseRun());
+    kb.on('keydown-P', () => this.pauseRun());
+    subscribeForScene(this, [EventBus.on('ui:pause', () => this.pauseRun())]);
+    const onAway = () => this.pauseRun();
+    // Keys released while paused never reached this scene: don't let them stick.
+    const onResume = () => {
+      this.pausePending = false;
+      this.input.keyboard?.resetKeys();
+    };
+    this.game.events.on(Phaser.Core.Events.BLUR, onAway);
+    this.game.events.on(Phaser.Core.Events.HIDDEN, onAway);
+    this.events.on(Phaser.Scenes.Events.RESUME, onResume);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(Phaser.Core.Events.BLUR, onAway);
+      this.game.events.off(Phaser.Core.Events.HIDDEN, onAway);
+      this.events.off(Phaser.Scenes.Events.RESUME, onResume);
+    });
+  }
+
+  private pauseRun(): void {
+    // Phaser applies pause on its next update, so several triggers in one frame (switching
+    // tabs fires both BLUR and HIDDEN) must only queue it once.
+    if (this.dead || this.pausePending || !this.scene.isActive()) return;
+    this.pausePending = true;
+    this.scene.pause();
+    this.scene.pause(SceneKeys.Hud);
+    this.scene.launch(SceneKeys.Pause);
   }
 
   override update(time: number, delta: number): void {

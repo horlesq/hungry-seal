@@ -1,5 +1,5 @@
 // Turns upgrade levels into run modifiers and handles purchase rules. Pure logic, no Phaser.
-import { UPGRADE_EFFECTS, upgradeDef, type UpgradeId } from '../config/upgrades';
+import { UPGRADE_EFFECTS, UPGRADE_IDS, upgradeDef, type UpgradeId } from '../config/upgrades';
 
 export type UpgradeLevels = Record<UpgradeId, number>;
 
@@ -48,6 +48,14 @@ export function maxLevel(id: UpgradeId): number {
 export function nextCost(id: UpgradeId, level: number): number | null {
   const costs = upgradeDef(id).costs;
   return level < costs.length ? costs[level] : null;
+}
+
+/** Whether any upgrade's next level is affordable (the "something to buy" badge). */
+export function anyAffordable(levels: UpgradeLevels, coins: number): boolean {
+  return UPGRADE_IDS.some((id) => {
+    const cost = nextCost(id, levels[id]);
+    return cost !== null && coins >= cost;
+  });
 }
 
 export type BuyResult =

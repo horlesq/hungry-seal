@@ -101,6 +101,8 @@ export interface GameEvents {
   /** First-run hint text to show at the bottom of the screen (null = hide). */
   hint: [text: string | null];
   'zone:enter': [zone: { name: string; blurb: string }];
+  /** The HUD's pause button was pressed. */
+  'ui:pause': [];
   'debug:toggle': [enabled: boolean];
   'debug:info': [info: DebugInfo];
 }

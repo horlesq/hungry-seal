@@ -19,6 +19,7 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run playtest"
   },
   "dependencies": {
+    "@fontsource-variable/baloo-2": "^5.3.0",
     "phaser": "^4.2.1"
   },
   "devDependencies": {

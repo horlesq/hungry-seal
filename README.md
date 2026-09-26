@@ -9,7 +9,8 @@ upgrades between runs.
 ## Controls
 - **Mouse:** the seal swims toward the cursor; hold the left button to boost
 - **Keyboard:** WASD / arrow keys to swim, Space or Shift to boost
-- **Touch:** hold and drag to swim, BOOST button to dash
+- **Touch:** hold and drag to swim, Boost button to dash
+- **Pause:** Esc or P, or the pause button (top-right)
 - Leap out of the water to catch birds. Fill the frenzy meter to eat *anything*.
 
 ## Development
@@ -27,4 +28,5 @@ URL flags: `?debug` (overlay and hit circles), `?calm` (no hazards or predators)
 Project docs: [design](docs/GAME_DESIGN.md), [architecture](docs/ARCHITECTURE.md),
 [roadmap](docs/ROADMAP.md), [assets](docs/ASSETS.md).
 
-All art is currently generated placeholder art, and all sound is synthesized in code.
+All art is currently generated placeholder art, and all sound is synthesized in code. UI font:
+[Baloo 2](https://fonts.google.com/specimen/Baloo+2) (SIL Open Font License), bundled via Fontsource.

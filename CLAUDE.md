@@ -14,11 +14,17 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 ## Commands
 - `npm run dev` (or `npm run dev:host` to test on a phone over LAN)
 - `npm run check` — typecheck + lint + unit tests + headless browser playtest. Must pass before a phase/feature is called done.
-- `npm run playtest` — screenshots land in `.playtest/`; look at them, passing checks don't prove it looks right.
+- `npm run playtest` — screenshots land in `.playtest/`; look at them, passing checks don't prove it looks right. `PLAYTEST_ONLY=desktop,mobile` runs single sections.
 - `npm run balance -- human 300` — bot plays a run; use it after any tuning change in `config/*.ts`. Take several samples (high variance).
 - URL flags: `?debug` (overlay + hit circles, or press `), `?calm` (no hazards/predators).
 - Git: `main` holds finished phases; do each phase on a `phase-N-...` branch.
 - Phaser API lookup: grep `node_modules/phaser/types/phaser.d.ts`.
+- Skills live in `.agents/skills/` (tracked, versions in `skills-lock.json`); `.claude/skills/` holds junctions to them (gitignored, recreate after cloning). Use `frontend-design` + `game-ui-ux` for UI work, `phaser-coder` for Phaser code.
+
+## UI rules
+- Use the design system in `src/ui/`: tokens and `uiText()` in `theme.ts`, `Button` (+ `setName` for tests), `FocusNav` for keyboard, `widgets.ts`. No ad-hoc fonts, colors or glossy buttons.
+- Buoy orange (`variant: 'primary'`) is for the single main action on a screen; gold is for spending coins.
+- Anchor to view edges plus `getSafeInsets()`; check desktop and phone screenshots after UI changes.
 
 ## Decisions already made (do not re-litigate)
 - Side-scroll, free 2D swim in all directions; seal can leap out of the water.

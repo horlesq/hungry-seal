@@ -37,6 +37,21 @@ export function computeViewport(cssWidth: number, cssHeight: number, dpr: number
   };
 }
 
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/** Converts CSS-pixel insets (e.g. the notch safe area) to design units for a viewport. */
+export function cssInsetsToDesign(css: Insets, v: Viewport): Insets {
+  const k = v.dpr / v.zoom;
+  return { top: css.top * k, right: css.right * k, bottom: css.bottom * k, left: css.left * k };
+}
+
 /** Text is rasterized at this multiple of its size so it stays sharp under camera zoom. */
 export function textResolution(zoom: number): number {
   return Math.min(4, Math.max(1, Math.ceil(zoom * 2) / 2));

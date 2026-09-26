@@ -8,9 +8,9 @@
 // The most recently used device wins, so a resting mouse doesn't fight the keyboard.
 import Phaser from 'phaser';
 import { INPUT } from '../config/balance';
-import { boostButtonCenter, TOUCH_UI } from '../config/layout';
+import { boostButtonCenter, pauseButtonCenter, TOUCH_UI } from '../config/layout';
 import { EventBus, type InputSource } from '../services/EventBus';
-import { getViewport } from '../services/Viewport';
+import { getSafeInsets, getViewport } from '../services/Viewport';
 
 type KeyName = 'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'space' | 'shift';
 
@@ -59,6 +59,7 @@ export class InputController {
     for (const p of this.scene.input.manager.pointers) {
       if (!p.isDown || !p.wasTouch) continue;
       if (this.isOnBoostButton(p.downX, p.downY)) touchBoost = true;
+      else if (this.isOnPauseButton(p.downX, p.downY)) continue;
       else if (!steerPointer || p.downTime > steerPointer.downTime) steerPointer = p;
     }
 
@@ -84,8 +85,15 @@ export class InputController {
   isOnBoostButton(x: number, y: number): boolean {
     // The HUD camera maps design units to canvas pixels by `zoom` from the top-left.
     const v = getViewport();
-    const c = boostButtonCenter(v.viewWidth, v.viewHeight);
+    const c = boostButtonCenter(v.viewWidth, v.viewHeight, getSafeInsets());
     return Math.hypot(x / v.zoom - c.x, y / v.zoom - c.y) <= TOUCH_UI.boostButton.hitRadius;
+  }
+
+  /** `x`, `y` are canvas pixels. Taps on the HUD pause button shouldn't steer the seal. */
+  isOnPauseButton(x: number, y: number): boolean {
+    const v = getViewport();
+    const c = pauseButtonCenter(v.viewWidth, getSafeInsets());
+    return Math.hypot(x / v.zoom - c.x, y / v.zoom - c.y) <= TOUCH_UI.pauseButton.hitRadius;
   }
 
   private steerToward(pointer: Phaser.Input.Pointer, originX: number, originY: number): void {

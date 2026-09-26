@@ -7,11 +7,23 @@
       "skillPath": "skills/agent-browser/SKILL.md",
       "computedHash": "80161e6836b3b40f4e83730a290deb40ac14d877d38c97ad5f6d71be37ce74c3"
     },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "106acf230014cbb43ca34e6410371321b56ca742f9ee0442e8ec05bf02eb0384"
+    },
     "game-developer": {
       "source": "jeffallan/claude-skills",
       "sourceType": "github",
       "skillPath": "skills/game-developer/SKILL.md",
       "computedHash": "f3fe0ec8a36bf09f2e4fc9d55f213160acfce2b6400976f5455d1a513f2b7f5b"
+    },
+    "game-ui-ux": {
+      "source": "gamedev-skills/awesome-gamedev-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/disciplines/game-ui-ux/SKILL.md",
+      "computedHash": "4aeb677be89029728154d40bb1d98e07d809f019ff8cd0e9188fb4a1f9d51255"
     },
     "phaser-coder": {
       "source": "yakoub-ai/phaser4-gamedev",

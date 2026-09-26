@@ -138,8 +138,25 @@ const targetAlive = (page) =>
       window.__lastTarget.motion === window.__lastTargetMotion,
   );
 
-const sceneActive = (page, key) =>
-  page.waitForFunction((k) => window.__PHASER_GAME__?.scene.isActive(k), key, { timeout: 15000 });
+/** Waits for a scene to be running; on timeout the error lists every scene's status. */
+async function sceneActive(page, key) {
+  try {
+    await page.waitForFunction((k) => window.__PHASER_GAME__?.scene.isActive(k), key, {
+      timeout: 15000,
+    });
+  } catch (err) {
+    const states = await page
+      .evaluate(() =>
+        window.__PHASER_GAME__.scene.scenes
+          .map((s) => `${s.sys.settings.key}:${s.sys.settings.status}`)
+          .join(' '),
+      )
+      .catch(() => 'unavailable');
+    throw new Error(`waiting for scene ${key} (statuses ${states}): ${err.message}`, {
+      cause: err,
+    });
+  }
+}
 
 /**
  * Converts design coordinates (HUD space: 0..viewWidth x 0..viewHeight) to page coordinates.
@@ -163,13 +180,33 @@ async function toPage(page, dx, dy) {
   return { x: r.left + (x / r.vw) * r.width, y: r.top + (y / r.vh) * r.height };
 }
 
-/**
- * Page position of a menu/shop control authored in the centered 720-tall column:
- * `dx` from the horizontal centre, `y` from the column top.
- */
-async function menuButton(page, dx, y) {
-  const v = await page.evaluate(() => window.__PHASER_GAME__.registry.get('viewport'));
-  return toPage(page, v.viewWidth / 2 + dx, (v.viewHeight - 720) / 2 + y);
+/** Page position of a named UI Button (see ui/Button.ts) in a scene, found by name. */
+async function buttonAt(page, sceneKey, name) {
+  const p = await page.evaluate(
+    ([key, n]) => {
+      const find = (list) => {
+        for (const o of list) {
+          if (o.name === n) return o;
+          const inner = o.list && find(o.list);
+          if (inner) return inner;
+        }
+        return null;
+      };
+      const btn = find(window.__PHASER_GAME__.scene.getScene(key).children.list);
+      if (!btn) return null;
+      const m = btn.getWorldTransformMatrix();
+      return { x: m.tx, y: m.ty };
+    },
+    [sceneKey, name],
+  );
+  if (!p) throw new Error(`button "${name}" not found in ${sceneKey}`);
+  return toPage(page, p.x, p.y);
+}
+
+/** Clicks a named UI Button with the mouse. */
+async function clickButton(page, sceneKey, name) {
+  const p = await buttonAt(page, sceneKey, name);
+  await page.mouse.click(p.x, p.y);
 }
 
 /** Canvas vs window: CSS box, backing pixels, and the current viewport. */
@@ -233,9 +270,16 @@ async function screens(browser) {
       const hud = window.__PHASER_GAME__.scene.getScene('Hud');
       const v = window.__PHASER_GAME__.registry.get('viewport');
       const b = hud.scoreText.getBounds();
-      return b.right <= v.viewWidth + 1 && b.right > v.viewWidth - 60 && b.top >= 0;
+      const pause = hud.pauseButton.getWorldTransformMatrix();
+      return (
+        pause.tx > v.viewWidth - 90 &&
+        pause.ty < 90 &&
+        b.right < pause.tx &&
+        b.right > v.viewWidth - 200 &&
+        b.top >= 0
+      );
     });
-    check(`score pinned to the top-right: ${c.name}`, hudInside);
+    check(`score + pause pinned to the top-right: ${c.name}`, hudInside);
     if (c.width === 1920) {
       await page.screenshot({ path: `${OUT}/00-widescreen.png` });
       // Live resize (e.g. restoring a maximized window) re-fits everything.
@@ -328,10 +372,37 @@ async function desktop(browser) {
   await page.keyboard.press('Backquote');
   const debugOff = await page.evaluate(() => window.__PHASER_GAME__.registry.get('debug'));
   check('backtick toggles debug off', debugOff === false);
+  // Esc pauses: the world freezes under the pause overlay; Esc again resumes.
   await page.keyboard.press('Escape');
+  await sceneActive(page, 'Pause');
+  const p0 = await sealState(page);
+  await page.waitForTimeout(400);
+  const p1 = await sealState(page);
+  const paused = await page.evaluate(() => window.__PHASER_GAME__.scene.isPaused('Game'));
+  check('Esc pauses the run', paused && p0.x === p1.x && p0.y === p1.y);
+  await page.screenshot({ path: `${OUT}/20-pause.png` });
+  await page.keyboard.press('Escape');
+  await sceneActive(page, 'Game');
+  const resumed = await page.evaluate(() => {
+    const g = window.__PHASER_GAME__.scene;
+    return g.isActive('Game') && g.isActive('Hud') && !g.isActive('Pause');
+  });
+  check('Esc resumes the run', resumed);
+
+  // The HUD pause button, then Quit to menu from the overlay.
+  await page.waitForTimeout(200);
+  await clickButton(page, 'Hud', 'pause');
+  await sceneActive(page, 'Pause');
+  check('HUD pause button pauses', true);
+  // Controls take input once the overlay has faded in.
+  await page.waitForTimeout(300);
+  await clickButton(page, 'Pause', 'quit');
   await sceneActive(page, 'Menu');
-  const hudStopped = await page.evaluate(() => !window.__PHASER_GAME__.scene.isActive('Hud'));
-  check('ESC returns to menu and stops HUD', hudStopped);
+  const hudStopped = await page.evaluate(() => {
+    const g = window.__PHASER_GAME__.scene;
+    return ['Game', 'Hud', 'Pause'].every((k) => !g.isActive(k) && !g.isPaused(k));
+  });
+  check('Quit to menu stops the run and HUD', hudStopped);
 
   // Re-enter to make sure scenes restart cleanly (listeners, textures).
   await page.keyboard.press('Enter');
@@ -422,7 +493,7 @@ async function gameplay(browser) {
   );
   await page.waitForTimeout(700);
   const hudStage = (await runState(page)).hudStage;
-  check('HUD shows the new size', hudStage === 'SIZE 2/5', `hud=${hudStage}`);
+  check('HUD shows the new size', hudStage === 'Size 2', `hud=${hudStage}`);
   await page.screenshot({ path: `${OUT}/08-grown.png` });
 
   // Natural drain.
@@ -640,8 +711,8 @@ async function danger(browser) {
     walk(go.children.list);
     return { texts, save: JSON.parse(localStorage.getItem('hungry-seal-save') ?? 'null') };
   });
-  check('killed by shark shows CHOMPED!', over.texts.includes('CHOMPED!'));
-  check('first run is a new best', over.texts.includes('NEW BEST!'));
+  check('killed by shark shows Chomped!', over.texts.includes('Chomped!'));
+  check('first run is a new best', over.texts.includes('New best!'));
   check(
     'run is saved (coins, best, runs)',
     over.save?.runs === 1 && over.save.coins >= 3 && over.save.bestScore > 0,
@@ -680,10 +751,6 @@ async function phase4(browser) {
   const page = await ctx.newPage();
   watch(page, 'phase4');
   const save = () => page.evaluate(() => JSON.parse(localStorage.getItem('hungry-seal-save')));
-  const click = async (dx, y) => {
-    const p = await menuButton(page, dx, y);
-    await page.mouse.click(p.x, p.y);
-  };
 
   await page.goto(URL);
   await sceneActive(page, 'Menu');
@@ -697,31 +764,51 @@ async function phase4(browser) {
   check('synthesized sounds + music are registered', audioOk);
 
   // Sound toggle (menu) persists.
-  await click(125, 505);
+  await clickButton(page, 'Menu', 'sound');
   // (Phaser's sound.mute can't be read reliably before audio unlocks; check our state.)
-  const menuTexts = () =>
-    page.evaluate(() =>
-      window.__PHASER_GAME__.scene
-        .getScene('Menu')
-        .children.list.flatMap((o) => (o.list ?? [o]).filter((c) => c.type === 'Text'))
-        .map((t) => t.text),
-    );
+  const soundIcon = () =>
+    page.evaluate(() => {
+      const menu = window.__PHASER_GAME__.scene.getScene('Menu');
+      return menu.children.getByName('sound').icon.texture.key;
+    });
   const muted = (await save()).settings?.muted;
-  check('sound button mutes', muted === true && (await menuTexts()).includes('SOUND: OFF'));
+  check('sound button mutes', muted === true && (await soundIcon()) === 'ui-sound-off');
   await page.reload();
   await sceneActive(page, 'Menu');
   await page.waitForTimeout(300);
   check(
     'mute persists across reloads',
-    (await save()).settings.muted === true && (await menuTexts()).includes('SOUND: OFF'),
+    (await save()).settings.muted === true && (await soundIcon()) === 'ui-sound-off',
   );
-  await click(125, 505); // back on
+  await clickButton(page, 'Menu', 'sound'); // back on
 
-  // Shop: buy Big Belly (second card).
-  await click(-125, 505);
+  // Coins to spend: the Upgrades button carries a badge.
+  const badge = await page.evaluate(
+    () =>
+      window.__PHASER_GAME__.scene.getScene('Menu').children.getByName('upgrades').badge.visible,
+  );
+  check('menu badges Upgrades when something is affordable', badge);
+
+  // Keyboard: the first arrow press shows focus on Play, the next moves it to Upgrades.
+  // (Reload first: hovering the sound button moved focus there, as intended.)
+  await page.mouse.move(5, 5);
+  await page.reload();
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  const ring = await page.evaluate(
+    () => window.__PHASER_GAME__.scene.getScene('Menu').children.getByName('upgrades').ring.visible,
+  );
+  check('arrow keys move a visible focus ring', ring);
+  await page.screenshot({ path: `${OUT}/21-menu-focus.png` });
+  await page.keyboard.press('Enter');
   await sceneActive(page, 'Shop');
+  check('Enter activates the focused button (Upgrades)', true);
   await page.waitForTimeout(500);
-  await click(-143, 311); // Big Belly's BUY (row 1, card 2)
+
+  // Buy Big Belly.
+  await clickButton(page, 'Shop', 'buy-belly');
   await page.waitForTimeout(300);
   const bought = await save();
   check(
@@ -734,7 +821,7 @@ async function phase4(browser) {
     () => window.__PHASER_GAME__.scene.getScene('Shop').cards.length,
   );
   check('shop lists all 7 upgrades', cards === 7, `${cards} cards`);
-  await click(160, 668); // PLAY
+  await clickButton(page, 'Shop', 'play');
   await sceneActive(page, 'Game');
   await sceneActive(page, 'Hud');
   await page.waitForTimeout(900);
@@ -842,7 +929,7 @@ async function phase4(browser) {
   });
   check(
     'zone banner on entering the open ocean',
-    banner.alpha > 0.5 && banner.title === 'OPEN OCEAN',
+    banner.alpha > 0.5 && banner.title === 'Open Ocean',
     banner.title,
   );
   await page.screenshot({ path: `${OUT}/18-zone-banner.png` });
@@ -1012,7 +1099,8 @@ async function mobile(browser) {
   await page.waitForTimeout(400);
   const fit = await canvasInfo(page);
   check('touch: canvas fills the phone screen', fillsWindow(fit), fitDetail(fit));
-  const playBtn = await menuButton(page, 0, 405);
+  await page.screenshot({ path: `${OUT}/22-mobile-menu.png` });
+  const playBtn = await buttonAt(page, 'Menu', 'play');
   await page.touchscreen.tap(playBtn.x, playBtn.y);
   await sceneActive(page, 'Game');
   await page.waitForTimeout(700);
@@ -1046,6 +1134,25 @@ async function mobile(browser) {
   await touch('touchEnd', []);
   const stop = await until(page, (s) => s.speed < 5, 5000);
   check('touch: release glides to a stop', stop.ok, `speed=${stop.last.speed.toFixed(1)}`);
+
+  // Tapping the pause button pauses without steering; Resume carries on.
+  const before = await sealState(page);
+  const pauseBtn = await buttonAt(page, 'Hud', 'pause');
+  await page.touchscreen.tap(pauseBtn.x, pauseBtn.y);
+  await sceneActive(page, 'Pause');
+  const still = await sealState(page);
+  check(
+    'touch: pause button pauses without steering',
+    Math.hypot(still.x - before.x, still.y - before.y) < 20,
+    `moved ${Math.hypot(still.x - before.x, still.y - before.y).toFixed(1)}`,
+  );
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${OUT}/23-mobile-pause.png` });
+  const resumeBtn = await buttonAt(page, 'Pause', 'resume');
+  await page.touchscreen.tap(resumeBtn.x, resumeBtn.y);
+  await sceneActive(page, 'Game');
+  const back = await page.evaluate(() => !window.__PHASER_GAME__.scene.isActive('Pause'));
+  check('touch: Resume returns to the run', back);
   await ctx.close();
 }
 
@@ -1069,14 +1176,13 @@ const browser = await chromium.launch({
   args: [...glArgs, '--ignore-gpu-blocklist'],
 });
 
+// PLAYTEST_ONLY=desktop,mobile runs just those sections.
+const sections = { screens, desktop, danger, phase4, phase5, gameplay, mobile };
+const only = process.env.PLAYTEST_ONLY?.split(',');
 try {
-  await screens(browser);
-  await desktop(browser);
-  await danger(browser);
-  await phase4(browser);
-  await phase5(browser);
-  await gameplay(browser);
-  await mobile(browser);
+  for (const [name, run] of Object.entries(sections)) {
+    if (!only || only.includes(name)) await run(browser);
+  }
 } catch (err) {
   errors.push(`playtest crashed: ${err.stack ?? err}`);
 } finally {
