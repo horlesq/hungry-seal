@@ -38,6 +38,7 @@ export class CoinField {
     camera: Phaser.Cameras.Scene2D.Camera,
     seal: Mover & { x: number; y: number; radius: number },
     collecting: boolean,
+    magnetRadius: number = COINS.magnetRadius,
   ): number {
     let collected = 0;
     this.worldCoins = 0;
@@ -49,7 +50,9 @@ export class CoinField {
       const coin = child as Coin;
       if (!coin.active) continue;
       // A dead seal doesn't attract coins: step them as if the seal were far away.
-      const alive = collecting ? coin.step(dt, seal.x, seal.y) : coin.step(dt, 1e9, 1e9);
+      const alive = collecting
+        ? coin.step(dt, seal.x, seal.y, magnetRadius)
+        : coin.step(dt, 1e9, 1e9);
       if (!alive) continue;
       if (collecting && Math.hypot(coin.x - seal.x, coin.y - seal.y) <= reach) {
         coin.despawn();

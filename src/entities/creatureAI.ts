@@ -3,7 +3,8 @@
 // threat (the seal), its depth band and, for school members, the school leader.
 //
 // Priority: flee > follow school leader > wander/drift. Band keeping and a hard clamp to the
-// water column apply on top.
+// creature's medium (water column, or the air for flyers) apply on top. Jetters (squid) move
+// in bursts: a sudden kick to high speed that decays back to cruising.
 import type { BehaviorId, CreatureDef } from '../config/creatures';
 import { moveTowards, rotateTowards } from '../utils/math';
 
@@ -15,6 +16,7 @@ export interface CreatureMotionParams {
   fleeRadius: number;
   flee: boolean;
   drift: boolean;
+  jet: boolean;
 }
 
 export interface CreatureMotion {
@@ -31,6 +33,8 @@ export interface CreatureMotion {
   fleeTimer: number;
   /** Fixed per-flee angle offset so a school scatters instead of moving as one. */
   fleeJitter: number;
+  /** Seconds until the next jet burst (jetters only). */
+  jetTimer: number;
   age: number;
 }
 
@@ -68,6 +72,7 @@ export function motionParamsFor(def: CreatureDef): CreatureMotionParams {
     fleeRadius: def.fleeRadius,
     flee: has('flee'),
     drift: has('drift'),
+    jet: has('jet'),
   };
 }
 
@@ -83,6 +88,7 @@ export function createCreatureMotion(x: number, y: number, heading: number): Cre
     wanderTimer: 0,
     fleeTimer: 0,
     fleeJitter: 0,
+    jetTimer: 0,
     age: 0,
   };
 }
@@ -117,7 +123,8 @@ export function stepCreatureMotion(
   if (fleeing) {
     m.fleeTimer -= dt;
     target = Math.atan2(m.y - ctx.threatY, m.x - ctx.threatX) + m.fleeJitter;
-    targetSpeed = p.fleeSpeed;
+    // Jetters escape in rapid bursts rather than at a steady top speed.
+    targetSpeed = p.jet ? p.speed * 1.5 : p.fleeSpeed;
   } else if (ctx.leader) {
     // Steer toward our slot next to the leader while matching its velocity.
     const tx = ctx.leader.x + ctx.slotX;
@@ -154,6 +161,14 @@ export function stepCreatureMotion(
   const turn = p.turnRate * (fleeing ? FLEE_TURN_BOOST : 1) * dt;
   m.heading = rotateTowards(m.heading, target, turn);
   m.speed = moveTowards(m.speed, targetSpeed, p.accel * dt);
+  if (p.jet) {
+    m.jetTimer -= dt;
+    if (m.jetTimer <= 0) {
+      // Kick: jump to (near) top speed, then let accel bleed it back to the target.
+      m.speed = p.fleeSpeed * (fleeing ? 1 : 0.7);
+      m.jetTimer = fleeing ? 0.45 + ctx.random() * 0.35 : 1.4 + ctx.random() * 1.6;
+    }
+  }
   m.vx = Math.cos(m.heading) * m.speed;
   m.vy = Math.sin(m.heading) * m.speed;
   if (p.drift && !fleeing) m.vy += Math.sin(m.age * 3.3) * DRIFT_BOB;

@@ -6,12 +6,13 @@ import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PreloadScene } from './scenes/PreloadScene';
+import { ShopScene } from './scenes/ShopScene';
 import { applyViewport, measureViewport } from './services/Viewport';
 
 // Order matters for rendering: later scenes draw on top (Hud over Game, GameOver over both).
 const game = new Phaser.Game(
   createGameConfig(
-    [BootScene, PreloadScene, MenuScene, GameScene, HudScene, GameOverScene],
+    [BootScene, PreloadScene, MenuScene, ShopScene, GameScene, HudScene, GameOverScene],
     measureViewport(),
   ),
 );

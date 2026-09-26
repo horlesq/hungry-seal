@@ -23,15 +23,41 @@ export interface Zone {
   top: number;
   /** Background water color at the top of the zone (CSS color). */
   color: string;
+  /** One-liner shown on the banner when the seal swims into the zone. */
+  blurb: string;
 }
 
 /** Ordered top to bottom. Each zone runs until the next zone's `top`. */
 export const ZONES: readonly Zone[] = [
-  { id: 'surface', name: 'Surface', top: WORLD.ceilingY, color: '#5ec8f2' },
-  { id: 'reef', name: 'Shallows', top: WORLD.surfaceY, color: '#2ac6d8' },
-  { id: 'ocean', name: 'Open Ocean', top: 1900, color: '#1a86bd' },
-  { id: 'deep', name: 'The Deep', top: 3400, color: '#11427f' },
-  { id: 'abyss', name: 'Abyss', top: 5000, color: '#1c1a52' },
+  { id: 'surface', name: 'Surface', top: WORLD.ceilingY, color: '#5ec8f2', blurb: '' },
+  {
+    id: 'reef',
+    name: 'Shallows',
+    top: WORLD.surfaceY,
+    color: '#2ac6d8',
+    blurb: 'Minnows, shrimp and penguins. Birds overhead!',
+  },
+  {
+    id: 'ocean',
+    name: 'Open Ocean',
+    top: 1900,
+    color: '#1a86bd',
+    blurb: 'Sardines, squid, turtles... and sharks',
+  },
+  {
+    id: 'deep',
+    name: 'The Deep',
+    top: 3400,
+    color: '#11427f',
+    blurb: 'Sea mines and hungry sharks. Burns energy fast',
+  },
+  {
+    id: 'abyss',
+    name: 'Abyss',
+    top: 5000,
+    color: '#1c1a52',
+    blurb: 'Nothing to eat down here. Yet.',
+  },
 ];
 
 /** Sky color right at the horizon (bottom of the sky gradient). */

@@ -1,16 +1,26 @@
-// Persistent save data: schema, defaults, validation/migration and run recording.
-// Pure logic (no storage access) so it can be unit tested; SaveService does the I/O.
+// Persistent save data: schema, defaults, validation/migration and pure update helpers.
+// No storage access here (SaveService does the I/O) so it can be unit tested.
+import { UPGRADE_IDS, type UpgradeId } from '../config/upgrades';
+import {
+  buyUpgrade as buy,
+  emptyUpgrades,
+  maxLevel,
+  type UpgradeLevels,
+} from '../systems/UpgradeSystem';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
-  /** Coins banked across runs (spent in the Phase 4 shop). */
+  /** Coins banked across runs, spent in the shop. */
   coins: number;
   bestScore: number;
   /** Best distance swum in one run, meters. */
   bestDistance: number;
   runs: number;
+  upgrades: UpgradeLevels;
+  /** First-run hints have been shown. */
+  tutorialDone: boolean;
   settings: {
     muted: boolean;
   };
@@ -29,6 +39,8 @@ export function defaultSave(): SaveData {
     bestScore: 0,
     bestDistance: 0,
     runs: 0,
+    upgrades: emptyUpgrades(),
+    tutorialDone: false,
     settings: { muted: false },
   };
 }
@@ -39,17 +51,24 @@ function count(value: unknown): number {
 
 /**
  * Turns whatever was in storage into valid SaveData. Unknown/corrupt fields fall back to
- * defaults; older versions are upgraded here as the schema evolves.
+ * defaults. v1 saves (no upgrades/tutorial fields) upgrade naturally: missing fields get
+ * defaults, except that anyone who already played counts as having seen the tutorial.
  */
 export function migrateSave(raw: unknown): SaveData {
   const data = defaultSave();
   if (!raw || typeof raw !== 'object') return data;
   const r = raw as Record<string, unknown>;
-  // (No older versions exist yet. Future: if (r.version === 1) { ...upgrade to 2... })
   data.coins = count(r.coins);
   data.bestScore = count(r.bestScore);
   data.bestDistance = count(r.bestDistance);
   data.runs = count(r.runs);
+
+  const upgrades = r.upgrades as Record<string, unknown> | undefined;
+  for (const id of UPGRADE_IDS) {
+    data.upgrades[id] = Math.min(maxLevel(id), count(upgrades?.[id]));
+  }
+
+  data.tutorialDone = typeof r.tutorialDone === 'boolean' ? r.tutorialDone : data.runs > 0;
   const settings = r.settings as Record<string, unknown> | undefined;
   if (settings && typeof settings.muted === 'boolean') data.settings.muted = settings.muted;
   return data;
@@ -68,4 +87,11 @@ export function recordRun(data: SaveData, run: RunRecord): { data: SaveData; new
       runs: data.runs + 1,
     },
   };
+}
+
+/** Buys the next level of an upgrade if affordable. Returns null if not possible. */
+export function purchase(data: SaveData, id: UpgradeId): SaveData | null {
+  const result = buy(data.upgrades, data.coins, id);
+  if (!result.ok) return null;
+  return { ...data, coins: result.coins, upgrades: result.levels };
 }

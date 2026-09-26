@@ -6,6 +6,7 @@ import { TextureKeys } from '../config/assets';
 import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
 import { textureScale } from '../services/Viewport';
+import type { RunModifiers } from '../systems/UpgradeSystem';
 import { damp } from '../utils/math';
 import {
   applyKnockback,
@@ -39,13 +40,33 @@ export class Seal extends Phaser.GameObjects.Sprite {
   /** Seconds of white hit flash left. */
   private flash = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  /** Shop upgrades (speed, boost) for this run. */
+  private readonly mods: RunModifiers;
+  /** Temporary speed multiplier (frenzy). */
+  private speedBonus = 1;
+  private frenzy = false;
+  private frenzyHue = 0;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, mods: RunModifiers) {
     super(scene, x, y, TextureKeys.Seal);
     this.texScale = textureScale(scene, TextureKeys.Seal);
+    this.mods = mods;
     this.motion = createSealMotionState(x, y);
     scene.add.existing(this);
     this.setDepth(10);
     this.setStage(1, false);
+  }
+
+  /** Frenzy glow on/off (visual only; the rules live in GameScene). */
+  setFrenzy(on: boolean): void {
+    this.frenzy = on;
+  }
+
+  /** Temporary speed multiplier on top of stage and upgrades (1 = none). */
+  setSpeedBonus(mult: number): void {
+    if (mult === this.speedBonus) return;
+    this.speedBonus = mult;
+    this.updateParams();
   }
 
   /** Advances movement and visuals. Returns motion events (breach, splashdown, boost). */
@@ -65,12 +86,24 @@ export class Seal extends Phaser.GameObjects.Sprite {
     const cfg = GROWTH.stages[index];
     this.stage = index + 1;
     this.baseScale = cfg.scale;
+    this.updateParams();
+    if (animate) this.pop = 0.35;
+  }
+
+  /** Motion params = base tuning x growth stage x upgrades x temporary bonus. */
+  private updateParams(): void {
+    const cfg = GROWTH.stages[this.stage - 1];
+    const b = SEAL_MOTION.boost;
     this.params = {
       ...SEAL_MOTION,
-      maxSpeed: SEAL_MOTION.maxSpeed * cfg.speedMult,
+      maxSpeed: SEAL_MOTION.maxSpeed * cfg.speedMult * this.mods.speedMult * this.speedBonus,
       radius: SEAL_MOTION.radius * (cfg.scale / STAGE1_SCALE),
+      boost: {
+        ...b,
+        drainPerSec: b.drainPerSec * this.mods.boostDrainMult,
+        regenPerSec: b.regenPerSec * this.mods.boostRegenMult,
+      },
     };
-    if (animate) this.pop = 0.35;
   }
 
   get maxSpeed(): number {
@@ -179,6 +212,16 @@ export class Seal extends Phaser.GameObjects.Sprite {
     if (this.flash > 0) this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     else if (this.stun > 0) {
       this.setTint(Math.floor(this.stun * 20) % 2 ? 0x9ff6ff : 0xffffff);
+      this.setTintMode(Phaser.TintModes.MULTIPLY);
+    } else if (this.frenzy) {
+      // Pulsing golden glow while in a frenzy (hue kept in the orange-yellow range).
+      this.frenzyHue += dt * 7;
+      const color = Phaser.Display.Color.HSVToRGB(
+        0.1 + 0.05 * Math.sin(this.frenzyHue),
+        0.35 + 0.15 * Math.sin(this.frenzyHue * 0.5),
+        1,
+      ) as Phaser.Types.Display.ColorObject;
+      this.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
       this.setTintMode(Phaser.TintModes.MULTIPLY);
     } else this.clearTint();
     this.setAlpha(this.invuln > 0 && Math.floor(this.invuln * 14) % 2 === 0 ? 0.35 : 1);

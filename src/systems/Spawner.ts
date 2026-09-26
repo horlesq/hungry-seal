@@ -1,9 +1,17 @@
-// Camera-relative, pooled creature spawning. Keeps roughly SPAWN.targetAlive creatures
+// Camera-relative, pooled creature spawning. Keeps roughly SPAWN.targetAlive swimmers
 // around the view: spawns just off-screen (biased ahead of the seal) using the zone at the
-// spawn point, and recycles anything that falls far behind. The world is never pre-built.
+// spawn point, and recycles anything that falls far behind. Seabirds are spawned separately
+// in the sky whenever the view is near the surface. The world is never pre-built.
 import Phaser from 'phaser';
 import { SPAWN } from '../config/balance';
-import { CREATURE_LIST, type CreatureDef } from '../config/creatures';
+import {
+  CREATURES,
+  FLYERS,
+  hardLimits,
+  SWIMMERS,
+  type CreatureDef,
+  type CreatureId,
+} from '../config/creatures';
 import { WORLD } from '../config/zones';
 import { getViewport } from '../services/Viewport';
 import { Creature, School } from '../entities/Creature';
@@ -14,6 +22,8 @@ import { pickForZone, pickOffscreenPoint } from './spawnPoint';
 const POOL_SIZE = 120;
 export const WATER_TOP = WORLD.surfaceY + 16;
 export const WATER_BOTTOM = WORLD.floorY - 16;
+/** Birds only spawn while the view is within this distance of the water line. */
+const SKY_SPAWN_RANGE = 500;
 
 export interface Threat {
   x: number;
@@ -28,6 +38,7 @@ export class Spawner {
   /** Active creatures, refreshed every update. */
   readonly alive: Creature[] = [];
   private timer = 0;
+  private skyTimer = 0;
   private readonly ctx: CreatureSteerContext;
 
   constructor(
@@ -66,7 +77,7 @@ export class Spawner {
         WATER_BOTTOM - 30,
       );
       if (Math.hypot(x - seal.x, y - seal.y) < SPAWN.initialMinDistance) continue;
-      const def = this.pickDef(y);
+      const def = pickForZone(SWIMMERS, y, this.random);
       if (!def) continue;
       this.spawnGroup(def, x, y, this.random() < 0.5 ? 0 : Math.PI);
       placed++;
@@ -81,6 +92,8 @@ export class Spawner {
     const ctx = this.ctx;
     ctx.threatX = seal.x;
     ctx.threatY = seal.y;
+    let swimmers = 0;
+    let flyers = 0;
 
     for (const c of this.alive) {
       const leader = c.school?.leader;
@@ -89,22 +102,40 @@ export class Spawner {
       ctx.slotY = c.slotY;
       ctx.bandTop = c.band.top;
       ctx.bandBottom = c.band.bottom;
+      ctx.hardTop = c.hard.top;
+      ctx.hardBottom = c.hard.bottom;
       ctx.threatActive = canEat(seal.stage, c.def.tier);
       stepCreatureMotion(c.motion, c.params, ctx, dt);
       c.syncVisual(dt);
 
       if (Math.hypot(c.x - cx, c.y - cy) > SPAWN.despawnDistance) c.despawn();
+      else if (c.flies) flyers++;
+      else swimmers++;
     }
 
     this.timer -= dt;
     if (this.timer <= 0) {
       this.timer = SPAWN.interval;
-      if (this.countActive() < SPAWN.targetAlive) this.spawnOffscreen(camera, seal);
+      if (swimmers < SPAWN.targetAlive) this.spawnOffscreen(camera, seal);
+    }
+
+    // Seabirds: only worth spawning when the sky is (nearly) in view.
+    this.skyTimer -= dt;
+    if (this.skyTimer <= 0) {
+      this.skyTimer = SPAWN.skyInterval;
+      const nearSurface = camera.worldView.y < WORLD.surfaceY + SKY_SPAWN_RANGE;
+      if (nearSurface && flyers < SPAWN.maxFlyers) this.spawnInSky(camera, seal);
     }
   }
 
   countActive(): number {
     return this.group.countActive(true);
+  }
+
+  /** Places one creature at an exact spot (scripted events, playtests). */
+  spawnAt(id: CreatureId, x: number, y: number, heading = 0): Creature | null {
+    const creature = this.group.get() as Creature | null;
+    return creature?.spawn(CREATURES[id], x, y, heading) ?? null;
   }
 
   private refreshAlive(): void {
@@ -124,7 +155,7 @@ export class Spawner {
         bottom: WATER_BOTTOM - 30,
       });
       if (!p) return;
-      const def = this.pickDef(p.y);
+      const def = pickForZone(SWIMMERS, p.y, this.random);
       if (!def) continue;
       // Swim into the view so the player gets to see it.
       const heading = p.x < camera.midPoint.x ? 0 : Math.PI;
@@ -133,27 +164,35 @@ export class Spawner {
     }
   }
 
-  /** Weighted random creature allowed in the zone at world-y `y`, or null if none. */
-  private pickDef(y: number): CreatureDef | null {
-    return pickForZone(CREATURE_LIST, y, this.random);
+  private spawnInSky(camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): void {
+    const def = FLYERS[Math.floor(this.random() * FLYERS.length)];
+    if (!def?.band) return;
+    const p = pickOffscreenPoint(camera, seal, this.random, {
+      marginMin: SPAWN.marginMin,
+      marginMax: SPAWN.marginMax,
+      aheadBias: SPAWN.aheadBias,
+      top: def.band.top,
+      bottom: def.band.bottom,
+    });
+    if (!p) return;
+    this.spawnGroup(def, p.x, p.y, p.x < camera.midPoint.x ? 0 : Math.PI);
   }
 
   private spawnGroup(def: CreatureDef, x: number, y: number, heading: number): void {
     const s = def.school;
     const count = s ? s.min + Math.floor(this.random() * (s.max - s.min + 1)) : 1;
     const school = s && count > 1 ? new School() : null;
+    // Start inside the creature's own band/medium (e.g. penguins near the surface).
+    const hard = hardLimits(def);
+    const top = Math.max(hard.top, def.band?.top ?? hard.top);
+    const bottom = Math.min(hard.bottom, def.band?.bottom ?? hard.bottom);
 
     for (let i = 0; i < count; i++) {
       const creature = this.group.get() as Creature | null;
       if (!creature) return; // pool exhausted
       const slotX = i === 0 || !s ? 0 : (this.random() - 0.5) * s.spread * 2.8;
       const slotY = i === 0 || !s ? 0 : (this.random() - 0.5) * s.spread * 1.4;
-      creature.spawn(
-        def,
-        x + slotX,
-        Phaser.Math.Clamp(y + slotY, WATER_TOP, WATER_BOTTOM),
-        heading,
-      );
+      creature.spawn(def, x + slotX, Phaser.Math.Clamp(y + slotY, top, bottom), heading);
       if (school) creature.joinSchool(school, slotX, slotY);
     }
   }

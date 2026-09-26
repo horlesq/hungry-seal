@@ -2,7 +2,7 @@
 // its definition, school membership and visuals. Reused via the Spawner's Group.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
-import type { CreatureDef } from '../config/creatures';
+import { hardLimits, type CreatureDef } from '../config/creatures';
 import { zoneBand } from '../config/zones';
 import { textureScale } from '../services/Viewport';
 import {
@@ -31,6 +31,8 @@ export class Creature extends Phaser.GameObjects.Sprite {
   motion!: CreatureMotion;
   params!: CreatureMotionParams;
   band = { top: 0, bottom: 0 };
+  /** Absolute vertical limits (water, or air for flyers). */
+  hard = { top: 0, bottom: 0 };
   school: School | null = null;
   slotX = 0;
   slotY = 0;
@@ -50,7 +52,8 @@ export class Creature extends Phaser.GameObjects.Sprite {
     this.params = motionParamsFor(def);
     this.motion = createCreatureMotion(x, y, heading);
     this.motion.speed = def.speed;
-    this.band = zoneBand(def.zones);
+    this.band = def.band ?? zoneBand(def.zones);
+    this.hard = hardLimits(def);
     this.school = null;
     this.slotX = 0;
     this.slotY = 0;
@@ -83,6 +86,10 @@ export class Creature extends Phaser.GameObjects.Sprite {
 
   get radius(): number {
     return this.def.radius;
+  }
+
+  get flies(): boolean {
+    return this.def.behaviors.includes('fly');
   }
 
   syncVisual(dt: number): void {

@@ -110,8 +110,11 @@ export const FEEDING = {
 } as const;
 
 export const SPAWN = {
-  /** Creatures kept alive around the camera. */
-  targetAlive: 34,
+  /**
+   * Swimmers kept alive around the camera. Bigger prey (penguin, squid, turtle) take slots a
+   * small seal can't eat, so this is higher than the edible density we actually want.
+   */
+  targetAlive: 40,
   /** Seconds between spawn attempts. */
   interval: 0.2,
   /** Spawn this far beyond the screen edge (min/max px). */
@@ -121,6 +124,9 @@ export const SPAWN = {
   despawnDistance: 1500,
   /** Chance a spawn is placed ahead of the seal's movement. */
   aheadBias: 0.7,
+  /** Seabirds alive at once (only while the view is near the surface), and spawn cadence. */
+  maxFlyers: 3,
+  skyInterval: 1.5,
   /** Groups placed around the seal when a run starts. */
   initialGroups: 7,
   initialMinDistance: 260,
@@ -171,6 +177,20 @@ export const DANGER = {
     { after: 270, count: 3 },
   ],
   predatorSpawnInterval: 6,
+} as const;
+
+export const FRENZY = {
+  /** Meter per meal (x combo multiplier): ~28 plain meals, far fewer on a combo. */
+  perMeal: 0.036,
+  decayDelay: 3,
+  decayPerSec: 0.04,
+  duration: 8,
+  speedMult: 1.3,
+  scoreMult: 2,
+  /** Coins within this distance fly to the seal during a frenzy. */
+  magnetRadius: 280,
+  /** Score for smashing through a hazard during a frenzy. */
+  hazardScore: 50,
 } as const;
 
 /** Brief freezes on impactful moments (seconds). */

@@ -67,17 +67,18 @@ Notes carried forward:
 - Sharks live in ocean/deep, so the shallow reef is relatively safe but only has tier-1 food; growth pushes you deeper (intended risk/reward).
 - No audio yet (Phase 4). Hit feedback currently relies on visuals only.
 
-## Phase 4 — PLAYABLE DEMO (vertical slice)
+## Phase 4 — PLAYABLE DEMO (vertical slice) — [~] in progress
 Goal: a shareable build that shows the whole game concept in ~5-10 minutes.
-- [ ] Two depth zones (Surface+Reef, Open Ocean) with distinct spawn tables and visuals
-- [ ] 8-10 creatures total incl. seabird (leap-to-catch), crab, squid
-- [ ] Boost (stamina) + Frenzy meter and mode
-- [ ] Shop scene with 4 upgrades (speed, max health, hunger resistance, boost) and coin costs
-- [ ] Menu with Play/Shop/Settings(mute)
-- [ ] Basic audio (bite, splash, coin, music loop) with mute toggle
-- [ ] First-30-seconds onboarding hints (controls tooltip)
-- [ ] Free/generated art pass v1 on seal + main creatures + UI (or clean placeholders)
-- [ ] Deployed to a public URL (itch.io/Netlify) for testers
+- [x] Resolution: native-resolution canvas, no letterbox bars on any aspect ratio, 2x placeholder art, crisp text (user-reported issue)
+- [x] Depth zones with distinct spawn tables; zone banner ("OPEN OCEAN — Sardines, squid, turtles... and sharks") on entering each zone. Distinct zone *visuals* beyond the gradient → art pass.
+- [x] 8 creatures: minnow, shrimp, sardine, squid (jets), penguin (near surface), turtle (slow, big), seabird (flies, leap to catch) + shark. Crab deferred to Phase 5 (needs a reef floor).
+- [x] Boost (stamina) + Frenzy meter and mode (fast, invulnerable, eats anything incl. sharks, x2 score, coin magnet, smashes hazards)
+- [x] Shop scene with 4 upgrades (Flippers speed, Big Belly max hunger, Blubber hunger drain, Turbo Tail boost), 5 levels each, costs 60/150/300/550/900; save v2 with migration
+- [x] Menu with Play / Shop / Sound toggle; results screen with Swim again / Shop / Menu buttons
+- [x] Audio: synthesized SFX (chomp, coin, splash, hurt, zap, explosion, boost, grow, frenzy, shark alert, UI) + procedural music loop; mute persists
+- [x] First-run onboarding hints (move, eat, boost, danger, grow, shark)
+- [ ] Free/generated art pass v1 on seal + main creatures + UI (or clean placeholders) — waiting on assets (see ASSETS.md)
+- [ ] Deployed to a public URL (itch.io/Netlify) for testers — needs a decision: the GitHub repo is private (free GitHub Pages needs public)
 **Exit:** a stranger can open the link, understand it, play several runs, buy upgrades, and want another run.
 
 ## Phase 5 — Content expansion

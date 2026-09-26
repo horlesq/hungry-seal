@@ -43,7 +43,12 @@ export class Coin extends Phaser.GameObjects.Image {
   }
 
   /** Returns false when the coin expired this frame. */
-  step(dt: number, sealX: number, sealY: number): boolean {
+  step(
+    dt: number,
+    sealX: number,
+    sealY: number,
+    magnetRadius: number = COINS.magnetRadius,
+  ): boolean {
     this.age += dt;
     this.life -= dt;
     if (this.life <= 0) {
@@ -54,7 +59,7 @@ export class Coin extends Phaser.GameObjects.Image {
     const dx = sealX - this.x;
     const dy = sealY - this.y;
     const dist = Math.hypot(dx, dy);
-    if (this.magnetized || dist < COINS.magnetRadius) {
+    if (this.magnetized || dist < magnetRadius) {
       this.magnetized = true;
       const step = Math.min(dist, COINS.magnetSpeed * dt);
       if (dist > 0) {

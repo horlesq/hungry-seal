@@ -45,7 +45,7 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 
 ### Combo and Frenzy
 - Eating within 2.2 s of the last meal builds a combo (done). Multiplier on score: x2 at 2 meals, x3 at 5, x4 at 10, x5 at 16. Getting hurt breaks the combo. Combos of 5+ get a "N COMBO!" callout when they end. HUD shows multiplier, count and a shrinking timer bar.
-- Combo also fills a **Frenzy** meter (Phase 4). When full: brief frenzy (speed boost, invulnerability, coin magnet, everything edible, score x2).
+- Meals fill a **Frenzy** meter (done): +3.6% per meal x combo multiplier (~28 plain meals, far fewer on a combo); drains slowly after 3 s without eating. When full: 8 s frenzy — 1.3x speed, invulnerable (smashes through jellyfish/mines for +50 each), everything edible including sharks (they flee), score x2, 280 px coin magnet, golden glow, HUD meter pulses.
 
 ### Damage (done)
 - Hazards and predator bites take a chunk of hunger, knock the seal back (it keeps facing the same way), may stun it (no steering), and give 1.2 s of invulnerability (seal blinks). Screen shake, brief hit-stop, red vignette flash, "-N" popup.
@@ -80,6 +80,10 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 | 1 | Minnow ✅ | Reef/Ocean | 6 | 10 | schools of 3-6, flees at 290 px/s |
 | 1 | Shrimp ✅ | Reef | 5 | 8 | drifts and bobs, flees at 230 px/s |
 | 2 | Sardine school ✅ | Ocean/Deep | 11 | 20 | schools of 6-10, flees at 330 px/s |
+| 2 | Seabird ✅ | Sky above the surface | 12 | 50 | glides and swoops low; leap out of the water to catch |
+| 3 | Squid ✅ | Ocean/Deep | 16 | 60 | cruises slowly, escapes in jet bursts (420 px/s kicks) |
+| 3 | Penguin ✅ | Upper reef (near surface) | 20 | 90 | groups of 2-3, fast (390 px/s flee) |
+| 4 | Sea turtle ✅ | Reef/Ocean | 32 | 120 | slow, doesn't flee: a big safe meal once you're size 4 |
 | 2 | Crab | Reef floor | 10 | 25 | walks, snaps |
 | 3 | Seabird | Surface/Air | 15 | 50 | glides, dives |
 | 3 | Squid | Ocean | 18 | 60 | jets away |
@@ -90,14 +94,21 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 ## Currency and progression
 - **Coins:** collected in run (floating clusters of 4-7 ahead of the seal, dropped by prey: 10% tier 1, 22% tier 2, ..., treasure chests later). Touch to collect, with a short magnet pull; dropped coins vanish after 10 s. Banked into the save when the run ends (done).
 - **Gems (later):** rare, premium-feel currency for skins; earned from rare events, not sold.
-- **Upgrades** (permanent, bought with coins, 5-8 levels each):
-  - Speed, Boost capacity, Max health, Hunger resistance (slower drain), Bite/Growth (faster growth), Coin magnet, Frenzy charge rate.
+- **Upgrades** (permanent, bought with coins in the Shop; 5 levels, costs 60 / 150 / 300 / 550 / 900) — done for 4:
+  - Flippers: +4% top speed per level. Big Belly: +12 max hunger per level. Blubber: -7% hunger drain per level. Turbo Tail: +18% boost (lasts longer, refills faster) per level.
+  - Later: Bite/Growth (faster growth), Coin magnet, Frenzy charge rate.
 - **Skins:** cosmetic seal variants (harbor, leopard, arctic, pirate, etc.).
 - **Missions (later):** 3 rotating goals per run set ("eat 20 crabs", "reach abyss").
 - Save data in localStorage: coins, best score, best distance, runs, settings (done); upgrade levels, skins owned/equipped (Phase 4+).
 
+## Audio (done, placeholder)
+All sounds are synthesized in code at startup (`src/audio/`): chomp / big chomp, coin, splash, hurt, jellyfish zap, explosion, boost whoosh, grow and frenzy arpeggios, shark "dun-dun" on its telegraph, bump, UI click, purchase, game over, and a calm 8-bar underwater music loop. Mute from the menu (persists). Replace with recorded audio later under the same keys.
+
+## Onboarding (done)
+First run only (until the first run ends): bottom-centre hints — how to swim (mouse/keys or touch), eat smaller fish + hunger drains, boost + leap for birds, jellyfish/mine warning at 24 s, "you grew", and "SHARK!" when one first hunts you. Zone banners (every run) name each depth zone as you enter it.
+
 ## Run structure
-1. Menu -> Play (or Shop).
+1. Menu -> Play (or Shop). Keys: Enter/Space play, S shop, M mute. Results: Swim again / Shop / Menu.
 2. Start near surface. Hunger full, stage 1.
 3. Endless run; difficulty ramps with time.
 4. Death -> results (score, coins, distance, best) -> Shop / Retry.

@@ -17,6 +17,7 @@ const P: CreatureMotionParams = {
   fleeRadius: 200,
   flee: true,
   drift: false,
+  jet: false,
 };
 
 const DT = 1 / 60;
@@ -103,6 +104,33 @@ describe('creature AI', () => {
     }
     const dist = Math.hypot(member.x - (leader.x - 40), member.y - (leader.y + 20));
     expect(dist).toBeLessThan(40);
+  });
+
+  it('jetters move in bursts: speed spikes then decays', () => {
+    const jetter = { ...P, jet: true, accel: 300 };
+    const m = createCreatureMotion(0, 1500, 0);
+    const speeds: number[] = [];
+    const c = ctx();
+    for (let t = 0; t < 6; t += DT) {
+      stepCreatureMotion(m, jetter, c, DT);
+      speeds.push(m.speed);
+    }
+    const peak = Math.max(...speeds);
+    expect(peak).toBeGreaterThan(jetter.speed * 1.5);
+    // Most of the time it is back near cruising speed.
+    const cruising = speeds.filter((s) => s < jetter.speed * 1.2).length / speeds.length;
+    expect(cruising).toBeGreaterThan(0.4);
+  });
+
+  it('flyers stay in the air when given air limits', () => {
+    const m = createCreatureMotion(0, 500, Math.PI / 2);
+    const c = ctx({ bandTop: 360, bandBottom: 615, hardTop: 40, hardBottom: 628 });
+    let maxY = -Infinity;
+    for (let t = 0; t < 20; t += DT) {
+      stepCreatureMotion(m, P, c, DT);
+      maxY = Math.max(maxY, m.y);
+    }
+    expect(maxY).toBeLessThanOrEqual(628);
   });
 
   it('never leaves the water column', () => {

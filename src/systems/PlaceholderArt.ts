@@ -28,6 +28,10 @@ const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   [TextureKeys.Minnow]: { width: 48, height: 26, draw: drawMinnow, res: HI },
   [TextureKeys.Shrimp]: { width: 44, height: 32, draw: drawShrimp, res: HI },
   [TextureKeys.Sardine]: { width: 60, height: 26, draw: drawSardine, res: HI },
+  [TextureKeys.Squid]: { width: 70, height: 36, draw: drawSquid, res: HI },
+  [TextureKeys.Penguin]: { width: 60, height: 34, draw: drawPenguin, res: HI },
+  [TextureKeys.Turtle]: { width: 86, height: 58, draw: drawTurtle, res: HI },
+  [TextureKeys.Seabird]: { width: 72, height: 44, draw: drawSeabird, res: HI },
   [TextureKeys.Shark]: { width: 220, height: 104, draw: drawShark, res: HI },
   [TextureKeys.Jellyfish]: { width: 60, height: 80, draw: drawJellyfish, res: HI },
   [TextureKeys.Mine]: { width: 68, height: 68, draw: drawMine, res: HI },
@@ -365,6 +369,238 @@ function drawShrimp(ctx: Ctx, w: number, h: number): void {
   ctx.fillStyle = '#10161c';
   ctx.beginPath();
   ctx.arc(w - 9, h * 0.3, 2.2, 0, TAU);
+  ctx.fill();
+}
+
+/** Squid swimming mantle-first (pointed end to the right), tentacles trailing left. */
+function drawSquid(ctx: Ctx, w: number, h: number): void {
+  const cy = h / 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // Tentacles.
+  for (let i = 0; i < 5; i++) {
+    const oy = (i - 2) * 3.2;
+    ctx.strokeStyle = i % 2 ? '#d9607a' : '#ef8098';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(24, cy + oy);
+    for (let x = 24; x >= 3; x -= 3) {
+      ctx.lineTo(x, cy + oy * 1.6 + Math.sin(x * 0.35 + i) * 2.2);
+    }
+    ctx.stroke();
+  }
+  // Mantle.
+  const mantle = new Path2D();
+  mantle.moveTo(20, cy - 9);
+  mantle.quadraticCurveTo(45, cy - 12, w - 4, cy);
+  mantle.quadraticCurveTo(45, cy + 12, 20, cy + 9);
+  mantle.quadraticCurveTo(16, cy, 20, cy - 9);
+  mantle.closePath();
+  const grad = ctx.createLinearGradient(0, cy - 12, 0, cy + 12);
+  grad.addColorStop(0, '#ff9ab0');
+  grad.addColorStop(1, '#e45a7a');
+  ctx.fillStyle = grad;
+  ctx.fill(mantle);
+  ctx.strokeStyle = '#8a2440';
+  ctx.lineWidth = 2;
+  ctx.stroke(mantle);
+  // Fins at the tip.
+  ctx.fillStyle = '#f07892';
+  ctx.beginPath();
+  ctx.moveTo(w - 16, cy - 5);
+  ctx.lineTo(w - 6, cy - 14);
+  ctx.lineTo(w - 6, cy - 2);
+  ctx.closePath();
+  ctx.moveTo(w - 16, cy + 5);
+  ctx.lineTo(w - 6, cy + 14);
+  ctx.lineTo(w - 6, cy + 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Spots and eye.
+  ctx.fillStyle = 'rgba(160, 40, 70, 0.5)';
+  for (const [x, y] of [
+    [36, cy - 4],
+    [46, cy + 3],
+    [54, cy - 2],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 1.8, 0, TAU);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(25, cy - 3, 4, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(24.5, cy - 3, 2.3, 0, TAU);
+  ctx.fill();
+}
+
+/** Penguin swimming to the right: black back, white belly, orange beak. */
+function drawPenguin(ctx: Ctx, w: number, h: number): void {
+  const cy = h / 2;
+  ctx.lineJoin = 'round';
+  const outline = '#0e1620';
+  // Feet trailing behind.
+  ctx.fillStyle = '#f29a2e';
+  ctx.beginPath();
+  ctx.ellipse(6, cy + 3, 6, 3, 0.3, 0, TAU);
+  ctx.fill();
+  // Body.
+  const body = new Path2D();
+  body.ellipse(w / 2 - 2, cy, w / 2 - 8, h / 2 - 4, 0, 0, TAU);
+  ctx.fillStyle = '#1d2733';
+  ctx.fill(body);
+  ctx.save();
+  ctx.clip(body);
+  ctx.fillStyle = '#f4f7fa';
+  ctx.beginPath();
+  ctx.ellipse(w / 2, cy + 7, w / 2 - 12, h / 2 - 9, 0, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2;
+  ctx.stroke(body);
+  // Flipper.
+  ctx.fillStyle = '#26323f';
+  ctx.beginPath();
+  ctx.ellipse(w / 2 - 4, cy + 2, 11, 4, 0.35, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // Beak and eye.
+  ctx.fillStyle = '#f29a2e';
+  ctx.beginPath();
+  ctx.moveTo(w - 8, cy - 4);
+  ctx.lineTo(w - 1, cy - 1);
+  ctx.lineTo(w - 8, cy + 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(w - 14, cy - 5, 3.2, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(w - 13.4, cy - 5, 1.8, 0, TAU);
+  ctx.fill();
+}
+
+/** Sea turtle facing right: patterned shell, head and four flippers. */
+function drawTurtle(ctx: Ctx, w: number, h: number): void {
+  const cy = h / 2;
+  const outline = '#1e3a22';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2.5;
+  ctx.fillStyle = '#7fbf6a';
+  // Flippers (front big, back small).
+  const flipper = (x: number, y: number, rx: number, ry: number, rot: number) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, rot, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  };
+  flipper(w * 0.62, cy - 16, 15, 6, -0.6);
+  flipper(w * 0.62, cy + 16, 15, 6, 0.6);
+  flipper(w * 0.24, cy - 13, 9, 4.5, 0.5);
+  flipper(w * 0.24, cy + 13, 9, 4.5, -0.5);
+  // Head.
+  ctx.beginPath();
+  ctx.ellipse(w - 12, cy, 10, 8, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(w - 9, cy - 3, 1.8, 0, TAU);
+  ctx.fill();
+  // Shell.
+  const shell = new Path2D();
+  shell.ellipse(w * 0.44, cy, w * 0.3, h * 0.36, 0, 0, TAU);
+  const grad = ctx.createRadialGradient(w * 0.42, cy - 6, 2, w * 0.44, cy, w * 0.3);
+  grad.addColorStop(0, '#a37a3d');
+  grad.addColorStop(1, '#5f4520');
+  ctx.fillStyle = grad;
+  ctx.fill(shell);
+  ctx.save();
+  ctx.clip(shell);
+  ctx.strokeStyle = 'rgba(255, 230, 170, 0.45)';
+  ctx.lineWidth = 1.6;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.ellipse(w * 0.44 + i * 10, cy, 6, 8, 0, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2.5;
+  ctx.stroke(shell);
+}
+
+/** Seagull gliding to the right with wings up. */
+function drawSeabird(ctx: Ctx, w: number, h: number): void {
+  const cy = h * 0.62;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const outline = '#3a4652';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2;
+  // Far wing (behind the body).
+  ctx.fillStyle = '#b9c4ce';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.42, cy - 4);
+  ctx.quadraticCurveTo(w * 0.3, 6, w * 0.08, 3);
+  ctx.quadraticCurveTo(w * 0.3, 14, w * 0.52, cy - 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Body.
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(w * 0.5, cy, w * 0.3, h * 0.16, 0, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // Tail.
+  ctx.beginPath();
+  ctx.moveTo(w * 0.22, cy - 2);
+  ctx.lineTo(w * 0.06, cy - 6);
+  ctx.lineTo(w * 0.08, cy + 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Near wing with black tip.
+  ctx.fillStyle = '#d6dde3';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.46, cy - 3);
+  ctx.quadraticCurveTo(w * 0.52, 2, w * 0.78, 2);
+  ctx.quadraticCurveTo(w * 0.62, 12, w * 0.6, cy - 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#20272e';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.7, 4);
+  ctx.quadraticCurveTo(w * 0.75, 2, w * 0.78, 2);
+  ctx.quadraticCurveTo(w * 0.74, 7, w * 0.7, 8);
+  ctx.closePath();
+  ctx.fill();
+  // Head, beak, eye.
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(w * 0.8, cy - 3, 6.5, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#f2a53a';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.86, cy - 3);
+  ctx.lineTo(w - 2, cy - 1);
+  ctx.lineTo(w * 0.86, cy + 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(w * 0.82, cy - 5, 1.6, 0, TAU);
   ctx.fill();
 }
 

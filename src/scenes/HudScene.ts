@@ -11,6 +11,7 @@ import {
   type BoostState,
   type ComboState,
   type DebugInfo,
+  type FrenzyState,
   type GrowthState,
   type HungerState,
   type InputSource,
@@ -19,12 +20,22 @@ import { fitUiCamera, onResize, sharpenTexts, textureScale } from '../services/V
 
 const BAR = { x: 84, y: 20, w: 330, h: 26 };
 const GROW = { x: 84, y: 52, w: 330, h: 10 };
+const FRENZY_BAR = { x: 84, y: 68, w: 330, h: 8 };
 const COMBO_BAR = { w: 150, h: 8 };
 
 export class HudScene extends Phaser.Scene {
   private root!: Phaser.GameObjects.Container;
   private hungerBar!: Phaser.GameObjects.Graphics;
   private growthBar!: Phaser.GameObjects.Graphics;
+  private frenzyBar!: Phaser.GameObjects.Graphics;
+  private frenzyLabel!: Phaser.GameObjects.Text;
+  private frenzy: FrenzyState = { meter: 0, active: false };
+  private hintRoot!: Phaser.GameObjects.Container;
+  private hintBg!: Phaser.GameObjects.Graphics;
+  private hintText!: Phaser.GameObjects.Text;
+  private bannerRoot!: Phaser.GameObjects.Container;
+  private bannerTitle!: Phaser.GameObjects.Text;
+  private bannerBlurb!: Phaser.GameObjects.Text;
   private stageText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
   private rightRoot!: Phaser.GameObjects.Container;
@@ -59,6 +70,7 @@ export class HudScene extends Phaser.Scene {
     this.hurtFlash = 0;
     this.lastMultiplier = 1;
     this.coins = 0;
+    this.frenzy = { meter: 0, active: false };
 
     // Behind the rest of the HUD so bars stay readable.
     this.vignette = this.add.image(0, 0, TextureKeys.Vignette).setOrigin(0).setAlpha(0);
@@ -69,9 +81,10 @@ export class HudScene extends Phaser.Scene {
     this.createStatusPanel();
     this.createScore();
     this.createCombo();
+    this.createHintAndBanner();
     this.createBoostButton();
     this.debugText = this.add
-      .text(12, 82, '', {
+      .text(12, 90, '', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#e8fbff',
@@ -87,6 +100,9 @@ export class HudScene extends Phaser.Scene {
       EventBus.on('run:score', (score) => (this.targetScore = score)),
       EventBus.on('run:coins', this.onCoins, this),
       EventBus.on('run:combo', this.onCombo, this),
+      EventBus.on('run:frenzy', (state) => (this.frenzy = state)),
+      EventBus.on('hint', this.onHint, this),
+      EventBus.on('zone:enter', this.onZone, this),
       EventBus.on('seal:hurt', () => (this.hurtFlash = 0.9)),
       EventBus.on('run:over', this.onRunOver, this),
       EventBus.on('seal:boost', this.onBoost, this),
@@ -105,6 +121,8 @@ export class HudScene extends Phaser.Scene {
     this.vignette.setDisplaySize(v.viewWidth, v.viewHeight);
     this.rightRoot.x = v.viewWidth;
     this.comboRoot.x = v.viewWidth / 2;
+    this.hintRoot.setPosition(v.viewWidth / 2, v.viewHeight - 64);
+    this.bannerRoot.setPosition(v.viewWidth / 2, 150);
     const b = boostButtonCenter(v.viewWidth, v.viewHeight);
     this.boostButton.setPosition(b.x, b.y);
     sharpenTexts(this);
@@ -116,6 +134,7 @@ export class HudScene extends Phaser.Scene {
     this.hurtFlash = Math.max(0, this.hurtFlash - delta / 450);
     const low = this.lowHunger ? 0.35 + 0.25 * Math.sin(time * 0.006) : 0;
     this.vignette.setAlpha(Math.max(low, this.hurtFlash));
+    this.drawFrenzy(time);
 
     // Roll the score up instead of jumping.
     if (this.displayedScore !== this.targetScore) {
@@ -149,7 +168,47 @@ export class HudScene extends Phaser.Scene {
       strokeThickness: 4,
     });
     this.stageText.setOrigin(0, 0.5);
-    this.root.add([this.hungerBar, this.growthBar, icon, label, this.stageText]);
+    this.frenzyBar = this.add.graphics();
+    this.frenzyLabel = this.add
+      .text(FRENZY_BAR.x + FRENZY_BAR.w + 10, FRENZY_BAR.y + FRENZY_BAR.h / 2 + 2, 'FRENZY!', {
+        fontFamily: UI_FONT,
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ffb13c',
+        stroke: '#3a0b0b',
+        strokeThickness: 4,
+      })
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+    this.root.add([
+      this.hungerBar,
+      this.growthBar,
+      this.frenzyBar,
+      icon,
+      label,
+      this.stageText,
+      this.frenzyLabel,
+    ]);
+  }
+
+  /** Thin frenzy meter under the growth bar; pulses while a frenzy is running. */
+  private drawFrenzy(time: number): void {
+    const f = this.frenzy;
+    const g = this.frenzyBar;
+    const b = FRENZY_BAR;
+    g.clear();
+    g.fillStyle(0x3a1a06, 0.6).fillRoundedRect(b.x - 2, b.y - 2, b.w + 4, b.h + 4, 5);
+    if (f.meter > 0) {
+      const pulse = f.active && Math.floor(time / 120) % 2 === 0;
+      g.fillStyle(pulse ? 0xff6ad5 : 0xffb13c, 1).fillRoundedRect(
+        b.x,
+        b.y,
+        Math.max(b.h, b.w * f.meter),
+        b.h,
+        4,
+      );
+    }
+    this.frenzyLabel.setVisible(f.active).setScale(1 + 0.08 * Math.sin(time * 0.02));
   }
 
   private createScore(): void {
@@ -195,6 +254,82 @@ export class HudScene extends Phaser.Scene {
     this.coinText.setText(String(coins));
     // Keep the icon just left of the right-aligned number as it grows.
     this.coinIcon.setPosition(this.coinText.x - this.coinText.width - 18, 101);
+  }
+
+  /** Bottom-centre tutorial hint box and the top-centre zone banner (both hidden at start). */
+  private createHintAndBanner(): void {
+    this.hintBg = this.add.graphics();
+    this.hintText = this.add
+      .text(0, 0, '', {
+        fontFamily: UI_FONT,
+        fontSize: '24px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        align: 'center',
+      })
+      .setOrigin(0.5);
+    this.hintRoot = this.add.container(0, 0, [this.hintBg, this.hintText]).setAlpha(0);
+
+    this.bannerTitle = this.add
+      .text(0, 0, '', {
+        fontFamily: UI_FONT,
+        fontSize: '46px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#0b3a66',
+        strokeThickness: 10,
+      })
+      .setOrigin(0.5);
+    this.bannerBlurb = this.add
+      .text(0, 42, '', {
+        fontFamily: UI_FONT,
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#bff4ff',
+        stroke: '#0b3a66',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5);
+    this.bannerRoot = this.add.container(0, 0, [this.bannerTitle, this.bannerBlurb]).setAlpha(0);
+  }
+
+  private onHint(text: string | null): void {
+    this.tweens.killTweensOf(this.hintRoot);
+    if (!text) {
+      this.tweens.add({ targets: this.hintRoot, alpha: 0, duration: 250 });
+      return;
+    }
+    this.hintText.setText(text);
+    const w = this.hintText.width + 48;
+    const h = this.hintText.height + 24;
+    this.hintBg
+      .clear()
+      .fillStyle(0x03203a, 0.78)
+      .fillRoundedRect(-w / 2, -h / 2, w, h, 18)
+      .lineStyle(3, 0x6ff3ff, 0.9)
+      .strokeRoundedRect(-w / 2, -h / 2, w, h, 18);
+    this.hintRoot.setAlpha(0).setScale(0.9);
+    this.tweens.add({
+      targets: this.hintRoot,
+      alpha: 1,
+      scale: 1,
+      duration: 220,
+      ease: 'Back.Out',
+    });
+  }
+
+  private onZone(zone: { name: string; blurb: string }): void {
+    this.bannerTitle.setText(zone.name.toUpperCase());
+    this.bannerBlurb.setText(zone.blurb);
+    this.tweens.killTweensOf(this.bannerRoot);
+    this.bannerRoot.setAlpha(0).setY(130);
+    this.tweens.chain({
+      targets: this.bannerRoot,
+      tweens: [
+        { alpha: 1, y: 150, duration: 350, ease: 'Quad.Out' },
+        { alpha: 0, y: 140, delay: 2200, duration: 500 },
+      ],
+    });
   }
 
   /** Top-centre combo readout: multiplier, meal count and a shrinking timer bar. */
@@ -295,7 +430,7 @@ export class HudScene extends Phaser.Scene {
   private onRunOver(): void {
     this.lowHunger = false;
     this.tweens.add({
-      targets: [this.root, this.boostButton, this.comboRoot],
+      targets: [this.root, this.boostButton, this.comboRoot, this.hintRoot, this.bannerRoot],
       alpha: 0,
       duration: 800,
     });

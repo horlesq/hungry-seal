@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { ASSET_MANIFEST } from '../config/assets';
 import { SceneKeys } from '../config/keys';
 import { UI_FONT } from '../config/layout';
+import { audio } from '../services/AudioManager';
 import { fitUiCamera, uiTextResolution } from '../services/Viewport';
 import { ensurePlaceholderTextures } from '../systems/PlaceholderArt';
 
@@ -47,6 +48,7 @@ export class PreloadScene extends Phaser.Scene {
     if (import.meta.env.DEV && generated.length > 0) {
       console.info(`[assets] placeholders generated: ${generated.join(', ')}`);
     }
+    audio.register(this.game);
     this.scene.start(SceneKeys.Menu);
   }
 

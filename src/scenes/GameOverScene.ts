@@ -6,6 +6,7 @@ import { SceneKeys } from '../config/keys';
 import { UI_FONT } from '../config/layout';
 import type { DeathCause, RunResult } from '../services/EventBus';
 import { fitUiCamera, onResize, sharpenTexts, textureScale } from '../services/Viewport';
+import { Button } from '../ui/Button';
 
 /** Ignore input briefly so a finger still held from the run doesn't skip the screen. */
 const INPUT_DELAY = 700;
@@ -35,7 +36,7 @@ export class GameOverScene extends Phaser.Scene {
     this.tweens.add({ targets: dim, alpha: 0.6, duration: 400 });
 
     const W = 620;
-    const H = 560;
+    const H = 640;
     const panel = this.add.container(cx, v.viewHeight / 2);
     const bg = this.add.graphics();
     bg.fillStyle(0x06284a, 0.92).fillRoundedRect(-W / 2, -H / 2, W, H, 28);
@@ -112,24 +113,35 @@ export class GameOverScene extends Phaser.Scene {
         .setOrigin(1, 0.5),
     );
 
-    const touch = this.sys.game.device.input.touch;
-    const prompt = this.add
-      .text(0, H / 2 - 62, touch ? 'Tap to swim again' : 'Click or press Enter to swim again', {
-        fontFamily: UI_FONT,
-        fontSize: '26px',
-        fontStyle: 'bold',
-        color: '#7dfcff',
-      })
-      .setOrigin(0.5);
-    const hint = this.add
-      .text(0, H / 2 - 28, touch ? '' : 'Esc: menu', {
-        fontFamily: UI_FONT,
-        fontSize: '16px',
-        color: '#9fc3d6',
-      })
-      .setOrigin(0.5);
-    panel.add([prompt, hint]);
-    this.tweens.add({ targets: prompt, alpha: 0.45, duration: 650, yoyo: true, repeat: -1 });
+    // Buttons: swim again (Enter/Space), shop (S), menu (Esc).
+    const retry = new Button(this, 0, H / 2 - 110, {
+      width: 330,
+      height: 76,
+      label: 'SWIM AGAIN',
+      fontSize: 36,
+      color: 0x33c46b,
+      onClick: () => this.go(SceneKeys.Game),
+    });
+    const shop = new Button(this, -95, H / 2 - 38, {
+      width: 170,
+      height: 54,
+      label: 'SHOP',
+      fontSize: 24,
+      color: 0xf2b134,
+      onClick: () => this.go(SceneKeys.Shop),
+    });
+    const menu = new Button(this, 95, H / 2 - 38, {
+      width: 170,
+      height: 54,
+      label: 'MENU',
+      fontSize: 24,
+      color: 0x5d7fa6,
+      onClick: () => this.go(SceneKeys.Menu),
+    });
+    panel.add([retry, shop, menu]);
+    const buttons = [retry, shop, menu];
+    // Ignore input briefly so a click/finger still held from the run doesn't skip the screen.
+    buttons.forEach((b) => b.setEnabled(false));
 
     panel.setScale(0.8).setAlpha(0);
     this.tweens.add({ targets: panel, scale: 1, alpha: 1, duration: 350, ease: 'Back.Out' });
@@ -141,26 +153,25 @@ export class GameOverScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(INPUT_DELAY, () => {
-      this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.retry());
+      buttons.forEach((b) => b.setEnabled(true));
       const kb = this.input.keyboard!;
-      kb.once('keydown-ENTER', () => this.retry());
-      kb.once('keydown-SPACE', () => this.retry());
-      kb.once('keydown-ESC', () => this.toMenu());
+      kb.once('keydown-ENTER', () => retry.press());
+      kb.once('keydown-SPACE', () => retry.press());
+      kb.once('keydown-S', () => shop.press());
+      kb.once('keydown-ESC', () => menu.press());
     });
   }
 
-  private retry(): void {
+  private go(target: typeof SceneKeys.Game | typeof SceneKeys.Shop | typeof SceneKeys.Menu): void {
     if (this.leaving) return;
     this.leaving = true;
-    // Restarts the running GameScene (its shutdown also stops this overlay).
-    this.scene.start(SceneKeys.Game);
-  }
-
-  private toMenu(): void {
-    if (this.leaving) return;
-    this.leaving = true;
+    if (target === SceneKeys.Game) {
+      // Restarts the running GameScene (its shutdown also stops this overlay).
+      this.scene.start(SceneKeys.Game);
+      return;
+    }
     this.scene.stop(SceneKeys.Game);
-    this.scene.start(SceneKeys.Menu);
+    this.scene.start(target);
   }
 }
 

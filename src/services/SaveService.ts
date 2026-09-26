@@ -1,6 +1,14 @@
 // localStorage-backed save. Storage can be missing or throw (private mode, blocked
 // cookies), so every access is guarded and the game keeps working with in-memory data.
-import { defaultSave, migrateSave, recordRun, type RunRecord, type SaveData } from './saveData';
+import type { UpgradeId } from '../config/upgrades';
+import {
+  defaultSave,
+  migrateSave,
+  purchase,
+  recordRun,
+  type RunRecord,
+  type SaveData,
+} from './saveData';
 
 const STORAGE_KEY = 'hungry-seal-save';
 
@@ -31,6 +39,26 @@ export class SaveService {
     this.current = result.data;
     this.persist();
     return result;
+  }
+
+  /** Buys the next level of an upgrade. Returns false if maxed or unaffordable. */
+  buyUpgrade(id: UpgradeId): boolean {
+    const next = purchase(this.current, id);
+    if (!next) return false;
+    this.current = next;
+    this.persist();
+    return true;
+  }
+
+  setMuted(muted: boolean): void {
+    this.current = { ...this.current, settings: { ...this.current.settings, muted } };
+    this.persist();
+  }
+
+  completeTutorial(): void {
+    if (this.current.tutorialDone) return;
+    this.current = { ...this.current, tutorialDone: true };
+    this.persist();
   }
 
   private load(): SaveData {

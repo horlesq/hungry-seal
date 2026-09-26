@@ -32,15 +32,20 @@ hungry-seal/
       creatures.ts      creature definitions (tier, speeds, nutrition, behaviors, zones, school)
       hazards.ts        hazard definitions (jellyfish, mine: damage, knockback, stun, drift)
       predators.ts      predator definitions (shark: tier, speeds, radii, timings, rewards)
-      upgrades.ts       (planned) upgrade definitions and cost curves
+      upgrades.ts       upgrade definitions (name, costs, effect text) and per-level effects
     scenes/
       BootScene.ts      reads ?debug, starts Preload
       PreloadScene.ts   load manifest, progress bar, generate missing placeholders
       MenuScene.ts      title screen (placeholder until Phase 4)
       GameScene.ts      the run
       HudScene.ts       overlay UI running parallel to GameScene
-      GameOverScene.ts  results overlay launched over the still-running GameScene
-      ShopScene.ts      (planned)
+      GameOverScene.ts  results overlay launched over the still-running GameScene (buttons)
+      ShopScene.ts      upgrade cards, buy with banked coins, Back / Play
+    ui/
+      Button.ts         reusable rounded button (Zone hit area, hover/press/disabled, click sound)
+    audio/
+      synth.ts          PURE offline synth: effects + seamless stereo music loop (+ tests)
+      sounds.ts         SoundKeys + tone recipes for every effect
     entities/
       sealMotion.ts     PURE seal movement model (swim, surface, air, boost) + tests
       Seal.ts           sprite; applies sealMotion, growth stage scaling, mouth circle, visual feel
@@ -65,13 +70,17 @@ hungry-seal/
       HazardField.ts       pooled hazard spawning/stepping (spawnAt for scripted/tests)
       Predators.ts         predator spawning by schedule, AI stepping, off-screen warning arrows
       CoinField.ts         coin clusters + prey drops, collection
-      FrenzySystem.ts, UpgradeSystem.ts, AudioManager.ts  (planned)
+      FrenzySystem.ts      PURE frenzy meter/duration (tested in frenzy.test.ts)
+      UpgradeSystem.ts     PURE upgrade levels -> run modifiers, purchase rules (upgrades.test.ts)
+      Tutorial.ts          PURE first-run hint rules (tutorial.test.ts)
     services/
       EventBus.ts          typed events between scenes/systems
-      saveData.ts          PURE save schema, defaults, migrateSave, recordRun (+ save.test.ts)
+      saveData.ts          PURE save schema v2 (coins, bests, upgrades, tutorialDone, settings),
+                           migrateSave (v1 -> v2), recordRun, purchase (+ save.test.ts)
+      AudioManager.ts      registers synthesized sounds as AudioBuffers, rate-limited play,
+                           music loop, mute (save is the source of truth)
       SaveService.ts       localStorage wrapper (guarded; in-memory fallback), `saves` singleton
       Viewport.ts          current viewport, canvas resize, fitUiCamera/fitWorldCamera, sharpenTexts, textureScale
-    ui/                 (planned) reusable UI widgets (bars, buttons, panels)
     utils/
       math.ts           clamp, lerp, angle helpers, frame-rate independent damp (+ tests)
       rng.ts            seeded mulberry32 RNG (+ tests)
@@ -84,7 +93,9 @@ hungry-seal/
 ```
 
 ## Scenes
-- **Boot -> Preload -> Menu -> Game (+Hud in parallel) -> GameOver overlay -> Game (retry) / Menu**
+- **Boot -> Preload -> Menu <-> Shop -> Game (+Hud in parallel) -> GameOver overlay -> Game (retry) / Shop / Menu**
+- Upgrades are read once at run start (`runModifiers(saves.data.upgrades)`) and passed to the Seal (speed, boost) and HungerSystem (max, drain).
+- Audio: `audio.register(game)` in Preload renders every sound into Phaser's audio cache (Web Audio only; silent otherwise). `audio.play(key)` rate-limits per key. Phaser's `sound.mute` can't be read reliably before the first user gesture unlocks audio, so the save's `settings.muted` is the source of truth.
 - GameScene owns world simulation; HudScene subscribes to events (`run:hunger` every frame; `run:score`, `run:growth` on change and on the first frame; `run:over`; `seal:boost`; debug) via EventBus and never reads game objects directly. GameScene launches Hud on create and stops Hud + GameOver on shutdown. ESC returns to the menu (until a pause menu exists).
 - Game over: GameScene marks itself dead, plays the death tween, then launches GameOverScene on top while the world keeps animating. Retry = `scene.start(Game)` from the overlay (restarts the running GameScene). Scene order in `main.ts` sets draw order (GameOver above Hud above Game).
 - HUD can't receive events emitted during GameScene.create (it isn't created yet), so GameScene sets `hudDirty` and publishes the full state on its first update.

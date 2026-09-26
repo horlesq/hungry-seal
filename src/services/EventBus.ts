@@ -33,6 +33,12 @@ export interface ComboState {
   remaining: number;
 }
 
+export interface FrenzyState {
+  /** 0..1 fill, or time left while active. */
+  meter: number;
+  active: boolean;
+}
+
 export interface RunResult {
   score: number;
   seconds: number;
@@ -85,8 +91,12 @@ export interface GameEvents {
   'run:score': [score: number];
   'run:coins': [coins: number];
   'run:combo': [state: ComboState];
+  'run:frenzy': [state: FrenzyState];
   'run:over': [result: RunResult];
   'seal:hurt': [info: { source: DamageSource; damage: number }];
+  /** First-run hint text to show at the bottom of the screen (null = hide). */
+  hint: [text: string | null];
+  'zone:enter': [zone: { name: string; blurb: string }];
   'debug:toggle': [enabled: boolean];
   'debug:info': [info: DebugInfo];
 }

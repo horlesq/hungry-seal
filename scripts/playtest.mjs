@@ -163,6 +163,15 @@ async function toPage(page, dx, dy) {
   return { x: r.left + (x / r.vw) * r.width, y: r.top + (y / r.vh) * r.height };
 }
 
+/**
+ * Page position of a menu/shop control authored in the centered 720-tall column:
+ * `dx` from the horizontal centre, `y` from the column top.
+ */
+async function menuButton(page, dx, y) {
+  const v = await page.evaluate(() => window.__PHASER_GAME__.registry.get('viewport'));
+  return toPage(page, v.viewWidth / 2 + dx, (v.viewHeight - 720) / 2 + y);
+}
+
 /** Canvas vs window: CSS box, backing pixels, and the current viewport. */
 const canvasInfo = (page) =>
   page.evaluate(() => {
@@ -656,6 +665,186 @@ async function danger(browser) {
   await ctx.close();
 }
 
+/** Phase 4: audio, mute, shop + upgrades, first-run hints, new creatures, frenzy, zones. */
+async function phase4(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  // Start from an old v1 save with coins and no runs: exercises migration + the shop.
+  await ctx.addInitScript(() => {
+    if (!localStorage.getItem('hungry-seal-save')) {
+      localStorage.setItem(
+        'hungry-seal-save',
+        JSON.stringify({ version: 1, coins: 500, bestScore: 0, runs: 0 }),
+      );
+    }
+  });
+  const page = await ctx.newPage();
+  watch(page, 'phase4');
+  const save = () => page.evaluate(() => JSON.parse(localStorage.getItem('hungry-seal-save')));
+  const click = async (dx, y) => {
+    const p = await menuButton(page, dx, y);
+    await page.mouse.click(p.x, p.y);
+  };
+
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(400);
+  const audioOk = await page.evaluate(() => {
+    const g = window.__PHASER_GAME__;
+    return ['sfx-chomp', 'sfx-coin', 'sfx-splash', 'sfx-frenzy', 'music-ocean'].every((k) =>
+      g.cache.audio.exists(k),
+    );
+  });
+  check('synthesized sounds + music are registered', audioOk);
+
+  // Sound toggle (menu) persists.
+  await click(125, 505);
+  // (Phaser's sound.mute can't be read reliably before audio unlocks; check our state.)
+  const menuTexts = () =>
+    page.evaluate(() =>
+      window.__PHASER_GAME__.scene
+        .getScene('Menu')
+        .children.list.flatMap((o) => (o.list ?? [o]).filter((c) => c.type === 'Text'))
+        .map((t) => t.text),
+    );
+  const muted = (await save()).settings?.muted;
+  check('sound button mutes', muted === true && (await menuTexts()).includes('SOUND: OFF'));
+  await page.reload();
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(300);
+  check(
+    'mute persists across reloads',
+    (await save()).settings.muted === true && (await menuTexts()).includes('SOUND: OFF'),
+  );
+  await click(125, 505); // back on
+
+  // Shop: buy Big Belly (second card).
+  await click(-125, 505);
+  await sceneActive(page, 'Shop');
+  await page.waitForTimeout(500);
+  await click(-150, 450);
+  await page.waitForTimeout(300);
+  const bought = await save();
+  check(
+    'shop: buying an upgrade spends coins',
+    bought.upgrades?.belly === 1 && bought.coins === 440,
+    `belly=${bought.upgrades?.belly} coins=${bought.coins}`,
+  );
+  await page.screenshot({ path: `${OUT}/14-shop.png` });
+  await click(170, 640); // PLAY
+  await sceneActive(page, 'Game');
+  await sceneActive(page, 'Hud');
+  await page.waitForTimeout(900);
+  const hungerMax = await inGame(page, (s) => s.hunger.max);
+  check('upgrade applies in the run (+12 max hunger)', hungerMax === 112, `max=${hungerMax}`);
+
+  const hint = await page.evaluate(() => {
+    const hud = window.__PHASER_GAME__.scene.getScene('Hud');
+    return { alpha: hud.hintRoot.alpha, text: hud.hintText.text };
+  });
+  check(
+    'first run shows a how-to-swim hint',
+    hint.alpha > 0.5 && /swim/i.test(hint.text),
+    hint.text,
+  );
+  await page.screenshot({ path: `${OUT}/15-hint.png` });
+
+  // New creatures (spawned right next to the seal).
+  await noStarve(page);
+  await inGame(page, (s) => {
+    const { x, y } = s.seal;
+    ['squid', 'penguin', 'turtle'].forEach((id, i) =>
+      s.spawner.spawnAt(id, x + 220 + i * 130, y + 90, Math.PI),
+    );
+    s.spawner.spawnAt('seabird', x + 160, 560, Math.PI);
+  });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/16-new-creatures.png` });
+  await page.waitForTimeout(2200);
+  const birds = await inGame(page, (s) =>
+    s.spawner.alive.filter((c) => c.active && c.def.id === 'seabird').map((c) => c.y),
+  );
+  check(
+    'seabirds stay above the water',
+    birds.length > 0 && birds.every((y) => y < 640),
+    `y=${birds.map((y) => y.toFixed(0)).join(',')}`,
+  );
+
+  // Frenzy: fill the meter, one more meal starts it.
+  await inGame(page, (s) => {
+    s.frenzy.meter = 0.99;
+  });
+  await feedOnce(page);
+  await page.waitForTimeout(150);
+  const fr = await inGame(page, (s) => ({ active: s.frenzy.active, hud: s.frenzy.meter }));
+  check('a full meter starts a frenzy', fr.active);
+  await inGame(page, (s) => {
+    window.__shark = s.predators.spawnAt('shark', s.seal.x + 260, s.seal.y, Math.PI);
+  });
+  await page.waitForTimeout(300);
+  const sharkState = await page.evaluate(() => window.__shark.motion.state);
+  check('frenzy: sharks flee', sharkState === 'flee', sharkState);
+  await inGame(page, (s) => {
+    const p = window.__shark;
+    const m = s.seal.motion;
+    m.heading = 0;
+    m.speed = 0;
+    m.x = 0;
+    m.y = 0;
+    const vec = {
+      x: 0,
+      y: 0,
+      set(x, y) {
+        this.x = x;
+        this.y = y;
+        return this;
+      },
+    };
+    const offset = s.seal.mouthPosition(vec).x;
+    m.x = p.motion.x - offset;
+    m.y = p.motion.y;
+    p.motion.speed = 0;
+    window.__sharkMotion = p.motion;
+  });
+  await page.waitForTimeout(250);
+  const sharkEaten = await page.evaluate(
+    () => !(window.__shark.active && window.__shark.motion === window.__sharkMotion),
+  );
+  check('frenzy: sharks can be eaten', sharkEaten);
+  const h0 = await inGame(page, (s) => {
+    s.hunger.value = 80;
+    window.__jelly = s.hazards.spawnAt('jellyfish', s.seal.x, s.seal.y);
+    return s.hunger.value;
+  });
+  await page.waitForTimeout(250);
+  const smash = await inGame(page, (s) => ({
+    hunger: s.hunger.value,
+    jelly: window.__jelly.active,
+  }));
+  check(
+    'frenzy: hazards are smashed without damage',
+    !smash.jelly && smash.hunger > h0 - 3,
+    `hunger ${h0} -> ${smash.hunger.toFixed(1)}`,
+  );
+  await page.screenshot({ path: `${OUT}/17-frenzy.png` });
+
+  // Zone banner on entering the open ocean.
+  await inGame(page, (s) => {
+    s.seal.motion.y = 2300;
+  });
+  await page.waitForTimeout(700);
+  const banner = await page.evaluate(() => {
+    const hud = window.__PHASER_GAME__.scene.getScene('Hud');
+    return { alpha: hud.bannerRoot.alpha, title: hud.bannerTitle.text };
+  });
+  check(
+    'zone banner on entering the open ocean',
+    banner.alpha > 0.5 && banner.title === 'OPEN OCEAN',
+    banner.title,
+  );
+  await page.screenshot({ path: `${OUT}/18-zone-banner.png` });
+  await ctx.close();
+}
+
 async function mobile(browser) {
   const ctx = await browser.newContext({
     viewport: { width: 915, height: 412 },
@@ -677,8 +866,8 @@ async function mobile(browser) {
   await page.waitForTimeout(400);
   const fit = await canvasInfo(page);
   check('touch: canvas fills the phone screen', fillsWindow(fit), fitDetail(fit));
-  const center = await toPage(page, 640, 360);
-  await page.touchscreen.tap(center.x, center.y);
+  const playBtn = await menuButton(page, 0, 405);
+  await page.touchscreen.tap(playBtn.x, playBtn.y);
   await sceneActive(page, 'Game');
   await page.waitForTimeout(700);
   await noStarve(page);
@@ -738,6 +927,7 @@ try {
   await screens(browser);
   await desktop(browser);
   await danger(browser);
+  await phase4(browser);
   await gameplay(browser);
   await mobile(browser);
 } catch (err) {
