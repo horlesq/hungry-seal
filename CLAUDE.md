@@ -15,7 +15,8 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 - `npm run dev` (or `npm run dev:host` to test on a phone over LAN)
 - `npm run check` — typecheck + lint + unit tests + headless browser playtest. Must pass before a phase/feature is called done.
 - `npm run playtest` — screenshots land in `.playtest/`; look at them, passing checks don't prove it looks right.
-- `npm run balance -- human 150` — bot plays a run; use it after any tuning change in `config/balance.ts` or `config/creatures.ts`.
+- `npm run balance -- human 300` — bot plays a run; use it after any tuning change in `config/*.ts`. Take several samples (high variance).
+- URL flags: `?debug` (overlay + hit circles, or press `), `?calm` (no hazards/predators).
 - Git: `main` holds finished phases; do each phase on a `phase-N-...` branch.
 - Phaser API lookup: grep `node_modules/phaser/types/phaser.d.ts`.
 

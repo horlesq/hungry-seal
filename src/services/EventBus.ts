@@ -22,12 +22,33 @@ export interface GrowthState {
   progress: number;
 }
 
+export type DamageSource = 'jellyfish' | 'mine' | 'shark';
+export type DeathCause = 'starved' | DamageSource;
+
+export interface ComboState {
+  /** Meals in the combo; 0 = no combo. */
+  count: number;
+  multiplier: number;
+  /** 0..1 time left in the combo window. */
+  remaining: number;
+}
+
 export interface RunResult {
   score: number;
   seconds: number;
   eaten: number;
   stage: number;
-  cause: 'starved';
+  /** Coins collected this run. */
+  coins: number;
+  /** Meters swum this run. */
+  distance: number;
+  /** Deepest point reached, meters. */
+  maxDepth: number;
+  cause: DeathCause;
+  newBest: boolean;
+  bestScore: number;
+  /** Banked coins after this run. */
+  totalCoins: number;
 }
 
 export interface DebugInfo {
@@ -47,9 +68,13 @@ export interface DebugInfo {
   particles: number;
   objects: number;
   creatures: number;
+  hazards: number;
+  predators: string;
+  coins: number;
   stage: number;
   hunger: number;
   drain: number;
+  elapsed: number;
 }
 
 export interface GameEvents {
@@ -58,7 +83,10 @@ export interface GameEvents {
   'run:hunger': [state: HungerState];
   'run:growth': [state: GrowthState];
   'run:score': [score: number];
+  'run:coins': [coins: number];
+  'run:combo': [state: ComboState];
   'run:over': [result: RunResult];
+  'seal:hurt': [info: { source: DamageSource; damage: number }];
   'debug:toggle': [enabled: boolean];
   'debug:info': [info: DebugInfo];
 }

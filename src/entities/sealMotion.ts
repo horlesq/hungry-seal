@@ -13,6 +13,8 @@ export interface SealMotionParams {
   floorDeflectRate: number;
   steerDeadzone: number;
   radius: number;
+  /** How fast a knockback impulse dies out (per second, exponential). */
+  knockDecay: number;
   boost: {
     speedMult: number;
     accelMult: number;
@@ -61,6 +63,9 @@ export interface SealMotionState {
   /** Seconds before stamina starts regenerating again. */
   regenDelay: number;
   inWater: boolean;
+  /** Knockback velocity, added on top of swimming and decaying over time. */
+  kx: number;
+  ky: number;
 }
 
 export type SealMotionEvent =
@@ -79,7 +84,18 @@ export function createSealMotionState(x: number, y: number): SealMotionState {
     boosting: false,
     regenDelay: 0,
     inWater: true,
+    kx: 0,
+    ky: 0,
   };
+}
+
+/**
+ * Shoves the seal (e.g. when hit). The impulse is separate from swimming so the seal keeps
+ * facing the same way instead of snapping around.
+ */
+export function applyKnockback(s: SealMotionState, vx: number, vy: number): void {
+  s.kx = vx;
+  s.ky = vy;
 }
 
 export function stepSealMotion(
@@ -95,8 +111,13 @@ export function stepSealMotion(
   if (s.inWater) swim(s, input, p, dt);
   else fly(s, input, p, dt);
 
-  s.x += s.vx * dt;
-  s.y += s.vy * dt;
+  s.x += (s.vx + s.kx) * dt;
+  s.y += (s.vy + s.ky) * dt;
+  const decay = Math.exp(-p.knockDecay * dt);
+  s.kx *= decay;
+  s.ky *= decay;
+  if (Math.abs(s.kx) < 1) s.kx = 0;
+  if (Math.abs(s.ky) < 1) s.ky = 0;
 
   resolveSurface(s, p, env, events);
   resolveBounds(s, p, env, dt);
@@ -178,6 +199,7 @@ function resolveSurface(
       // seal can still turn upward and build enough speed to leap.
       s.y = env.surfaceY;
       if (s.vy < 0) s.vy = 0;
+      if (s.ky < 0) s.ky = 0;
     }
     return;
   }
@@ -202,6 +224,7 @@ function resolveBounds(
   if (s.y > floor) {
     s.y = floor;
     if (s.vy > 0) s.vy = 0;
+    if (s.ky > 0) s.ky = 0;
     if (Math.sin(s.heading) > 0) {
       const level = Math.cos(s.heading) >= 0 ? 0 : Math.PI;
       s.heading = rotateTowards(s.heading, level, p.floorDeflectRate * dt);

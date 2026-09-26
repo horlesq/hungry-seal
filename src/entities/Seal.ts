@@ -7,6 +7,7 @@ import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
 import { damp } from '../utils/math';
 import {
+  applyKnockback,
   createSealMotionState,
   stepSealMotion,
   type SealMotionEvent,
@@ -28,6 +29,12 @@ export class Seal extends Phaser.GameObjects.Sprite {
   private wigglePhase = 0;
   /** Extra scale that decays back to 0 (gulps, growing). */
   private pop = 0;
+  /** Seconds of post-hit invulnerability left (seal flashes). */
+  private invuln = 0;
+  /** Seconds of stun left (no steering). */
+  private stun = 0;
+  /** Seconds of white hit flash left. */
+  private flash = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, TextureKeys.Seal);
@@ -39,6 +46,9 @@ export class Seal extends Phaser.GameObjects.Sprite {
 
   /** Advances movement and visuals. Returns motion events (breach, splashdown, boost). */
   step(input: SealMotionInput, dt: number): SealMotionEvent[] {
+    this.invuln = Math.max(0, this.invuln - dt);
+    this.stun = Math.max(0, this.stun - dt);
+    this.flash = Math.max(0, this.flash - dt);
     const events = stepSealMotion(this.motion, input, this.params, WORLD, dt);
     this.setPosition(this.motion.x, this.motion.y);
     this.updateVisuals(dt);
@@ -65,6 +75,32 @@ export class Seal extends Phaser.GameObjects.Sprite {
 
   get speedFraction(): number {
     return Math.min(1.5, this.motion.speed / this.params.maxSpeed);
+  }
+
+  /** Body radius for being hit and collecting coins. */
+  get radius(): number {
+    return this.params.radius;
+  }
+
+  get isInvulnerable(): boolean {
+    return this.invuln > 0 || this.dead;
+  }
+
+  get isStunned(): boolean {
+    return this.stun > 0;
+  }
+
+  /**
+   * Took a hit from something at (fromX, fromY): knocked away, briefly stunned, then
+   * invulnerable for a moment. Damage to hunger is applied by the caller.
+   */
+  hurt(fromX: number, fromY: number, knockback: number, stun: number, invuln: number): void {
+    const a = Math.atan2(this.motion.y - fromY, this.motion.x - fromX);
+    applyKnockback(this.motion, Math.cos(a) * knockback, Math.sin(a) * knockback);
+    this.motion.speed *= 0.3;
+    this.stun = Math.max(this.stun, stun);
+    this.invuln = invuln;
+    this.flash = 0.12;
   }
 
   get mouthRadius(): number {
@@ -105,6 +141,7 @@ export class Seal extends Phaser.GameObjects.Sprite {
     this.dead = true;
     this.motion.speed = 0;
     this.motion.boosting = false;
+    this.clearTint().setAlpha(1);
     this.scene.tweens.add({
       targets: this,
       rotation: this.rotation + Math.PI * this.facing,
@@ -133,5 +170,13 @@ export class Seal extends Phaser.GameObjects.Sprite {
     const stretch = 1 + SEAL_VISUAL.stretch * speedFrac;
     const base = this.baseScale * (1 + this.pop);
     this.setScale(base * stretch, base * (2 - stretch) * this.facing);
+
+    // Hit feedback: white flash, electric tint while stunned, blinking while invulnerable.
+    if (this.flash > 0) this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    else if (this.stun > 0) {
+      this.setTint(Math.floor(this.stun * 20) % 2 ? 0x9ff6ff : 0xffffff);
+      this.setTintMode(Phaser.TintModes.MULTIPLY);
+    } else this.clearTint();
+    this.setAlpha(this.invuln > 0 && Math.floor(this.invuln * 14) % 2 === 0 ? 0.35 : 1);
   }
 }

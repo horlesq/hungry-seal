@@ -11,6 +11,8 @@ export class BootScene extends Phaser.Scene {
     // `?debug` in the URL starts with the debug overlay on (handy on phones).
     const params = new URLSearchParams(window.location.search);
     this.registry.set(RegistryKeys.Debug, params.has('debug'));
+    // `?calm` turns off hazards and predators.
+    this.registry.set(RegistryKeys.Calm, params.has('calm'));
     this.scene.start(SceneKeys.Preload);
   }
 }

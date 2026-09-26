@@ -14,6 +14,8 @@ export class Effects {
   private readonly bubbles: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly droplets: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly zaps: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly rings: Phaser.GameObjects.Image[] = [];
   private readonly texts: Phaser.GameObjects.Text[] = [];
   private nextRing = 0;
@@ -63,6 +65,30 @@ export class Effects {
     });
     this.sparks.setDepth(16);
 
+    this.blast = scene.add.particles(0, 0, TextureKeys.Spark, {
+      emitting: false,
+      lifespan: { min: 450, max: 800 },
+      speed: { min: 160, max: 520 },
+      scale: { start: 1.6, end: 0 },
+      alpha: { start: 1, end: 0 },
+      rotate: { min: 0, max: 360 },
+      tint: [0xff9a3c, 0xffd23c, 0xff5a2a, 0xffffff],
+      maxParticles: 80,
+    });
+    this.blast.setDepth(17);
+
+    this.zaps = scene.add.particles(0, 0, TextureKeys.Spark, {
+      emitting: false,
+      lifespan: { min: 200, max: 420 },
+      speed: { min: 100, max: 320 },
+      scale: { start: 0.9, end: 0 },
+      alpha: { start: 1, end: 0 },
+      rotate: { min: 0, max: 360 },
+      tint: [0x9ff6ff, 0xffffff, 0xd48cff],
+      maxParticles: 60,
+    });
+    this.zaps.setDepth(17);
+
     for (let i = 0; i < SPLASH_RINGS; i++) {
       const ring = scene.add.image(0, 0, TextureKeys.Ring).setVisible(false).setDepth(14);
       this.rings.push(ring);
@@ -89,6 +115,27 @@ export class Effects {
   chomp(x: number, y: number, big = false): void {
     this.sparks.emitParticleAt(x, y, big ? 12 : 7);
     this.bubbles.emitParticleAt(x, y, big ? 5 : 3);
+  }
+
+  /** Sea mine going off. */
+  explosion(x: number, y: number): void {
+    this.blast.emitParticleAt(x, y, 40);
+    this.bubbles.emitParticleAt(x, y, 20);
+  }
+
+  /** Jellyfish sting. */
+  zap(x: number, y: number): void {
+    this.zaps.emitParticleAt(x, y, 16);
+  }
+
+  /** Predator bite landing on the seal. */
+  bite(x: number, y: number): void {
+    this.sparks.emitParticleAt(x, y, 10);
+    this.bubbles.emitParticleAt(x, y, 8);
+  }
+
+  coinPickup(x: number, y: number): void {
+    this.sparks.emitParticleAt(x, y, 4);
   }
 
   /** Celebration burst when the seal grows a stage. */
@@ -181,7 +228,9 @@ export class Effects {
     return (
       this.bubbles.getAliveParticleCount() +
       this.droplets.getAliveParticleCount() +
-      this.sparks.getAliveParticleCount()
+      this.sparks.getAliveParticleCount() +
+      this.blast.getAliveParticleCount() +
+      this.zaps.getAliveParticleCount()
     );
   }
 }

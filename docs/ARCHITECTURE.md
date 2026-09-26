@@ -30,6 +30,8 @@ hungry-seal/
       zones.ts          WORLD bounds (surface, floor), depth zones + colors, zoneBand()
       assets.ts         asset manifest (keys -> optional urls)
       creatures.ts      creature definitions (tier, speeds, nutrition, behaviors, zones, school)
+      hazards.ts        hazard definitions (jellyfish, mine: damage, knockback, stun, drift)
+      predators.ts      predator definitions (shark: tier, speeds, radii, timings, rewards)
       upgrades.ts       (planned) upgrade definitions and cost curves
     scenes/
       BootScene.ts      reads ?debug, starts Preload
@@ -44,7 +46,10 @@ hungry-seal/
       Seal.ts           sprite; applies sealMotion, growth stage scaling, mouth circle, visual feel
       creatureAI.ts     PURE creature behaviors (wander, drift, flee, school, band keeping) + tests
       Creature.ts       pooled prey sprite driven by a CreatureDef; School = follow-the-leader group
-      Coin.ts           (planned)
+      predatorAI.ts     PURE predator state machine (patrol/notice/chase/recover/flee) + tests
+      Predator.ts       pooled predator sprite, mouth circle, telegraph tint + "!"
+      Hazard.ts         pooled hazard sprite (drift, bob, pulse/blink)
+      Coin.ts           pooled coin (float or pop-out, magnet, spin, expiry blink)
     systems/
       InputController.ts   unifies mouse/touch/keyboard -> steer vector + boost
       WorldBackground.ts   parallax, depth gradient, light rays, marine snow, water line
@@ -54,10 +59,17 @@ hungry-seal/
       HungerSystem.ts      PURE hunger drain/feed/starve (tested in rules.test.ts)
       GrowthSystem.ts      PURE growth points -> stages (tested in rules.test.ts)
       feeding.ts           PURE bite rule (canEat) + circle overlap
-      ComboSystem.ts, FrenzySystem.ts, UpgradeSystem.ts, AudioManager.ts  (planned)
+      ComboSystem.ts       PURE combo count/multiplier/window (tested in combo.test.ts)
+      danger.ts            PURE difficulty schedule: hazards/predators allowed by run time
+      spawnPoint.ts        shared off-screen spawn point picker + zone-weighted pick
+      HazardField.ts       pooled hazard spawning/stepping (spawnAt for scripted/tests)
+      Predators.ts         predator spawning by schedule, AI stepping, off-screen warning arrows
+      CoinField.ts         coin clusters + prey drops, collection
+      FrenzySystem.ts, UpgradeSystem.ts, AudioManager.ts  (planned)
     services/
       EventBus.ts          typed events between scenes/systems
-      SaveService.ts       (planned) localStorage wrapper, versioned schema
+      saveData.ts          PURE save schema, defaults, migrateSave, recordRun (+ save.test.ts)
+      SaveService.ts       localStorage wrapper (guarded; in-memory fallback), `saves` singleton
     ui/                 (planned) reusable UI widgets (bars, buttons, panels)
     utils/
       math.ts           clamp, lerp, angle helpers, frame-rate independent damp (+ tests)
@@ -112,11 +124,19 @@ hungry-seal/
 - Schools: `School.members[0]` is the leader; members steer toward leader + a fixed slot offset. When the leader is eaten the next member leads.
 - Spawner keeps ~`SPAWN.targetAlive` creatures, spawning just off-screen (70% ahead of the seal) with the zone at the spawn point choosing a weighted creature, and recycles creatures > `despawnDistance` from the camera centre. Pooled objects are reused: code that holds a creature reference across frames must also check it wasn't respawned (e.g. compare its `motion` object).
 
+## Danger, damage and saves
+- Hazards and predators spawn by run time (`systems/danger.ts` + `DANGER` config); URL `?calm` forces danger time to 0 (no hazards/predators) for testing and tuning.
+- Contacts: hazards vs the seal's body circle; predator **mouth** circle vs the seal's body; the seal's mouth vs a predator's body when the seal has outgrown it (predators flee then).
+- `GameScene.hurt()` is the single damage path: hunger damage, knockback (`applyKnockback` — a decaying impulse separate from swimming, so facing doesn't flip), stun, i-frames, combo reset, hit-stop, shake, `seal:hurt` event (HUD vignette flash). It records the last hit for the death cause.
+- Hit-stop: `GameScene.update` returns early while `hitStop > 0` (tweens keep running).
+- On death `saves.recordRun()` banks coins and bests; the result (with `newBest`, totals) goes to GameOverScene. The menu shows best score and coins.
+
 ## Testing / verification
 - `npm run check` = typecheck + lint + unit tests + playtest. Run it before calling a phase done.
 - Unit tests (Vitest, `src/**/*.test.ts`, Node environment) for pure logic: movement, math, later hunger, growth thresholds, combo timing, upgrade cost curves, save migration.
 - `npm run playtest` boots the game via Vite in headless Chrome (GPU via ANGLE D3D11 on Windows; `PLAYTEST_GL=swiftshader` for software), drives keyboard/mouse/multi-touch, asserts on live state through `window.__PHASER_GAME__`, fails on console errors or HTTP errors, and writes screenshots to `.playtest/` (gitignored). Extend it with checks for every new mechanic.
-- `npm run balance -- [human|perfect] [seconds]` runs a bot that chases prey with the mouse and logs hunger/score/stage every 5 s. Use after changing tuning; reference numbers are in the script header and ROADMAP.
+- Playtest flows: desktop movement, gameplay (eating/growth/game over) and mobile run with `?calm`; the danger flow runs without it and places threats with `hazards.spawnAt` / `predators.spawnAt`. Page-side helpers must return plain data, never game objects (serializing the scene graph takes seconds and breaks timing checks).
+- `npm run balance -- [human|perfect] [seconds]` runs a bot that chases prey with the mouse, dodges close threats (boosting away from hunting sharks), and logs hunger/score/stage every 5 s plus hits taken and cause of death. Results vary a lot run to run: take several samples. Reference numbers are in the script header and ROADMAP.
 - Manual play on a real phone over LAN: `npm run dev:host`, open the printed network URL.
 
 ## Scripts

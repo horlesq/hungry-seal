@@ -46,20 +46,26 @@ Goal: the fundamental "eat to survive" loop works.
 **Exit:** you can play a run from full hunger to starvation, eating fish and growing. (Tech prototype) — verified: playtest 39/39; human-like bot starves at ~2:00 reaching size 3; perfect bot sustains at size 4.
 
 Notes carried forward:
-- Balance is tuned without predators/hazards. Re-run `npm run balance` after Phase 3 adds danger; expect to lower drain or raise nutrition slightly.
+- ~~Balance is tuned without predators/hazards~~ → retuned in Phase 3.
 - Seal grows 0.72 → 1.12 scale over 5 stages with no camera zoom-out. If bigger stages feel cramped, add zoom in Phase 5 (background layers are sized for zoom 1 and must be widened first).
 - Deep/abyss have almost no edible food for a small seal (sardines are tier 2, abyss is empty) — intentional pressure for now; Phase 5 fills them.
 
-## Phase 3 — Danger, feedback, and run flow
+## Phase 3 — Danger, feedback, and run flow ✅ (2026-09-26)
 Goal: the run has stakes and readable feedback.
-- [ ] Hazards: jellyfish, sea mine (damage, stun, invulnerability frames)
-- [ ] First predator (shark): patrol/notice/chase/bite with telegraph
-- [ ] Combo system and score multiplier
-- [ ] Coins (pickup, from prey), coin counter in HUD
-- [ ] Juice v1: screen shake, chomp particles, floating text, hit-stop, low-hunger vignette
-- [ ] GameOver scene with results (score, coins, distance, best)
-- [ ] SaveService: coins, best score persisted
-**Exit:** runs feel dangerous and rewarding; death and retry loop is smooth.
+- [x] Hazards: jellyfish (sting + stun), sea mine (explodes); knockback, invulnerability frames; ramp in from 25 s
+- [x] First predator (shark): patrol / notice (0.8 s telegraph: red flash + "!") / chase / bite / recover; flees and is edible once the seal reaches size 5; off-screen warning arrows
+- [x] Combo system (x2..x5) with HUD readout and timer bar; hurt breaks it
+- [x] Coins: floating clusters + prey drops, magnet pickup, HUD counter
+- [x] Juice v1: shake, chomp/zap/explosion particles, floating text, hit-stop, low-hunger + hurt vignette, seal hit flash/blink
+- [x] GameOver with results: cause-specific title, score, NEW BEST, coins (+total), distance, deepest, time, fish, size
+- [x] SaveService: versioned localStorage save (coins, best score/distance, runs), corrupt/missing storage safe; menu shows best + coins
+- [x] `?calm` flag, danger playtest flow (60 checks total), balance bot dodges threats and reports hits/cause
+**Exit:** runs feel dangerous and rewarding; death and retry loop is smooth. — Verified by playtest 60/60. Balance (human-like bot, 4 samples): 1:06 / 2:02 / 2:44 / 4:49, median ≈ 2:20, deaths from stings, mines and starving.
+
+Notes carried forward:
+- Balance has high variance run to run; always sample the bot several times.
+- Sharks live in ocean/deep, so the shallow reef is relatively safe but only has tier-1 food; growth pushes you deeper (intended risk/reward).
+- No audio yet (Phase 4). Hit feedback currently relies on visuals only.
 
 ## Phase 4 — PLAYABLE DEMO (vertical slice)
 Goal: a shareable build that shows the whole game concept in ~5-10 minutes.

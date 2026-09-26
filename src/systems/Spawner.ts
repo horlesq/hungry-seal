@@ -5,14 +5,15 @@ import Phaser from 'phaser';
 import { SPAWN } from '../config/balance';
 import { CREATURE_LIST, type CreatureDef } from '../config/creatures';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/layout';
-import { WORLD, zoneAt } from '../config/zones';
+import { WORLD } from '../config/zones';
 import { Creature, School } from '../entities/Creature';
 import { stepCreatureMotion, type CreatureSteerContext } from '../entities/creatureAI';
 import { canEat } from './feeding';
+import { pickForZone, pickOffscreenPoint } from './spawnPoint';
 
 const POOL_SIZE = 120;
-const WATER_TOP = WORLD.surfaceY + 16;
-const WATER_BOTTOM = WORLD.floorY - 16;
+export const WATER_TOP = WORLD.surfaceY + 16;
+export const WATER_BOTTOM = WORLD.floorY - 16;
 
 export interface Threat {
   x: number;
@@ -113,54 +114,27 @@ export class Spawner {
   }
 
   private spawnOffscreen(camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): void {
-    const view = camera.worldView;
-    const halfW = GAME_WIDTH / 2;
-    const halfH = GAME_HEIGHT / 2;
-    const moving = Math.hypot(seal.vx, seal.vy) > 40;
-
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const angle =
-        moving && this.random() < SPAWN.aheadBias
-          ? Math.atan2(seal.vy, seal.vx) + (this.random() - 0.5) * 2.1
-          : this.random() * Math.PI * 2;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      // Distance from the view centre to its edge along `angle`, plus a margin.
-      const toEdge = Math.min(
-        Math.abs(cos) > 1e-3 ? halfW / Math.abs(cos) : Infinity,
-        Math.abs(sin) > 1e-3 ? halfH / Math.abs(sin) : Infinity,
-      );
-      const dist = toEdge + SPAWN.marginMin + this.random() * (SPAWN.marginMax - SPAWN.marginMin);
-      const x = camera.midPoint.x + cos * dist;
-      const y = Phaser.Math.Clamp(
-        camera.midPoint.y + sin * dist,
-        WATER_TOP + 30,
-        WATER_BOTTOM - 30,
-      );
-
-      // Clamping to the water may have pulled the point into view; try another angle.
-      if (view.contains(x, y)) continue;
-      const def = this.pickDef(y);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const p = pickOffscreenPoint(camera, seal, this.random, {
+        marginMin: SPAWN.marginMin,
+        marginMax: SPAWN.marginMax,
+        aheadBias: SPAWN.aheadBias,
+        top: WATER_TOP + 30,
+        bottom: WATER_BOTTOM - 30,
+      });
+      if (!p) return;
+      const def = this.pickDef(p.y);
       if (!def) continue;
       // Swim into the view so the player gets to see it.
-      const heading = x < camera.midPoint.x ? 0 : Math.PI;
-      this.spawnGroup(def, x, y, heading + (this.random() - 0.5) * 0.4);
+      const heading = p.x < camera.midPoint.x ? 0 : Math.PI;
+      this.spawnGroup(def, p.x, p.y, heading + (this.random() - 0.5) * 0.4);
       return;
     }
   }
 
   /** Weighted random creature allowed in the zone at world-y `y`, or null if none. */
   private pickDef(y: number): CreatureDef | null {
-    const zone = zoneAt(y).id;
-    const candidates = CREATURE_LIST.filter((d) => d.zones.includes(zone));
-    const total = candidates.reduce((sum, d) => sum + d.weight, 0);
-    if (total <= 0) return null;
-    let roll = this.random() * total;
-    for (const d of candidates) {
-      roll -= d.weight;
-      if (roll <= 0) return d;
-    }
-    return candidates[candidates.length - 1];
+    return pickForZone(CREATURE_LIST, y, this.random);
   }
 
   private spawnGroup(def: CreatureDef, x: number, y: number, heading: number): void {

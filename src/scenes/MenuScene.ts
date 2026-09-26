@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { SceneKeys } from '../config/keys';
 import { GAME_HEIGHT, GAME_WIDTH, UI_FONT } from '../config/layout';
+import { saves } from '../services/SaveService';
 
 export class MenuScene extends Phaser.Scene {
   private started = false;
@@ -72,6 +73,20 @@ export class MenuScene extends Phaser.Scene {
         align: 'center',
       })
       .setOrigin(0.5);
+
+    const save = saves.data;
+    if (save.runs > 0) {
+      this.add
+        .text(cx, 660, `Best ${save.bestScore}   •   Coins ${save.coins}`, {
+          fontFamily: UI_FONT,
+          fontSize: '22px',
+          fontStyle: 'bold',
+          color: '#fff27a',
+          stroke: '#0b3a66',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5);
+    }
 
     this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.startGame());
     this.input.keyboard!.once('keydown', () => this.startGame());

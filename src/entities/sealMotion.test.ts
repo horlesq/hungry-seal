@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyKnockback,
   createSealMotionState,
   stepSealMotion,
   type SealMotionEvent,
@@ -18,6 +19,7 @@ const P: SealMotionParams = {
   floorDeflectRate: 7,
   steerDeadzone: 0.1,
   radius: 20,
+  knockDecay: 4,
   boost: {
     speedMult: 2,
     accelMult: 2,
@@ -114,6 +116,27 @@ describe('seal motion: surface', () => {
     const s = createSealMotionState(0, ENV.surfaceY);
     const events = run(s, { steerX: 0, steerY: -1, boost: false }, 1);
     expect(events.some((e) => e.type === 'breach')).toBe(true);
+  });
+});
+
+describe('seal motion: knockback', () => {
+  it('shoves the seal without changing its heading, then fades out', () => {
+    const s = createSealMotionState(0, 1500);
+    s.heading = 0;
+    applyKnockback(s, -400, 0);
+    run(s, NONE, 0.5);
+    expect(s.x).toBeLessThan(-50);
+    expect(s.heading).toBe(0);
+    run(s, NONE, 3);
+    expect(s.kx).toBe(0);
+  });
+
+  it('does not pin the seal against the seabed', () => {
+    const s = createSealMotionState(0, ENV.floorY - P.radius);
+    applyKnockback(s, 0, 500);
+    stepSealMotion(s, NONE, P, ENV, DT);
+    expect(s.ky).toBe(0);
+    expect(s.y).toBe(ENV.floorY - P.radius);
   });
 });
 

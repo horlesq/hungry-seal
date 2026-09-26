@@ -10,7 +10,10 @@ import { createServer } from 'vite';
 
 const OUT = '.playtest';
 const PORT = 5199;
-const URL = `http://localhost:${PORT}/?debug`;
+// Movement/eating flows run with ?calm (no hazards or predators) so they're deterministic;
+// the danger flow runs without it and places threats explicitly.
+const URL = `http://localhost:${PORT}/?debug&calm`;
+const DANGER_URL = `http://localhost:${PORT}/?debug`;
 const GAME_W = 1280;
 const GAME_H = 720;
 const FLOOR_CONTACT_Y = 6400 - 22;
@@ -374,6 +377,195 @@ async function gameplay(browser) {
   await ctx.close();
 }
 
+/**
+ * Runs `fn(scene, arg)` against the live GameScene inside the page. `fn` must return plain
+ * data (or nothing): returning a game object makes Playwright serialize the whole scene
+ * graph, which takes seconds while the game keeps running and skews timing checks.
+ */
+const inGame = (page, fn, arg = null) =>
+  page.evaluate(
+    ([src, a]) => {
+      const scene = window.__PHASER_GAME__.scene.getScene('Game');
+      return new Function('s', 'arg', `return (${src})(s, arg);`)(scene, a);
+    },
+    [fn.toString(), arg],
+  );
+
+/** Waits until the seal's post-hit invulnerability has worn off. */
+const waitVulnerable = (page) =>
+  page.waitForFunction(
+    () => !window.__PHASER_GAME__.scene.getScene('Game').seal.isInvulnerable,
+    null,
+    { timeout: 5000 },
+  );
+
+async function danger(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  const page = await ctx.newPage();
+  watch(page, 'danger');
+  await page.goto(DANGER_URL);
+  await sceneActive(page, 'Menu');
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(800);
+
+  const early = await inGame(page, (s) => ({
+    hazards: s.hazards.alive.length,
+    predators: s.predators.alive.length,
+  }));
+  check('start of a run is safe', early.hazards === 0 && early.predators === 0);
+
+  // Combo: three quick meals.
+  for (let i = 0; i < 3; i++) {
+    await feedOnce(page);
+    await page.waitForTimeout(120);
+  }
+  const combo = await inGame(page, (s) => ({
+    count: s.combo.count,
+    mult: s.combo.multiplier,
+    hud: window.__PHASER_GAME__.scene.getScene('Hud').comboRoot.visible,
+  }));
+  check('quick meals build a combo', combo.count >= 3 && combo.mult >= 2, `x${combo.mult}`);
+  check('HUD shows the combo', combo.hud);
+
+  // Coins popped next to the seal get collected.
+  const coins0 = await inGame(page, (s) => s.runCoins);
+  await inGame(page, (s) => s.coins.drop(s.seal.x + 30, s.seal.y, 3));
+  await page.waitForTimeout(900);
+  const coins1 = await inGame(page, (s) => ({
+    run: s.runCoins,
+    hud: window.__PHASER_GAME__.scene.getScene('Hud').coinText.text,
+  }));
+  check('coins are collected', coins1.run >= coins0 + 3, `${coins0} -> ${coins1.run}`);
+  check('HUD shows coins', coins1.hud === String(coins1.run), `hud=${coins1.hud}`);
+
+  // Jellyfish: damage, stun, knockback, invulnerability, combo reset.
+  const setHunger = (v) => inGame(page, (s, value) => (s.hunger.value = value), v);
+  await setHunger(80);
+  await inGame(page, (s) => void s.hazards.spawnAt('jellyfish', s.seal.x, s.seal.y));
+  await page.waitForTimeout(200);
+  const stung = await inGame(page, (s) => ({
+    hunger: s.hunger.value,
+    stunned: s.seal.isStunned,
+    invuln: s.seal.isInvulnerable,
+    combo: s.combo.count,
+    vignette: window.__PHASER_GAME__.scene.getScene('Hud').vignette.alpha,
+  }));
+  await page.screenshot({ path: `${OUT}/10-stung.png` });
+  check(
+    'jellyfish stings (hunger damage)',
+    stung.hunger <= 70,
+    `hunger=${stung.hunger.toFixed(1)}`,
+  );
+  check('jellyfish stuns the seal', stung.stunned);
+  check('hit grants invulnerability', stung.invuln);
+  check('getting hurt breaks the combo', stung.combo === 0);
+  check(
+    'hurt flashes the red vignette',
+    stung.vignette > 0.2,
+    `alpha=${stung.vignette.toFixed(2)}`,
+  );
+
+  const h0 = stung.hunger;
+  await inGame(page, (s) => void s.hazards.spawnAt('jellyfish', s.seal.x, s.seal.y));
+  await page.waitForTimeout(200);
+  const h1 = await inGame(page, (s) => s.hunger.value);
+  check('no damage while invulnerable', h1 > h0 - 3, `${h0.toFixed(1)} -> ${h1.toFixed(1)}`);
+
+  // Mine: big damage and it's gone afterwards.
+  await inGame(page, (s) => s.hazards.alive.forEach((h) => h.despawn()));
+  await waitVulnerable(page);
+  await setHunger(80);
+  await inGame(page, (s) => {
+    window.__mine = s.hazards.spawnAt('mine', s.seal.x, s.seal.y);
+  });
+  await page.waitForTimeout(80);
+  await page.screenshot({ path: `${OUT}/11-mine.png` });
+  await page.waitForTimeout(200);
+  const boom = await inGame(page, (s) => ({ hunger: s.hunger.value, mine: window.__mine.active }));
+  check('mine explodes (big damage)', boom.hunger <= 55, `hunger=${boom.hunger.toFixed(1)}`);
+  check('mine is used up', !boom.mine);
+
+  // Shark: telegraph, chase, bite.
+  await waitVulnerable(page);
+  await setHunger(80);
+  await inGame(page, (s) => {
+    window.__shark = s.predators.spawnAt('shark', s.seal.x - 320, s.seal.y, 0);
+  });
+  const states = new Set();
+  let bitten = false;
+  let telegraphShot = false;
+  const until = Date.now() + 6000;
+  while (Date.now() < until && !bitten) {
+    const st = await inGame(page, (s) => ({
+      state: window.__shark.motion.state,
+      hunger: s.hunger.value,
+    }));
+    states.add(st.state);
+    if (st.state === 'notice' && !telegraphShot) {
+      telegraphShot = true;
+      await page.screenshot({ path: `${OUT}/12-shark-telegraph.png` });
+    }
+    bitten = st.hunger < 60;
+    await page.waitForTimeout(40);
+  }
+  const afterBite = await inGame(page, () => window.__shark.motion.state);
+  check('shark telegraphs before attacking', states.has('notice'));
+  check('shark chases', states.has('chase'));
+  check('shark bite hurts', bitten);
+  check('shark swims off after biting', afterBite === 'recover', afterBite);
+
+  // Death by shark shows the right title and banks the run.
+  await waitVulnerable(page);
+  await inGame(page, (s) => {
+    s.hunger.value = 5;
+    const m = window.__shark.motion;
+    m.state = 'chase';
+    m.stateTime = 0;
+    m.cooldown = 0;
+    m.x = s.seal.x - 200;
+    m.y = s.seal.y;
+    m.heading = 0;
+  });
+  await sceneActive(page, 'GameOver');
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${OUT}/13-chomped.png` });
+  const over = await page.evaluate(() => {
+    const go = window.__PHASER_GAME__.scene.getScene('GameOver');
+    const texts = [];
+    const walk = (list) =>
+      list.forEach((o) => {
+        if (o.type === 'Text') texts.push(o.text);
+        if (o.list) walk(o.list);
+      });
+    walk(go.children.list);
+    return { texts, save: JSON.parse(localStorage.getItem('hungry-seal-save') ?? 'null') };
+  });
+  check('killed by shark shows CHOMPED!', over.texts.includes('CHOMPED!'));
+  check('first run is a new best', over.texts.includes('NEW BEST!'));
+  check(
+    'run is saved (coins, best, runs)',
+    over.save?.runs === 1 && over.save.coins >= 3 && over.save.bestScore > 0,
+    JSON.stringify(over.save),
+  );
+
+  // Saved progress shows on the menu after a reload.
+  await page.reload();
+  await sceneActive(page, 'Menu');
+  const menuTexts = await page.evaluate(() =>
+    window.__PHASER_GAME__.scene
+      .getScene('Menu')
+      .children.list.filter((o) => o.type === 'Text')
+      .map((o) => o.text),
+  );
+  check(
+    'menu shows best score and coins after reload',
+    menuTexts.some((t) => t.startsWith('Best ')),
+    menuTexts.find((t) => t.startsWith('Best ')) ?? 'missing',
+  );
+  await ctx.close();
+}
+
 async function mobile(browser) {
   const ctx = await browser.newContext({
     viewport: { width: 915, height: 412 },
@@ -451,6 +643,7 @@ const browser = await chromium.launch({
 
 try {
   await desktop(browser);
+  await danger(browser);
   await gameplay(browser);
   await mobile(browser);
 } catch (err) {

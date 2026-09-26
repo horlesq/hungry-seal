@@ -14,6 +14,7 @@ export const SEAL_MOTION: SealMotionParams = {
   floorDeflectRate: 7,
   steerDeadzone: 0.12,
   radius: 22,
+  knockDecay: 4,
   boost: {
     speedMult: 1.75,
     accelMult: 2.4,
@@ -69,9 +70,9 @@ export const INPUT = {
 export const HUNGER = {
   max: 100,
   /** Drain at the start of a run; a full bar lasts max / this seconds without food. */
-  baseDrainPerSec: 2.6,
+  baseDrainPerSec: 2.3,
   /** Drain grows linearly with run time: +100% after this many seconds. */
-  rampSeconds: 240,
+  rampSeconds: 270,
   /** Deeper water burns more energy. */
   zoneMultiplier: {
     surface: 1,
@@ -110,7 +111,7 @@ export const FEEDING = {
 
 export const SPAWN = {
   /** Creatures kept alive around the camera. */
-  targetAlive: 30,
+  targetAlive: 34,
   /** Seconds between spawn attempts. */
   interval: 0.2,
   /** Spawn this far beyond the screen edge (min/max px). */
@@ -123,6 +124,60 @@ export const SPAWN = {
   /** Groups placed around the seal when a run starts. */
   initialGroups: 7,
   initialMinDistance: 260,
+} as const;
+
+export const DAMAGE = {
+  /** Seconds of invulnerability (flashing) after being hurt. */
+  invulnTime: 1.2,
+  /** Hunger reaching zero within this many seconds of a hit counts as killed by it. */
+  killWindow: 0.6,
+} as const;
+
+export const COMBO = {
+  /** Seconds after a meal in which the next meal continues the combo. */
+  window: 2.2,
+  /** Combo counts at which the score multiplier becomes x2, x3, x4, x5. */
+  thresholds: [2, 5, 10, 16],
+} as const;
+
+export const COINS = {
+  /** Chance a prey drops a coin when eaten, by tier (index = tier). */
+  dropChanceByTier: [0, 0.1, 0.22, 0.35, 0.5, 1],
+  /** Coin pickup radius around the seal centre (on top of the seal's body radius). */
+  pickupRadius: 16,
+  /** Coins inside this distance fly to the seal. */
+  magnetRadius: 90,
+  magnetSpeed: 700,
+  /** Dropped coins disappear after this many seconds (blinking near the end). */
+  dropLifetime: 10,
+  /** Floating coin clusters kept around the camera, and coins per cluster. */
+  clustersAlive: 2,
+  clusterSize: [4, 7],
+  clusterInterval: 3,
+} as const;
+
+/** Difficulty ramp: when hazards and predators start and how many are allowed. */
+export const DANGER = {
+  hazardsStartAt: 25,
+  /** Max hazards alive = base + perMinute * minutes since start, capped. */
+  hazardsBase: 2,
+  hazardsPerMinute: 2,
+  hazardsMax: 7,
+  hazardSpawnInterval: 1.2,
+  /** Max predators alive after N seconds of the run. */
+  predatorSchedule: [
+    { after: 45, count: 1 },
+    { after: 150, count: 2 },
+    { after: 270, count: 3 },
+  ],
+  predatorSpawnInterval: 6,
+} as const;
+
+/** Brief freezes on impactful moments (seconds). */
+export const HITSTOP = {
+  eatBig: 0.05,
+  hurt: 0.09,
+  explode: 0.12,
 } as const;
 
 export const EFFECTS = {

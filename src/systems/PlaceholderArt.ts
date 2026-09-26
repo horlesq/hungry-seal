@@ -19,7 +19,13 @@ const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   [TextureKeys.Minnow]: { width: 48, height: 26, draw: drawMinnow },
   [TextureKeys.Shrimp]: { width: 44, height: 32, draw: drawShrimp },
   [TextureKeys.Sardine]: { width: 60, height: 26, draw: drawSardine },
+  [TextureKeys.Shark]: { width: 220, height: 104, draw: drawShark },
+  [TextureKeys.Jellyfish]: { width: 60, height: 80, draw: drawJellyfish },
+  [TextureKeys.Mine]: { width: 68, height: 68, draw: drawMine },
+  [TextureKeys.Coin]: { width: 30, height: 30, draw: drawCoin },
   [TextureKeys.Spark]: { width: 24, height: 24, draw: drawSpark },
+  [TextureKeys.Vignette]: { width: 256, height: 144, draw: drawVignette },
+  [TextureKeys.Arrow]: { width: 56, height: 56, draw: drawArrow },
   [TextureKeys.Bubble]: { width: 32, height: 32, draw: drawBubble },
   [TextureKeys.Droplet]: { width: 16, height: 16, draw: drawDroplet },
   [TextureKeys.Ring]: { width: 128, height: 32, draw: drawRing },
@@ -346,6 +352,247 @@ function drawShrimp(ctx: Ctx, w: number, h: number): void {
   ctx.beginPath();
   ctx.arc(w - 9, h * 0.3, 2.2, 0, TAU);
   ctx.fill();
+}
+
+/** Cartoon shark facing right with a toothy grin. */
+function drawShark(ctx: Ctx, _w: number, h: number): void {
+  const outline = '#1c2a38';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 3;
+  const cy = h * 0.52;
+
+  // Tail (crescent).
+  ctx.fillStyle = '#5d7488';
+  ctx.beginPath();
+  ctx.moveTo(44, cy);
+  ctx.quadraticCurveTo(22, cy - 20, 6, cy - 44);
+  ctx.quadraticCurveTo(24, cy - 6, 18, cy);
+  ctx.quadraticCurveTo(24, cy + 8, 10, cy + 34);
+  ctx.quadraticCurveTo(28, cy + 16, 44, cy + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Dorsal fin.
+  ctx.beginPath();
+  ctx.moveTo(96, cy - 26);
+  ctx.quadraticCurveTo(104, cy - 52, 118, cy - 50);
+  ctx.quadraticCurveTo(116, cy - 38, 128, cy - 26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Body.
+  const body = new Path2D();
+  body.moveTo(40, cy);
+  body.bezierCurveTo(70, cy - 34, 150, cy - 36, 196, cy - 14);
+  body.quadraticCurveTo(216, cy - 4, 214, cy + 4);
+  body.bezierCurveTo(206, cy + 24, 150, cy + 34, 100, cy + 30);
+  body.bezierCurveTo(70, cy + 26, 52, cy + 12, 40, cy);
+  body.closePath();
+  const grad = ctx.createLinearGradient(0, cy - 34, 0, cy + 32);
+  grad.addColorStop(0, '#5a7186');
+  grad.addColorStop(0.5, '#7e95a8');
+  grad.addColorStop(0.56, '#e9eef2');
+  grad.addColorStop(1, '#d6dee5');
+  ctx.fillStyle = grad;
+  ctx.fill(body);
+  ctx.stroke(body);
+
+  // Pectoral fin.
+  ctx.fillStyle = '#5d7488';
+  ctx.beginPath();
+  ctx.moveTo(128, cy + 18);
+  ctx.quadraticCurveTo(116, cy + 40, 100, cy + 48);
+  ctx.quadraticCurveTo(122, cy + 42, 146, cy + 22);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Gills.
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(150 + i * 7, cy - 10);
+    ctx.quadraticCurveTo(146 + i * 7, cy, 150 + i * 7, cy + 10);
+    ctx.stroke();
+  }
+
+  // Mouth with teeth.
+  ctx.fillStyle = '#6b1f2a';
+  ctx.beginPath();
+  ctx.moveTo(210, cy + 8);
+  ctx.quadraticCurveTo(190, cy + 26, 166, cy + 14);
+  ctx.quadraticCurveTo(190, cy + 16, 210, cy + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 6; i++) {
+    const x = 172 + i * 6.2;
+    const y = cy + 14 - Math.sin((i / 5) * Math.PI) * 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 3, y + 5);
+    ctx.lineTo(x + 6, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Angry eye.
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(186, cy - 10, 7, 6, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#111820';
+  ctx.beginPath();
+  ctx.arc(188, cy - 9, 3.6, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(178, cy - 20);
+  ctx.lineTo(195, cy - 14);
+  ctx.stroke();
+}
+
+/** Translucent pink jellyfish: bell on top, wavy tentacles below. */
+function drawJellyfish(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  ctx.lineCap = 'round';
+  // Tentacles.
+  for (let i = 0; i < 5; i++) {
+    const x = cx - 16 + i * 8;
+    ctx.strokeStyle = i % 2 ? 'rgba(255, 150, 210, 0.85)' : 'rgba(210, 130, 255, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, 34);
+    for (let y = 34; y <= h - 4; y += 4) {
+      ctx.lineTo(x + Math.sin(y * 0.22 + i) * 4, y);
+    }
+    ctx.stroke();
+  }
+  // Bell.
+  const bell = new Path2D();
+  bell.moveTo(4, 38);
+  bell.bezierCurveTo(4, 4, w - 4, 4, w - 4, 38);
+  bell.quadraticCurveTo(w * 0.75, 32, cx, 38);
+  bell.quadraticCurveTo(w * 0.25, 32, 4, 38);
+  bell.closePath();
+  const grad = ctx.createRadialGradient(cx, 18, 2, cx, 22, w / 2);
+  grad.addColorStop(0, 'rgba(255, 230, 250, 0.95)');
+  grad.addColorStop(0.6, 'rgba(255, 140, 210, 0.85)');
+  grad.addColorStop(1, 'rgba(190, 90, 220, 0.85)');
+  ctx.fillStyle = grad;
+  ctx.fill(bell);
+  ctx.strokeStyle = 'rgba(120, 40, 140, 0.9)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke(bell);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.beginPath();
+  ctx.ellipse(cx - 9, 16, 7, 4, -0.4, 0, TAU);
+  ctx.fill();
+}
+
+/** Spiky naval mine with a red warning light. */
+function drawMine(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = w * 0.3;
+  ctx.fillStyle = '#2d3238';
+  ctx.strokeStyle = '#111417';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU;
+    ctx.save();
+    ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    ctx.rotate(a);
+    ctx.fillRect(0, -3, r * 0.55, 6);
+    ctx.strokeRect(0, -3, r * 0.55, 6);
+    ctx.beginPath();
+    ctx.arc(r * 0.55, 0, 4, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  const grad = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.4, 2, cx, cy, r);
+  grad.addColorStop(0, '#6b737c');
+  grad.addColorStop(1, '#23272c');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = '#ff3b30';
+  ctx.beginPath();
+  ctx.arc(cx, cy - r * 0.15, 5, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255, 220, 210, 0.9)';
+  ctx.beginPath();
+  ctx.arc(cx - 1.5, cy - r * 0.15 - 1.5, 1.8, 0, TAU);
+  ctx.fill();
+}
+
+function drawCoin(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = w / 2 - 2;
+  ctx.fillStyle = '#b8860b';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, TAU);
+  ctx.fill();
+  const grad = ctx.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, r);
+  grad.addColorStop(0, '#fff6b0');
+  grad.addColorStop(0.5, '#ffd23c');
+  grad.addColorStop(1, '#e0a010');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 2.5, 0, TAU);
+  ctx.fill();
+  // Embossed star.
+  ctx.fillStyle = 'rgba(184, 120, 10, 0.8)';
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * TAU - Math.PI / 2;
+    const rr = i % 2 === 0 ? r * 0.5 : r * 0.22;
+    ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ---------------------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------------------
+
+/** Red edge glow, clear in the middle. Stretched over the whole screen. */
+function drawVignette(ctx: Ctx, w: number, h: number): void {
+  const grad = ctx.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.62);
+  grad.addColorStop(0, 'rgba(200, 0, 20, 0)');
+  grad.addColorStop(0.6, 'rgba(200, 0, 20, 0.35)');
+  grad.addColorStop(1, 'rgba(160, 0, 10, 0.85)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** Warning arrow pointing right (rotated toward off-screen threats). */
+function drawArrow(ctx: Ctx, w: number, h: number): void {
+  const cy = h / 2;
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = '#ff4d3d';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(w - 4, cy);
+  ctx.lineTo(10, 6);
+  ctx.lineTo(20, cy);
+  ctx.lineTo(10, h - 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 // ---------------------------------------------------------------------------------------

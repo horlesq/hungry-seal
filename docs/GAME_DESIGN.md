@@ -27,51 +27,59 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 
 ### Hunger (health)
 - Single bar (max 100). Drains continuously; rate rises with time in the run and with depth zone.
-  - Current tuning: 2.6/s at the start (full bar lasts ~38 s without food), +100% after 240 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6.
+  - Current tuning: 2.3/s at the start (full bar lasts ~43 s without food), +100% after 270 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6.
 - Eating restores hunger by the prey's nutrition value.
-- Hazards and predators deal damage to the same bar. Zero = run ends. (Phase 3)
-- Starvation warning: bar flashes below 25% (done); screen vignette (Phase 3).
+- Hazards and predators deal damage to the same bar. Zero = run ends.
+- Starvation warning: bar flashes and a red screen vignette pulses below 25%.
 
 ### Eating
 - The seal eats with its **mouth** (a circle just behind the nose), not its whole body, so you have to face your food.
 - Bite on contact when seal stage (bite tier) >= prey tier. Otherwise the seal bumps off: it loses most of its speed, the prey bolts, and "Too big!" pops up (no damage yet).
-- Larger predators eat the seal if they touch it (damage chunk, brief invulnerability after). (Phase 3)
-- Eating gives: nutrition, score, growth progress (coins in Phase 3).
-- Feedback: gulp squash, star sparks, floating "+score" text (done); hit-stop and shake scaled to prey size (Phase 3).
+- Predators bite the seal with their mouth (see Damage).
+- Eating gives: nutrition, score (x combo), growth progress, sometimes a coin.
+- Feedback: gulp squash, star sparks, floating "+score" text; brief hit-stop on bigger prey.
 
 ### Growth
 - Growth meter fills from eating. Filling it grows the seal by a stage (visible size increase, up to 5 stages per run) and raises bite tier. Stage resets at the start of each run; upgrades set the starting stage/baseline.
   - Current tuning: stage costs 80 / 200 / 380 / 600 growth points; scale 0.72 → 1.12; top speed +4% per stage.
 
 ### Combo and Frenzy
-- Eating within ~2s of the last meal builds a combo multiplier (x2..x5) on score.
-- Combo also fills a **Frenzy** meter. When full: brief frenzy (speed boost, invulnerability, coin magnet, everything edible, score x2).
+- Eating within 2.2 s of the last meal builds a combo (done). Multiplier on score: x2 at 2 meals, x3 at 5, x4 at 10, x5 at 16. Getting hurt breaks the combo. Combos of 5+ get a "N COMBO!" callout when they end. HUD shows multiplier, count and a shrinking timer bar.
+- Combo also fills a **Frenzy** meter (Phase 4). When full: brief frenzy (speed boost, invulnerability, coin magnet, everything edible, score x2).
+
+### Damage (done)
+- Hazards and predator bites take a chunk of hunger, knock the seal back (it keeps facing the same way), may stun it (no steering), and give 1.2 s of invulnerability (seal blinks). Screen shake, brief hit-stop, red vignette flash, "-N" popup.
+- Death cause = the last hit if hunger hit zero within 0.6 s of it, otherwise "starved". Results screen title per cause: STARVED! / CHOMPED! / KABOOM! / STUNG!
 
 ### Boost
 - Limited stamina bar, regenerates when not boosting. Gives a speed burst; ideal for chasing prey and escaping.
 
 ### Hazards
+Appear from 25 s into a run: 2 allowed at first, +2 per minute, max 7 (`DANGER` in balance.ts).
+
 | Hazard | Behaviour | Effect |
 |---|---|---|
-| Jellyfish | Drifts vertically, static-ish | Damage + brief stun |
-| Sea mine | Stationary, blinks | Big damage, explodes |
+| Jellyfish ✅ | Drifts slowly, bobs and pulses; reef/ocean/deep | 12 damage, 0.7 s stun, knockback |
+| Sea mine ✅ | Sways on its chain, blinks; ocean/deep/abyss | 30 damage, explodes (gone), big knockback |
 | Pufferfish | Inflates near seal | Damage if eaten too early |
 | Fishing net / hook (later) | Hangs from surface | Slows/traps |
 | Toxic waste / oil (later) | Zone | Drains hunger fast |
 
 ### Predators
-- Shark (mid), Orca (deep), Giant squid / Anglerfish (abyss).
-- States: patrol, notice, chase, bite, flee-when-frenzy. Telegraph before attack (readable warning).
-- Seal outgrowing a predator's tier makes it prey and turns it into a big reward.
+- Shark ✅ (ocean/deep), Orca (deep), Giant squid / Anglerfish (abyss).
+- States: patrol → notice (0.8 s telegraph: stops, turns to the seal, flashes red, "!") → chase (370 px/s, turns slower than the seal, gives up after 6 s or 900 px) → bite → recover (swims off, then 4 s cooldown). Only hunts a seal that's in the water. Off-screen hunters show a red arrow at the screen edge.
+- Shark bite: 28 damage + knockback. Outrun it with boost, out-turn it, or leap out of the water.
+- Seal outgrowing a predator's tier (shark = tier 5, max size) makes it flee and turns it into a big reward (45 nutrition, 250 score, 5 coins).
+- Schedule: first shark at 45 s, up to 2 at 150 s, 3 at 270 s.
 
 ## Prey table (initial; tune in `src/config/creatures.ts`)
 Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enough to eat them.
 
 | Tier | Creature | Zone | Nutrition | Score | Behaviour |
 |---|---|---|---|---|---|
-| 1 | Minnow ✅ | Reef/Ocean | 4 | 10 | schools of 3-6, flees at 290 px/s |
-| 1 | Shrimp ✅ | Reef | 3 | 8 | drifts and bobs, flees at 230 px/s |
-| 2 | Sardine school ✅ | Ocean/Deep | 8 | 20 | schools of 6-10, flees at 330 px/s |
+| 1 | Minnow ✅ | Reef/Ocean | 6 | 10 | schools of 3-6, flees at 290 px/s |
+| 1 | Shrimp ✅ | Reef | 5 | 8 | drifts and bobs, flees at 230 px/s |
+| 2 | Sardine school ✅ | Ocean/Deep | 11 | 20 | schools of 6-10, flees at 330 px/s |
 | 2 | Crab | Reef floor | 10 | 25 | walks, snaps |
 | 3 | Seabird | Surface/Air | 15 | 50 | glides, dives |
 | 3 | Squid | Ocean | 18 | 60 | jets away |
@@ -80,13 +88,13 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 | 5 | Small shark | Deep | 45 | 250 | fights back |
 
 ## Currency and progression
-- **Coins:** collected in run (floating, from prey, treasure chests). Persist across runs.
+- **Coins:** collected in run (floating clusters of 4-7 ahead of the seal, dropped by prey: 10% tier 1, 22% tier 2, ..., treasure chests later). Touch to collect, with a short magnet pull; dropped coins vanish after 10 s. Banked into the save when the run ends (done).
 - **Gems (later):** rare, premium-feel currency for skins; earned from rare events, not sold.
 - **Upgrades** (permanent, bought with coins, 5-8 levels each):
   - Speed, Boost capacity, Max health, Hunger resistance (slower drain), Bite/Growth (faster growth), Coin magnet, Frenzy charge rate.
 - **Skins:** cosmetic seal variants (harbor, leopard, arctic, pirate, etc.).
 - **Missions (later):** 3 rotating goals per run set ("eat 20 crabs", "reach abyss").
-- Save data in localStorage: coins, upgrade levels, skins owned/equipped, best score, settings.
+- Save data in localStorage: coins, best score, best distance, runs, settings (done); upgrade levels, skins owned/equipped (Phase 4+).
 
 ## Run structure
 1. Menu -> Play (or Shop).

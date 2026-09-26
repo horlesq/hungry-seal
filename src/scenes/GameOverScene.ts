@@ -1,12 +1,20 @@
 // Run results, shown over the (still animating) game world. Retry restarts GameScene;
-// Esc goes back to the menu. Phase 3 adds coins, distance and best score.
+// Esc goes back to the menu.
 import Phaser from 'phaser';
+import { TextureKeys } from '../config/assets';
 import { SceneKeys } from '../config/keys';
 import { GAME_HEIGHT, GAME_WIDTH, UI_FONT } from '../config/layout';
-import type { RunResult } from '../services/EventBus';
+import type { DeathCause, RunResult } from '../services/EventBus';
 
 /** Ignore input briefly so a finger still held from the run doesn't skip the screen. */
 const INPUT_DELAY = 700;
+
+const TITLES: Record<DeathCause, { title: string; subtitle: string; color: string }> = {
+  starved: { title: 'STARVED!', subtitle: 'Your seal ran out of food', color: '#ff8a5c' },
+  shark: { title: 'CHOMPED!', subtitle: 'A shark got you', color: '#ff5a4f' },
+  mine: { title: 'KABOOM!', subtitle: 'You swam into a sea mine', color: '#ffb13c' },
+  jellyfish: { title: 'STUNG!', subtitle: 'Zapped by a jellyfish', color: '#ff8ae0' },
+};
 
 export class GameOverScene extends Phaser.Scene {
   private leaving = false;
@@ -18,27 +26,30 @@ export class GameOverScene extends Phaser.Scene {
   create(result: RunResult): void {
     this.leaving = false;
     const cx = GAME_WIDTH / 2;
+    const t = TITLES[result.cause];
 
     const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x020c18, 1).setOrigin(0);
     dim.setAlpha(0);
     this.tweens.add({ targets: dim, alpha: 0.6, duration: 400 });
 
+    const W = 620;
+    const H = 560;
     const panel = this.add.container(cx, GAME_HEIGHT / 2);
     const bg = this.add.graphics();
-    bg.fillStyle(0x06284a, 0.92).fillRoundedRect(-300, -210, 600, 420, 28);
-    bg.lineStyle(4, 0x6ff3ff, 0.9).strokeRoundedRect(-300, -210, 600, 420, 28);
+    bg.fillStyle(0x06284a, 0.92).fillRoundedRect(-W / 2, -H / 2, W, H, 28);
+    bg.lineStyle(4, 0x6ff3ff, 0.9).strokeRoundedRect(-W / 2, -H / 2, W, H, 28);
     const title = this.add
-      .text(0, -160, 'STARVED!', {
+      .text(0, -H / 2 + 56, t.title, {
         fontFamily: UI_FONT,
         fontSize: '64px',
         fontStyle: 'bold',
-        color: '#ff8a5c',
+        color: t.color,
         stroke: '#2a0d06',
         strokeThickness: 10,
       })
       .setOrigin(0.5);
     const subtitle = this.add
-      .text(0, -108, 'Your seal ran out of food', {
+      .text(0, -H / 2 + 106, t.subtitle, {
         fontFamily: UI_FONT,
         fontSize: '20px',
         color: '#cfe9f5',
@@ -46,26 +57,62 @@ export class GameOverScene extends Phaser.Scene {
       .setOrigin(0.5);
     panel.add([bg, title, subtitle]);
 
+    // Score line, with a badge for a new best.
+    const scoreY = -H / 2 + 160;
+    panel.add(
+      this.add
+        .text(0, scoreY, String(result.score), {
+          fontFamily: UI_FONT,
+          fontSize: '48px',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          stroke: '#0b3a66',
+          strokeThickness: 8,
+        })
+        .setOrigin(0.5),
+    );
+    const bestLabel = result.newBest ? 'NEW BEST!' : `Best ${result.bestScore}`;
+    const best = this.add
+      .text(0, scoreY + 40, bestLabel, {
+        fontFamily: UI_FONT,
+        fontSize: result.newBest ? '24px' : '18px',
+        fontStyle: 'bold',
+        color: result.newBest ? '#fff27a' : '#9fc3d6',
+      })
+      .setOrigin(0.5);
+    panel.add(best);
+    if (result.newBest) {
+      this.tweens.add({ targets: best, scale: 1.15, duration: 420, yoyo: true, repeat: -1 });
+    }
+
     const rows: Array<[string, string]> = [
-      ['Score', String(result.score)],
+      ['Coins', `+${result.coins}   (${result.totalCoins} total)`],
+      ['Distance', `${result.distance} m`],
+      ['Deepest', `${result.maxDepth} m`],
       ['Time', formatTime(result.seconds)],
       ['Fish eaten', String(result.eaten)],
-      ['Size reached', String(result.stage)],
+      ['Size reached', `${result.stage}`],
     ];
+    const style = { fontFamily: UI_FONT, fontSize: '22px', color: '#ffffff' };
     rows.forEach(([name, value], i) => {
-      const y = -50 + i * 42;
-      const style = { fontFamily: UI_FONT, fontSize: '26px', color: '#ffffff' };
-      panel.add(this.add.text(-200, y, name, style).setOrigin(0, 0.5));
+      const y = scoreY + 92 + i * 34;
+      panel.add(this.add.text(-220, y, name, style).setOrigin(0, 0.5));
       panel.add(
         this.add
-          .text(200, y, value, { ...style, fontStyle: 'bold', color: '#fff27a' })
+          .text(220, y, value, { ...style, fontStyle: 'bold', color: '#fff27a' })
           .setOrigin(1, 0.5),
       );
     });
+    panel.add(
+      this.add
+        .image(-238, scoreY + 92, TextureKeys.Coin)
+        .setScale(0.8)
+        .setOrigin(1, 0.5),
+    );
 
     const touch = this.sys.game.device.input.touch;
     const prompt = this.add
-      .text(0, 150, touch ? 'Tap to swim again' : 'Click or press Enter to swim again', {
+      .text(0, H / 2 - 62, touch ? 'Tap to swim again' : 'Click or press Enter to swim again', {
         fontFamily: UI_FONT,
         fontSize: '26px',
         fontStyle: 'bold',
@@ -73,7 +120,7 @@ export class GameOverScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const hint = this.add
-      .text(0, 186, touch ? '' : 'Esc: menu', {
+      .text(0, H / 2 - 28, touch ? '' : 'Esc: menu', {
         fontFamily: UI_FONT,
         fontSize: '16px',
         color: '#9fc3d6',
