@@ -9,6 +9,27 @@ export interface BoostState {
   stamina: number;
 }
 
+export interface HungerState {
+  value: number;
+  max: number;
+  low: boolean;
+}
+
+export interface GrowthState {
+  stage: number;
+  maxStage: number;
+  /** 0..1 toward the next stage. */
+  progress: number;
+}
+
+export interface RunResult {
+  score: number;
+  seconds: number;
+  eaten: number;
+  stage: number;
+  cause: 'starved';
+}
+
 export interface DebugInfo {
   fps: number;
   x: number;
@@ -25,11 +46,19 @@ export interface DebugInfo {
   steerY: number;
   particles: number;
   objects: number;
+  creatures: number;
+  stage: number;
+  hunger: number;
+  drain: number;
 }
 
 export interface GameEvents {
   'input:source': [source: InputSource];
   'seal:boost': [state: BoostState];
+  'run:hunger': [state: HungerState];
+  'run:growth': [state: GrowthState];
+  'run:score': [score: number];
+  'run:over': [result: RunResult];
   'debug:toggle': [enabled: boolean];
   'debug:info': [info: DebugInfo];
 }

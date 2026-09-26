@@ -6,6 +6,10 @@
 
 export const TextureKeys = {
   Seal: 'seal',
+  Minnow: 'creature-minnow',
+  Shrimp: 'creature-shrimp',
+  Sardine: 'creature-sardine',
+  Spark: 'fx-spark',
   Bubble: 'fx-bubble',
   Droplet: 'fx-droplet',
   Ring: 'fx-ring',
@@ -33,6 +37,10 @@ export type AssetEntry =
 
 export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { type: 'image', key: TextureKeys.Seal },
+  { type: 'image', key: TextureKeys.Minnow },
+  { type: 'image', key: TextureKeys.Shrimp },
+  { type: 'image', key: TextureKeys.Sardine },
+  { type: 'image', key: TextureKeys.Spark },
   { type: 'image', key: TextureKeys.Bubble },
   { type: 'image', key: TextureKeys.Droplet },
   { type: 'image', key: TextureKeys.Ring },

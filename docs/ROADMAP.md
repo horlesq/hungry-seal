@@ -29,19 +29,26 @@ Goal: swimming feels good before anything else exists.
 **Exit:** swimming and leaping feels smooth on desktop and touch. (Verified by playtest: 21/21 checks, ~165 FPS on GTX 1060.)
 
 Notes carried forward:
-- Seal physics body is a circle scaled with the sprite; the roll flip squashes it. Phase 2 should use a separate mouth hitbox rather than the sprite body.
+- ~~Seal physics body squashes during the roll flip~~ → resolved in Phase 2: Arcade Physics removed; eating uses a dedicated mouth circle.
 - Wide phones get side bars under Scale.FIT; revisit in Phase 9 (or earlier if it bothers testers).
 - Only one flat seabed at the abyss floor; shallower reef floors (for crabs) come with zone work in Phase 4/5.
 
-## Phase 2 — Eating loop (core prototype)
+## Phase 2 — Eating loop (core prototype) ✅ (2026-09-26)
 Goal: the fundamental "eat to survive" loop works.
-- [ ] Creature base class driven by config; behaviors: wander, flee, school
-- [ ] Spawner: camera-relative, pooled, tier-1/2 prey in reef/ocean
-- [ ] Eat on overlap (tier rule), nutrition, score
-- [ ] HungerSystem (drain + eat + death), GrowthSystem (stages, size scale)
-- [ ] Minimal HUD (hunger bar, score) in HudScene via EventBus
-- [ ] Game over -> restart
-**Exit:** you can play a run from full hunger to starvation, eating fish and growing. (Tech prototype)
+- [x] Creature sprite driven by config (`config/creatures.ts`); pure behaviors in `creatureAI.ts`: wander, drift, flee, school (+ depth-band keeping)
+- [x] Spawner: camera-relative, pooled (Group, max 120), spawns off-screen biased ahead of the seal; minnow + shrimp (tier 1, reef/ocean), sardine schools (tier 2, ocean/deep)
+- [x] Eat on mouth-circle contact (tier rule), nutrition, score; too-big prey bumps the seal ("Too big!")
+- [x] HungerSystem (drain ramps with time and depth, eat, starve), GrowthSystem (5 stages: size, speed, bite tier)
+- [x] HUD: hunger bar (flashes when low), growth meter + size, rolling score
+- [x] Game over overlay (score, time, fish eaten, size) -> retry or menu
+- [x] Chomp sparks, floating "+score" text, growth burst (pulled forward from Phase 3 juice)
+- [x] Balance bot (`npm run balance`) to sanity-check tuning
+**Exit:** you can play a run from full hunger to starvation, eating fish and growing. (Tech prototype) — verified: playtest 39/39; human-like bot starves at ~2:00 reaching size 3; perfect bot sustains at size 4.
+
+Notes carried forward:
+- Balance is tuned without predators/hazards. Re-run `npm run balance` after Phase 3 adds danger; expect to lower drain or raise nutrition slightly.
+- Seal grows 0.72 → 1.12 scale over 5 stages with no camera zoom-out. If bigger stages feel cramped, add zoom in Phase 5 (background layers are sized for zoom 1 and must be widened first).
+- Deep/abyss have almost no edible food for a small seal (sardines are tier 2, abyss is empty) — intentional pressure for now; Phase 5 fills them.
 
 ## Phase 3 — Danger, feedback, and run flow
 Goal: the run has stakes and readable feedback.

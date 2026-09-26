@@ -1,9 +1,9 @@
 // The player seal. Movement comes from the pure sealMotion model; this class owns the
-// sprite, the physics body (used for overlaps only) and the purely visual feel:
-// belly-roll when changing direction, swim wiggle, stretch at speed.
+// sprite, growth-stage scaling, the mouth hit circle, and the purely visual feel:
+// belly-roll when changing direction, swim wiggle, stretch at speed, gulp pop.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
-import { SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
+import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
 import { damp } from '../utils/math';
 import {
@@ -11,50 +11,108 @@ import {
   stepSealMotion,
   type SealMotionEvent,
   type SealMotionInput,
+  type SealMotionParams,
   type SealMotionState,
 } from './sealMotion';
 
-export class Seal extends Phaser.Physics.Arcade.Sprite {
+const STAGE1_SCALE = GROWTH.stages[0].scale;
+
+export class Seal extends Phaser.GameObjects.Sprite {
   readonly motion: SealMotionState;
+  stage = 1;
+  dead = false;
+  private params: SealMotionParams = SEAL_MOTION;
+  private baseScale: number = STAGE1_SCALE;
   /** -1 = facing left, 1 = facing right; animated through 0 for the roll effect. */
   private facing = 1;
   private wigglePhase = 0;
+  /** Extra scale that decays back to 0 (gulps, growing). */
+  private pop = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, TextureKeys.Seal);
     this.motion = createSealMotionState(x, y);
-
     scene.add.existing(this);
-    scene.physics.add.existing(this);
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    // Kinematic: we integrate position ourselves; the body just follows for overlap checks.
-    body.moves = false;
-    const r = SEAL_MOTION.radius / SEAL_VISUAL.scale;
-    body.setCircle(r, this.width / 2 - r, this.height / 2 - r);
-
-    this.setScale(SEAL_VISUAL.scale);
     this.setDepth(10);
+    this.setStage(1, false);
   }
 
   /** Advances movement and visuals. Returns motion events (breach, splashdown, boost). */
   step(input: SealMotionInput, dt: number): SealMotionEvent[] {
-    const events = stepSealMotion(this.motion, input, SEAL_MOTION, WORLD, dt);
+    const events = stepSealMotion(this.motion, input, this.params, WORLD, dt);
     this.setPosition(this.motion.x, this.motion.y);
     this.updateVisuals(dt);
     return events;
   }
 
+  /** Applies a growth stage: size, speed and mouth all scale with it. */
+  setStage(stage: number, animate = true): void {
+    const index = Phaser.Math.Clamp(stage, 1, GROWTH.stages.length) - 1;
+    const cfg = GROWTH.stages[index];
+    this.stage = index + 1;
+    this.baseScale = cfg.scale;
+    this.params = {
+      ...SEAL_MOTION,
+      maxSpeed: SEAL_MOTION.maxSpeed * cfg.speedMult,
+      radius: SEAL_MOTION.radius * (cfg.scale / STAGE1_SCALE),
+    };
+    if (animate) this.pop = 0.35;
+  }
+
+  get maxSpeed(): number {
+    return this.params.maxSpeed;
+  }
+
   get speedFraction(): number {
-    return Math.min(1.5, this.motion.speed / SEAL_MOTION.maxSpeed);
+    return Math.min(1.5, this.motion.speed / this.params.maxSpeed);
+  }
+
+  get mouthRadius(): number {
+    return FEEDING.mouthRadius * this.baseScale;
+  }
+
+  /** World position of the mouth hit circle (just behind the nose). */
+  mouthPosition(out: Phaser.Math.Vector2): Phaser.Math.Vector2 {
+    const d = FEEDING.mouthOffset * this.baseScale;
+    return out.set(
+      this.motion.x + Math.cos(this.motion.heading) * d,
+      this.motion.y + Math.sin(this.motion.heading) * d,
+    );
   }
 
   /** World position of the tail, for bubble trails. */
   tailPosition(out: Phaser.Math.Vector2): Phaser.Math.Vector2 {
-    const back = 52 * SEAL_VISUAL.scale;
+    const back = 52 * this.baseScale;
     return out.set(
       this.x - Math.cos(this.motion.heading) * back,
       this.y - Math.sin(this.motion.heading) * back,
     );
+  }
+
+  /** Quick gulp squash when eating. */
+  chomp(): void {
+    this.pop = Math.max(this.pop, 0.16);
+  }
+
+  /** Bumped into something too big to eat: lose most of the speed. */
+  bump(): void {
+    this.motion.speed *= FEEDING.bumpSpeedKeep;
+  }
+
+  /** Starved: float belly-up and fade. Movement stops being simulated. */
+  die(): void {
+    if (this.dead) return;
+    this.dead = true;
+    this.motion.speed = 0;
+    this.motion.boosting = false;
+    this.scene.tweens.add({
+      targets: this,
+      rotation: this.rotation + Math.PI * this.facing,
+      y: this.y - 70,
+      alpha: 0,
+      duration: 1500,
+      ease: 'Sine.InOut',
+    });
   }
 
   private updateVisuals(dt: number): void {
@@ -63,6 +121,7 @@ export class Seal extends Phaser.Physics.Arcade.Sprite {
     // Hysteresis around vertical so swimming straight up/down doesn't flicker the facing.
     const targetFacing = cos > 0.15 ? 1 : cos < -0.15 ? -1 : Math.sign(this.facing) || 1;
     this.facing = damp(this.facing, targetFacing, SEAL_VISUAL.flipRate, dt);
+    this.pop = damp(this.pop, 0, 9, dt);
 
     const speedFrac = Math.min(1, this.speedFraction);
     this.wigglePhase += dt * Math.PI * 2 * SEAL_VISUAL.wiggleFreq * (0.35 + speedFrac);
@@ -72,7 +131,7 @@ export class Seal extends Phaser.Physics.Arcade.Sprite {
     // left. Passing the scale through 0 reads as a quick barrel roll.
     this.setRotation(m.heading + wiggle * this.facing);
     const stretch = 1 + SEAL_VISUAL.stretch * speedFrac;
-    const base = SEAL_VISUAL.scale;
+    const base = this.baseScale * (1 + this.pop);
     this.setScale(base * stretch, base * (2 - stretch) * this.facing);
   }
 }

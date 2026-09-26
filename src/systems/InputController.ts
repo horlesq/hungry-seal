@@ -91,7 +91,8 @@ export class InputController {
     const dy = this.worldPoint.y - originY;
     const dist = Math.hypot(dx, dy);
     if (dist < INPUT.pointerDeadzone) return;
-    const mag = Math.min(1, dist / INPUT.pointerFullSpeedDist);
+    const ramp = INPUT.pointerFullSpeedDist - INPUT.pointerDeadzone;
+    const mag = Math.min(1, (dist - INPUT.pointerDeadzone) / ramp);
     this.steer.set((dx / dist) * mag, (dy / dist) * mag);
   }
 

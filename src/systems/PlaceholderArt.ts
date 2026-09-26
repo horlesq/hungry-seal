@@ -16,6 +16,10 @@ interface Painter {
 
 const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   [TextureKeys.Seal]: { width: 176, height: 88, draw: drawSeal },
+  [TextureKeys.Minnow]: { width: 48, height: 26, draw: drawMinnow },
+  [TextureKeys.Shrimp]: { width: 44, height: 32, draw: drawShrimp },
+  [TextureKeys.Sardine]: { width: 60, height: 26, draw: drawSardine },
+  [TextureKeys.Spark]: { width: 24, height: 24, draw: drawSpark },
   [TextureKeys.Bubble]: { width: 32, height: 32, draw: drawBubble },
   [TextureKeys.Droplet]: { width: 16, height: 16, draw: drawDroplet },
   [TextureKeys.Ring]: { width: 128, height: 32, draw: drawRing },
@@ -183,9 +187,185 @@ function drawSeal(ctx: Ctx): void {
   ctx.restore();
 }
 
+interface FishStyle {
+  back: string;
+  belly: string;
+  fin: string;
+  outline: string;
+  stripe?: string;
+  spots?: string;
+}
+
+/** Simple cartoon fish facing right, filling the w x h box. */
+function drawFish(ctx: Ctx, w: number, h: number, s: FishStyle): void {
+  const cy = h / 2;
+  const tailW = w * 0.24;
+  const bodyL = tailW - 2;
+  const bodyR = w - 2;
+  const bodyH = h * 0.4;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = s.outline;
+
+  // Tail fin.
+  ctx.fillStyle = s.fin;
+  ctx.beginPath();
+  ctx.moveTo(tailW + 2, cy);
+  ctx.lineTo(2, cy - h * 0.38);
+  ctx.quadraticCurveTo(tailW * 0.45, cy, 2, cy + h * 0.38);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Body.
+  const body = new Path2D();
+  body.moveTo(bodyL, cy);
+  body.bezierCurveTo(bodyL + w * 0.2, cy - bodyH * 1.25, bodyR - w * 0.15, cy - bodyH, bodyR, cy);
+  body.bezierCurveTo(bodyR - w * 0.15, cy + bodyH, bodyL + w * 0.2, cy + bodyH * 1.25, bodyL, cy);
+  body.closePath();
+  const grad = ctx.createLinearGradient(0, cy - bodyH, 0, cy + bodyH);
+  grad.addColorStop(0, s.back);
+  grad.addColorStop(0.55, s.back);
+  grad.addColorStop(0.62, s.belly);
+  grad.addColorStop(1, s.belly);
+  ctx.fillStyle = grad;
+  ctx.fill(body);
+
+  ctx.save();
+  ctx.clip(body);
+  if (s.stripe) {
+    ctx.fillStyle = s.stripe;
+    ctx.fillRect(bodyL, cy - 1.5, bodyR - bodyL, 3);
+  }
+  if (s.spots) {
+    ctx.fillStyle = s.spots;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(bodyL + w * 0.2 + i * w * 0.11, cy - bodyH * 0.35, 1.8, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+  ctx.stroke(body);
+
+  // Dorsal fin.
+  ctx.fillStyle = s.fin;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.42, cy - bodyH * 0.95);
+  ctx.lineTo(w * 0.5, cy - bodyH * 1.6);
+  ctx.lineTo(w * 0.62, cy - bodyH * 0.95);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Eye.
+  const ex = bodyR - w * 0.14;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(ex, cy - bodyH * 0.2, h * 0.13, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(ex + 0.8, cy - bodyH * 0.2, h * 0.08, 0, TAU);
+  ctx.fill();
+}
+
+function drawMinnow(ctx: Ctx, w: number, h: number): void {
+  drawFish(ctx, w, h, {
+    back: '#7fb6d6',
+    belly: '#e9f4fa',
+    fin: '#f3b25c',
+    outline: '#2b4658',
+    stripe: 'rgba(255, 200, 120, 0.8)',
+  });
+}
+
+function drawSardine(ctx: Ctx, w: number, h: number): void {
+  drawFish(ctx, w, h, {
+    back: '#3a6fa8',
+    belly: '#dfe8f0',
+    fin: '#8fb3cf',
+    outline: '#1d3350',
+    spots: '#1d3350',
+  });
+}
+
+/** Curled pink shrimp facing right. */
+function drawShrimp(ctx: Ctx, w: number, h: number): void {
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const outline = '#8a3b3b';
+
+  // Tail fan (left).
+  ctx.fillStyle = '#f2a08a';
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(10, h * 0.62);
+  ctx.lineTo(2, h * 0.9);
+  ctx.lineTo(9, h * 0.92);
+  ctx.lineTo(14, h * 0.8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Curved segmented body.
+  const segs = 6;
+  for (let i = 0; i < segs; i++) {
+    const t = i / (segs - 1);
+    const x = 12 + t * (w - 22);
+    const y = h * 0.7 - Math.sin(t * Math.PI * 0.85) * h * 0.32;
+    const r = 4 + t * 3.2;
+    ctx.fillStyle = i % 2 ? '#ff9f8a' : '#ffb7a3';
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 1.1, r, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Legs.
+  ctx.strokeStyle = '#d06a5a';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 4; i++) {
+    const x = 18 + i * 5;
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.66);
+    ctx.lineTo(x - 2, h * 0.9);
+    ctx.stroke();
+  }
+
+  // Antennae and eye.
+  ctx.strokeStyle = '#c0504a';
+  ctx.beginPath();
+  ctx.moveTo(w - 8, h * 0.28);
+  ctx.quadraticCurveTo(w - 2, h * 0.02, w - 16, 2);
+  ctx.moveTo(w - 8, h * 0.3);
+  ctx.quadraticCurveTo(w, h * 0.12, w - 2, 1);
+  ctx.stroke();
+  ctx.fillStyle = '#10161c';
+  ctx.beginPath();
+  ctx.arc(w - 9, h * 0.3, 2.2, 0, TAU);
+  ctx.fill();
+}
+
 // ---------------------------------------------------------------------------------------
 // Effects
 // ---------------------------------------------------------------------------------------
+
+/** Four-point star used for chomp bursts (tinted at runtime). */
+function drawSpark(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h / 2;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU - Math.PI / 2;
+    const r = i % 2 === 0 ? w / 2 - 1 : w * 0.14;
+    ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
 
 function drawBubble(ctx: Ctx, w: number, h: number): void {
   const cx = w / 2;

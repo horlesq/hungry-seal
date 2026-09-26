@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "playtest": "node scripts/playtest.mjs",
+    "balance": "node scripts/balance-bot.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run playtest"
   },
   "dependencies": {

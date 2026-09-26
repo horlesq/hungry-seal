@@ -9,12 +9,14 @@ Web-based side-scrolling arcade game in the style of Hungry Shark Evolution / Fe
 - [docs/ASSETS.md](docs/ASSETS.md) — art/audio style, sources, manifest rules
 
 ## Stack
-TypeScript + Vite + Phaser 4, Arcade Physics. No UI framework; HUD and menus are Phaser scenes. Targets desktop and mobile browsers.
+TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circle contact checks (see ARCHITECTURE.md). No UI framework; HUD and menus are Phaser scenes. Targets desktop and mobile browsers.
 
 ## Commands
 - `npm run dev` (or `npm run dev:host` to test on a phone over LAN)
 - `npm run check` — typecheck + lint + unit tests + headless browser playtest. Must pass before a phase/feature is called done.
 - `npm run playtest` — screenshots land in `.playtest/`; look at them, passing checks don't prove it looks right.
+- `npm run balance -- human 150` — bot plays a run; use it after any tuning change in `config/balance.ts` or `config/creatures.ts`.
+- Git: `main` holds finished phases; do each phase on a `phase-N-...` branch.
 - Phaser API lookup: grep `node_modules/phaser/types/phaser.d.ts`.
 
 ## Decisions already made (do not re-litigate)

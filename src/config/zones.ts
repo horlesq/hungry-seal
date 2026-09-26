@@ -46,6 +46,28 @@ export function zoneAt(y: number): Zone {
   return ZONES[0];
 }
 
+/** Bottom edge (exclusive) of a zone: the next zone's top, or the seabed. */
+export function zoneBottom(id: ZoneId): number {
+  const i = ZONES.findIndex((z) => z.id === id);
+  return i >= 0 && i < ZONES.length - 1 ? ZONES[i + 1].top : WORLD.floorY;
+}
+
+/** Vertical span covered by a set of zones, clamped to the water column. */
+export function zoneBand(ids: readonly ZoneId[]): { top: number; bottom: number } {
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const id of ids) {
+    const zone = ZONES.find((z) => z.id === id);
+    if (!zone) continue;
+    top = Math.min(top, zone.top);
+    bottom = Math.max(bottom, zoneBottom(id));
+  }
+  return {
+    top: Math.max(top, WORLD.surfaceY),
+    bottom: Math.min(bottom, WORLD.floorY),
+  };
+}
+
 /** Depth below the surface in meters (negative when airborne). */
 export function depthMeters(y: number): number {
   return (y - WORLD.surfaceY) / WORLD.pxPerMeter;

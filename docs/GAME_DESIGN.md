@@ -15,7 +15,7 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 - Horizontal world is effectively infinite; a run's difficulty scales with elapsed time and distance.
 
 ## Controls
-- **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Cursor distance from the seal scales speed (full speed at ~230 px). Mouse leaving the canvas = glide.
+- **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Speed ramps from 0 at 18 px to full at 110 px from the seal, so pointing straight at nearby prey still chases at full speed. Mouse leaving the canvas = glide.
 - **Touch:** hold/drag anywhere to swim toward the finger; release to glide to a stop. A touch that *starts* on the bottom-right BOOST button boosts (works with a second finger while steering).
 - **Keyboard:** WASD/arrows to steer. Space/Shift = boost.
 - The most recently used device wins, so a resting mouse doesn't fight the keyboard.
@@ -26,19 +26,22 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 ## Core mechanics
 
 ### Hunger (health)
-- Single bar. Drains continuously; rate rises with time in the run and with depth zone.
+- Single bar (max 100). Drains continuously; rate rises with time in the run and with depth zone.
+  - Current tuning: 2.6/s at the start (full bar lasts ~38 s without food), +100% after 240 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6.
 - Eating restores hunger by the prey's nutrition value.
-- Hazards and predators deal damage to the same bar. Zero = run ends.
-- Starvation warning: bar flashes and screen vignette at low health.
+- Hazards and predators deal damage to the same bar. Zero = run ends. (Phase 3)
+- Starvation warning: bar flashes below 25% (done); screen vignette (Phase 3).
 
 ### Eating
-- Bite on contact with prey when seal size/bite tier >= prey tier. Otherwise the seal bounces off (small dmg or none).
-- Larger predators eat the seal if they touch it (damage chunk, brief invulnerability after).
-- Eating gives: nutrition, score, coins (sometimes), growth progress.
-- Feedback: chomp animation, particles, screen shake scaled to prey size, floating score text.
+- The seal eats with its **mouth** (a circle just behind the nose), not its whole body, so you have to face your food.
+- Bite on contact when seal stage (bite tier) >= prey tier. Otherwise the seal bumps off: it loses most of its speed, the prey bolts, and "Too big!" pops up (no damage yet).
+- Larger predators eat the seal if they touch it (damage chunk, brief invulnerability after). (Phase 3)
+- Eating gives: nutrition, score, growth progress (coins in Phase 3).
+- Feedback: gulp squash, star sparks, floating "+score" text (done); hit-stop and shake scaled to prey size (Phase 3).
 
 ### Growth
 - Growth meter fills from eating. Filling it grows the seal by a stage (visible size increase, up to 5 stages per run) and raises bite tier. Stage resets at the start of each run; upgrades set the starting stage/baseline.
+  - Current tuning: stage costs 80 / 200 / 380 / 600 growth points; scale 0.72 → 1.12; top speed +4% per stage.
 
 ### Combo and Frenzy
 - Eating within ~2s of the last meal builds a combo multiplier (x2..x5) on score.
@@ -62,11 +65,13 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 - Seal outgrowing a predator's tier makes it prey and turns it into a big reward.
 
 ## Prey table (initial; tune in `src/config/creatures.ts`)
+Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enough to eat them.
+
 | Tier | Creature | Zone | Nutrition | Score | Behaviour |
 |---|---|---|---|---|---|
-| 1 | Minnow | Reef/Ocean | 4 | 10 | schools, flees |
-| 1 | Shrimp | Reef | 3 | 8 | drifts |
-| 2 | Sardine school | Ocean | 8 | 20 | tight school |
+| 1 | Minnow ✅ | Reef/Ocean | 4 | 10 | schools of 3-6, flees at 290 px/s |
+| 1 | Shrimp ✅ | Reef | 3 | 8 | drifts and bobs, flees at 230 px/s |
+| 2 | Sardine school ✅ | Ocean/Deep | 8 | 20 | schools of 6-10, flees at 330 px/s |
 | 2 | Crab | Reef floor | 10 | 25 | walks, snaps |
 | 3 | Seabird | Surface/Air | 15 | 50 | glides, dives |
 | 3 | Squid | Ocean | 18 | 60 | jets away |

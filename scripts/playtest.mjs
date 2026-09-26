@@ -65,6 +65,76 @@ async function until(page, pred, timeout = 5000, every = 50) {
   return { ok: false, last: samples.at(-1), samples };
 }
 
+/** Gives the seal effectively infinite hunger for movement-only checks. */
+const noStarve = (page) =>
+  page.evaluate(() => {
+    window.__PHASER_GAME__.scene.getScene('Game').hunger.value = 1e9;
+  });
+
+const runState = (page) =>
+  page.evaluate(() => {
+    const game = window.__PHASER_GAME__;
+    const s = game.scene.getScene('Game');
+    const hud = game.scene.getScene('Hud');
+    return {
+      score: s.score,
+      eaten: s.eaten,
+      hunger: s.hunger.value,
+      stage: s.seal.stage,
+      scaleX: Math.abs(s.seal.scaleX),
+      speed: s.seal.motion.speed,
+      creatures: s.spawner.countActive(),
+      dead: s.dead,
+      hudScore: hud.scene.isActive() ? hud.scoreText.text : null,
+      hudStage: hud.scene.isActive() ? hud.stageText.text : null,
+    };
+  });
+
+/**
+ * Parks the seal so its mouth sits on a live creature (optionally forcing its tier), to
+ * exercise the real eat/bump path deterministically. Returns the creature's tier or null.
+ */
+const feedOnce = (page, forceTier = null) =>
+  page.evaluate((tier) => {
+    const s = window.__PHASER_GAME__.scene.getScene('Game');
+    const prey = s.spawner.alive.filter((c) => c.active && c.def.tier <= s.seal.stage);
+    const c = prey[0];
+    if (!c) return null;
+    if (tier !== null) c.def = { ...c.def, tier };
+    const m = s.seal.motion;
+    m.heading = 0;
+    m.speed = tier !== null ? 300 : 0;
+    m.x = 0;
+    m.y = 0;
+    const vec = {
+      x: 0,
+      y: 0,
+      set(x, y) {
+        this.x = x;
+        this.y = y;
+        return this;
+      },
+    };
+    const offset = s.seal.mouthPosition(vec).x;
+    m.x = c.motion.x - offset;
+    m.y = c.motion.y;
+    c.motion.speed = 0;
+    window.__lastTarget = c;
+    window.__lastTargetMotion = c.motion;
+    return c.def.tier;
+  }, forceTier);
+
+/**
+ * Whether the creature targeted by the last feedOnce() is still alive. Creatures are pooled,
+ * so also check it wasn't recycled into a new spawn (each spawn gets a new motion object).
+ */
+const targetAlive = (page) =>
+  page.evaluate(
+    () =>
+      window.__lastTarget?.active === true &&
+      window.__lastTarget.motion === window.__lastTargetMotion,
+  );
+
 const sceneActive = (page, key) =>
   page.waitForFunction((k) => window.__PHASER_GAME__?.scene.isActive(k), key, { timeout: 15000 });
 
@@ -97,6 +167,8 @@ async function desktop(browser) {
     ),
   );
   check('placeholder + gradient textures exist', texturesOk);
+  // Movement checks shouldn't be cut short by starving.
+  await noStarve(page);
 
   // Swim right.
   const s0 = await sealState(page);
@@ -171,6 +243,137 @@ async function desktop(browser) {
   await ctx.close();
 }
 
+async function gameplay(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  const page = await ctx.newPage();
+  watch(page, 'gameplay');
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(1000);
+
+  // Spawning.
+  const r0 = await runState(page);
+  check('creatures spawn around the seal', r0.creatures >= 10, `${r0.creatures} alive`);
+  const moved = await page.evaluate(async () => {
+    const s = window.__PHASER_GAME__.scene.getScene('Game');
+    const c = s.spawner.alive.find((x) => x.active);
+    const x0 = c.x;
+    await new Promise((r) => setTimeout(r, 400));
+    return Math.abs(c.x - x0);
+  });
+  check('creatures swim', moved > 5, `moved ${moved.toFixed(0)}px`);
+  await page.screenshot({ path: `${OUT}/07-creatures.png` });
+
+  // Eating restores hunger and scores.
+  await page.evaluate(() => {
+    window.__PHASER_GAME__.scene.getScene('Game').hunger.value = 50;
+  });
+  // The idle seal may already have caught passing fish, so compare against a snapshot.
+  const before = await runState(page);
+  const tier = await feedOnce(page);
+  await page.waitForTimeout(150);
+  const r1 = await runState(page);
+  check('found edible prey', tier !== null);
+  check('the targeted prey gets eaten', !(await targetAlive(page)));
+  check(
+    'eating scores',
+    r1.score > before.score && r1.eaten > before.eaten,
+    `score ${before.score} -> ${r1.score}`,
+  );
+  check('eating restores hunger', r1.hunger > 50, `hunger=${r1.hunger.toFixed(1)}`);
+  // The HUD rolls the score up over a few frames; wait for it to settle.
+  const hudSynced = await page
+    .waitForFunction(
+      () => {
+        const g = window.__PHASER_GAME__;
+        return g.scene.getScene('Hud').scoreText.text === String(g.scene.getScene('Game').score);
+      },
+      null,
+      { timeout: 3000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+  check('HUD shows the score', hudSynced);
+
+  // Prey above the seal's tier bumps instead of being eaten.
+  await feedOnce(page, 5);
+  await page.waitForTimeout(150);
+  const r2 = await runState(page);
+  check('too-big prey is not eaten', await targetAlive(page));
+  check('bumping slows the seal', r2.speed < 200, `speed=${r2.speed.toFixed(0)}`);
+
+  // Growth: set the meter one point short of stage 2; a real meal crosses the threshold.
+  await page.evaluate(() => {
+    const s = window.__PHASER_GAME__.scene.getScene('Game');
+    s.growth.add(s.growth.pointsToNext - 1);
+  });
+  await feedOnce(page);
+  await page.waitForTimeout(200);
+  const r3 = await runState(page);
+  check('eating fills growth to stage 2', r3.stage === 2, `stage=${r3.stage}`);
+  check(
+    'the seal gets bigger',
+    r3.scaleX > r1.scaleX,
+    `${r1.scaleX.toFixed(2)} -> ${r3.scaleX.toFixed(2)}`,
+  );
+  await page.waitForTimeout(700);
+  const hudStage = (await runState(page)).hudStage;
+  check('HUD shows the new size', hudStage === 'SIZE 2/5', `hud=${hudStage}`);
+  await page.screenshot({ path: `${OUT}/08-grown.png` });
+
+  // Natural drain.
+  const h0 = (await runState(page)).hunger;
+  await page.waitForTimeout(1000);
+  const h1 = (await runState(page)).hunger;
+  check('hunger drains over time', h1 < h0, `${h0.toFixed(1)} -> ${h1.toFixed(1)}`);
+
+  // Starving ends the run and shows results.
+  await page.evaluate(() => {
+    window.__PHASER_GAME__.scene.getScene('Game').hunger.value = 0.01;
+  });
+  await sceneActive(page, 'GameOver');
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `${OUT}/09-game-over.png` });
+  const over = await page.evaluate(() => {
+    const g = window.__PHASER_GAME__;
+    return { dead: g.scene.getScene('Game').dead, hud: g.scene.isActive('Hud') };
+  });
+  check('starving shows game over', over.dead);
+
+  // Retry restarts a fresh run.
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !window.__PHASER_GAME__.scene.isActive('GameOver'), null, {
+    timeout: 5000,
+  });
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(800);
+  const fresh = await runState(page);
+  check(
+    'retry starts a fresh run',
+    !fresh.dead && fresh.score === 0 && fresh.stage === 1 && fresh.hunger > 95,
+    `score=${fresh.score} stage=${fresh.stage} hunger=${fresh.hunger.toFixed(0)}`,
+  );
+  check('retry brings the HUD back', fresh.hudScore === '0');
+  check('retry repopulates creatures', fresh.creatures >= 10, `${fresh.creatures} alive`);
+
+  // Game over -> Esc goes to the menu and stops the run.
+  await page.evaluate(() => {
+    window.__PHASER_GAME__.scene.getScene('Game').hunger.value = 0.01;
+  });
+  await sceneActive(page, 'GameOver');
+  await page.waitForTimeout(800);
+  await page.keyboard.press('Escape');
+  await sceneActive(page, 'Menu');
+  const stopped = await page.evaluate(() => {
+    const g = window.__PHASER_GAME__;
+    return ['Game', 'Hud', 'GameOver'].every((k) => !g.scene.isActive(k));
+  });
+  check('Esc on game over returns to menu', stopped);
+  await ctx.close();
+}
+
 async function mobile(browser) {
   const ctx = await browser.newContext({
     viewport: { width: 915, height: 412 },
@@ -194,6 +397,7 @@ async function mobile(browser) {
   await page.touchscreen.tap(center.x, center.y);
   await sceneActive(page, 'Game');
   await page.waitForTimeout(700);
+  await noStarve(page);
 
   const boostVisible = await page.evaluate(
     () => window.__PHASER_GAME__.scene.getScene('Hud').boostButton.visible,
@@ -247,6 +451,7 @@ const browser = await chromium.launch({
 
 try {
   await desktop(browser);
+  await gameplay(browser);
   await mobile(browser);
 } catch (err) {
   errors.push(`playtest crashed: ${err.stack ?? err}`);

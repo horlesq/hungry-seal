@@ -14,15 +14,9 @@ export function createGameConfig(
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
     },
-    physics: {
-      default: 'arcade',
-      arcade: {
-        gravity: { x: 0, y: 0 },
-        // Variable step keeps motion smooth on 120/144 Hz displays.
-        fixedStep: false,
-        debug: false,
-      },
-    },
+    // No physics plugin: every mover (seal, creatures) runs its own kinematic motion model
+    // and contacts are circle checks (see systems/feeding.ts). Add Arcade back if a feature
+    // ever needs real collision response.
     input: {
       // Mouse + up to 3 simultaneous touches (steer + boost + spare).
       activePointers: 3,

@@ -1,19 +1,23 @@
-// Visual effects: surface splashes, the seal's bubble trail and ambient bubbles.
-// All emitters are capped (maxParticles) and particles are recycled by Phaser.
+// Visual effects: surface splashes, bubble trails, chomp bursts and floating text.
+// All emitters are capped (maxParticles) and texts/rings are pooled and reused.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { EFFECTS } from '../config/balance';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config/layout';
+import { GAME_WIDTH, GAME_HEIGHT, UI_FONT } from '../config/layout';
 import { WORLD } from '../config/zones';
 import { clamp } from '../utils/math';
 
 const SPLASH_RINGS = 4;
+const FLOAT_TEXTS = 16;
 
 export class Effects {
   private readonly bubbles: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly droplets: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly rings: Phaser.GameObjects.Image[] = [];
+  private readonly texts: Phaser.GameObjects.Text[] = [];
   private nextRing = 0;
+  private nextText = 0;
   private trailTimer = 0;
   private ambientTimer = 0;
 
@@ -47,10 +51,80 @@ export class Effects {
     });
     this.droplets.setDepth(15);
 
+    this.sparks = scene.add.particles(0, 0, TextureKeys.Spark, {
+      emitting: false,
+      lifespan: { min: 250, max: 480 },
+      speed: { min: 90, max: 260 },
+      scale: { start: 0.9, end: 0 },
+      alpha: { start: 1, end: 0 },
+      rotate: { min: 0, max: 360 },
+      tint: [0xfff27a, 0xffffff, 0xffc36b],
+      maxParticles: 120,
+    });
+    this.sparks.setDepth(16);
+
     for (let i = 0; i < SPLASH_RINGS; i++) {
       const ring = scene.add.image(0, 0, TextureKeys.Ring).setVisible(false).setDepth(14);
       this.rings.push(ring);
     }
+
+    for (let i = 0; i < FLOAT_TEXTS; i++) {
+      const text = scene.add
+        .text(0, 0, '', {
+          fontFamily: UI_FONT,
+          fontSize: '26px',
+          fontStyle: 'bold',
+          color: '#fff27a',
+          stroke: '#0b3a66',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5)
+        .setDepth(30)
+        .setVisible(false);
+      this.texts.push(text);
+    }
+  }
+
+  /** Burst of stars and bubbles where something got eaten. */
+  chomp(x: number, y: number, big = false): void {
+    this.sparks.emitParticleAt(x, y, big ? 12 : 7);
+    this.bubbles.emitParticleAt(x, y, big ? 5 : 3);
+  }
+
+  /** Celebration burst when the seal grows a stage. */
+  growBurst(x: number, y: number): void {
+    this.sparks.emitParticleAt(x, y, 24);
+    this.bubbles.emitParticleAt(x, y, 16);
+  }
+
+  /** Text that pops up and floats away, e.g. "+10". */
+  floatText(x: number, y: number, message: string, color = '#fff27a', size = 26): void {
+    const text = this.texts[this.nextText];
+    this.nextText = (this.nextText + 1) % this.texts.length;
+    this.scene.tweens.killTweensOf(text);
+    text
+      .setText(message)
+      .setColor(color)
+      .setFontSize(size)
+      .setPosition(x, y)
+      .setAlpha(1)
+      .setScale(0.6)
+      .setVisible(true);
+    this.scene.tweens.add({
+      targets: text,
+      scale: 1,
+      duration: 140,
+      ease: 'Back.Out',
+    });
+    this.scene.tweens.add({
+      targets: text,
+      y: y - 60,
+      alpha: 0,
+      delay: 250,
+      duration: 700,
+      ease: 'Quad.In',
+      onComplete: () => text.setVisible(false),
+    });
   }
 
   /** Splash at the water line. `vy` is the crossing vertical speed (sign ignored). */
@@ -104,6 +178,10 @@ export class Effects {
   }
 
   get particleCount(): number {
-    return this.bubbles.getAliveParticleCount() + this.droplets.getAliveParticleCount();
+    return (
+      this.bubbles.getAliveParticleCount() +
+      this.droplets.getAliveParticleCount() +
+      this.sparks.getAliveParticleCount()
+    );
   }
 }

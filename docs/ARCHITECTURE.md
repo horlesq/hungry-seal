@@ -1,7 +1,7 @@
 # Architecture
 
 ## Stack
-- **Phaser 4.2.1** (Arcade Physics), **TypeScript 6** (strict), **Vite 8**.
+- **Phaser 4.2.1** (no physics plugin, see Physics below), **TypeScript 6** (strict), **Vite 8**.
 - No React/other UI framework. HUD/menus are Phaser scenes/containers.
 - Package manager: npm. Lint/format: ESLint 10 (flat config) + Prettier. Tests: Vitest. Browser playtest: playwright-core driving the locally installed Chrome.
 - Deploy target: static build (`vite build` -> `dist/`, relative `base: './'`), suitable for itch.io / Netlify / GitHub Pages.
@@ -19,16 +19,17 @@ hungry-seal/
     assets/             (planned) images, atlases, audio, fonts (served as-is)
   scripts/
     playtest.mjs        headless browser smoke playtest (npm run playtest)
+    balance-bot.mjs     bot plays a run and logs hunger/score/stage (npm run balance)
   src/
     main.ts             Phaser.Game bootstrap; exposes window.__PHASER_GAME__ in dev
     config/
       game.ts           Phaser config, scale, physics
       layout.ts         GAME_WIDTH/HEIGHT, touch UI layout, UI font
       keys.ts           scene keys, registry keys
-      balance.ts        movement/camera/input/effects tuning (later: hunger, growth, combo)
-      zones.ts          WORLD bounds (surface, floor), depth zones + colors
+      balance.ts        movement, camera, input, hunger, growth, feeding, spawn, effects tuning
+      zones.ts          WORLD bounds (surface, floor), depth zones + colors, zoneBand()
       assets.ts         asset manifest (keys -> optional urls)
-      creatures.ts      (planned) creature definitions (data table)
+      creatures.ts      creature definitions (tier, speeds, nutrition, behaviors, zones, school)
       upgrades.ts       (planned) upgrade definitions and cost curves
     scenes/
       BootScene.ts      reads ?debug, starts Preload
@@ -36,22 +37,24 @@ hungry-seal/
       MenuScene.ts      title screen (placeholder until Phase 4)
       GameScene.ts      the run
       HudScene.ts       overlay UI running parallel to GameScene
-      GameOverScene.ts  (planned)
+      GameOverScene.ts  results overlay launched over the still-running GameScene
       ShopScene.ts      (planned)
     entities/
-      sealMotion.ts     PURE movement model (swim, surface, air, boost) + tests
-      Seal.ts           sprite + kinematic body; applies sealMotion, visual feel
-      Creature.ts       (planned) base for prey/predator/hazard, driven by config
-      behaviors/        (planned) wander, school, flee, chase, patrol, etc.
+      sealMotion.ts     PURE seal movement model (swim, surface, air, boost) + tests
+      Seal.ts           sprite; applies sealMotion, growth stage scaling, mouth circle, visual feel
+      creatureAI.ts     PURE creature behaviors (wander, drift, flee, school, band keeping) + tests
+      Creature.ts       pooled prey sprite driven by a CreatureDef; School = follow-the-leader group
       Coin.ts           (planned)
     systems/
       InputController.ts   unifies mouse/touch/keyboard -> steer vector + boost
       WorldBackground.ts   parallax, depth gradient, light rays, marine snow, water line
-      Effects.ts           splashes, bubble trail, ambient bubbles (later: shake, floating text)
+      Effects.ts           splashes, bubbles, chomp sparks, growth burst, pooled floating text
       PlaceholderArt.ts    Canvas 2D placeholder textures under final asset keys
-      Spawner.ts           (planned) zone-based, camera-relative, pooled spawning
-      HungerSystem.ts, GrowthSystem.ts, ComboSystem.ts, FrenzySystem.ts, UpgradeSystem.ts,
-      AudioManager.ts      (planned)
+      Spawner.ts           camera-relative, zone-weighted, pooled creature spawning/despawning
+      HungerSystem.ts      PURE hunger drain/feed/starve (tested in rules.test.ts)
+      GrowthSystem.ts      PURE growth points -> stages (tested in rules.test.ts)
+      feeding.ts           PURE bite rule (canEat) + circle overlap
+      ComboSystem.ts, FrenzySystem.ts, UpgradeSystem.ts, AudioManager.ts  (planned)
     services/
       EventBus.ts          typed events between scenes/systems
       SaveService.ts       (planned) localStorage wrapper, versioned schema
@@ -67,8 +70,10 @@ hungry-seal/
 ```
 
 ## Scenes
-- **Boot -> Preload -> Menu -> Game (+Hud in parallel) -> GameOver -> Shop/Menu**
-- GameScene owns world simulation; HudScene subscribes to events (boost, debug info; later hunger, score, combo) via EventBus and never reads game objects directly. GameScene launches Hud on create and stops it on shutdown. ESC returns to the menu (until a pause menu exists).
+- **Boot -> Preload -> Menu -> Game (+Hud in parallel) -> GameOver overlay -> Game (retry) / Menu**
+- GameScene owns world simulation; HudScene subscribes to events (`run:hunger` every frame; `run:score`, `run:growth` on change and on the first frame; `run:over`; `seal:boost`; debug) via EventBus and never reads game objects directly. GameScene launches Hud on create and stops Hud + GameOver on shutdown. ESC returns to the menu (until a pause menu exists).
+- Game over: GameScene marks itself dead, plays the death tween, then launches GameOverScene on top while the world keeps animating. Retry = `scene.start(Game)` from the overlay (restarts the running GameScene). Scene order in `main.ts` sets draw order (GameOver above Hud above Game).
+- HUD can't receive events emitted during GameScene.create (it isn't created yet), so GameScene sets `hudDirty` and publishes the full state on its first update.
 - EventBus subscribers pass their unsubscribe functions to `subscribeForScene(scene, [...])` so listeners are removed on scene shutdown (scenes restart cleanly).
 
 ## Key design rules
@@ -95,16 +100,24 @@ hungry-seal/
 - Target 60 FPS on mid-range phones; profile in Phase 9.
 
 ## Physics and time
-- Arcade Physics with `fixedStep: false` (variable step, smooth on 120/144 Hz). The seal is **kinematic**: `body.moves = false`, position comes from `sealMotion`; the body only follows for overlap checks.
-- Gravity only above the surface line (handled in `sealMotion`, not Arcade world gravity).
+- **No physics plugin** (removed in Phase 2). Every mover runs its own kinematic model (`sealMotion`, `creatureAI`) integrated with frame dt, and contacts are circle-vs-circle checks (`systems/feeding.ts`). Reasons: all motion is custom anyway, ≤ ~120 movers makes O(n) checks trivially cheap, the checks are unit-testable, and it avoids Arcade body/scale issues (the roll flip squashed the seal's body). Re-add Arcade only if a feature needs real collision response.
+- Eating uses the seal's **mouth circle** (`Seal.mouthPosition()` / `mouthRadius`, scales with growth) against each creature's `def.radius`.
+- Gravity only above the surface line (handled in `sealMotion`).
 - GameScene clamps dt to 50 ms. Note Phaser's TimeStep also clamps delta to 16.7 ms for the first 120 frames after (re)focus (`fps.panicMax`), so very slow devices run in slow motion briefly at start.
-- Overlap checks for eating, hazards, coins. Use circle bodies for creatures where possible. The seal's sprite body squashes during the roll flip; use a dedicated mouth hitbox for eating.
+- Debug mode draws hit circles (yellow = mouth, green = edible, red = too big) from GameScene.
+
+## Creatures and spawning
+- A creature = `CreatureDef` (data) + pooled `Creature` sprite + `CreatureMotion` (pure state). Behaviors are flags derived from `def.behaviors`; priority flee > follow school leader > wander/drift, then depth-band keeping and a hard clamp to the water.
+- Prey flee only from a seal that can eat them (`canEat(stage, tier)`); bumping startles them regardless.
+- Schools: `School.members[0]` is the leader; members steer toward leader + a fixed slot offset. When the leader is eaten the next member leads.
+- Spawner keeps ~`SPAWN.targetAlive` creatures, spawning just off-screen (70% ahead of the seal) with the zone at the spawn point choosing a weighted creature, and recycles creatures > `despawnDistance` from the camera centre. Pooled objects are reused: code that holds a creature reference across frames must also check it wasn't respawned (e.g. compare its `motion` object).
 
 ## Testing / verification
 - `npm run check` = typecheck + lint + unit tests + playtest. Run it before calling a phase done.
 - Unit tests (Vitest, `src/**/*.test.ts`, Node environment) for pure logic: movement, math, later hunger, growth thresholds, combo timing, upgrade cost curves, save migration.
 - `npm run playtest` boots the game via Vite in headless Chrome (GPU via ANGLE D3D11 on Windows; `PLAYTEST_GL=swiftshader` for software), drives keyboard/mouse/multi-touch, asserts on live state through `window.__PHASER_GAME__`, fails on console errors or HTTP errors, and writes screenshots to `.playtest/` (gitignored). Extend it with checks for every new mechanic.
+- `npm run balance -- [human|perfect] [seconds]` runs a bot that chases prey with the mouse and logs hunger/score/stage every 5 s. Use after changing tuning; reference numbers are in the script header and ROADMAP.
 - Manual play on a real phone over LAN: `npm run dev:host`, open the printed network URL.
 
 ## Scripts
-`npm run dev` | `dev:host` | `build` | `preview` | `typecheck` | `lint` | `format` | `format:check` | `test` | `test:watch` | `playtest` | `check`
+`npm run dev` | `dev:host` | `build` | `preview` | `typecheck` | `lint` | `format` | `format:check` | `test` | `test:watch` | `playtest` | `balance` | `check`
