@@ -9,6 +9,7 @@ import { MenuScene } from './scenes/MenuScene';
 import { PauseScene } from './scenes/PauseScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { ShopScene } from './scenes/ShopScene';
+import { SkinsScene } from './scenes/SkinsScene';
 import { applyViewport, measureViewport } from './services/Viewport';
 
 /** Don't hold the game back forever if the font can't load (it falls back to system fonts). */
@@ -37,6 +38,7 @@ function start(): void {
         PreloadScene,
         MenuScene,
         ShopScene,
+        SkinsScene,
         GameScene,
         HudScene,
         GameOverScene,

@@ -2,7 +2,7 @@
 // sprite, growth-stage scaling, the mouth hit circle, and the purely visual feel:
 // belly-roll when changing direction, swim wiggle, stretch at speed, gulp pop.
 import Phaser from 'phaser';
-import { TextureKeys } from '../config/assets';
+import { TextureKeys, type TextureKey } from '../config/assets';
 import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
 import { textureScale } from '../services/Viewport';
@@ -47,9 +47,16 @@ export class Seal extends Phaser.GameObjects.Sprite {
   private frenzy = false;
   private frenzyHue = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, mods: RunModifiers) {
-    super(scene, x, y, TextureKeys.Seal);
-    this.texScale = textureScale(scene, TextureKeys.Seal);
+  /** `texture`: the equipped skin (cosmetic only). */
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    mods: RunModifiers,
+    texture: TextureKey = TextureKeys.Seal,
+  ) {
+    super(scene, x, y, texture);
+    this.texScale = textureScale(scene, texture);
     this.mods = mods;
     this.motion = createSealMotionState(x, y);
     scene.add.existing(this);

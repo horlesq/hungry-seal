@@ -1328,6 +1328,84 @@ async function portrait(browser) {
   await ctx.close();
 }
 
+/** Skins: buy with coins, can't buy what you can't afford, equip, and the run uses it. */
+async function skins(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  await ctx.addInitScript(() => {
+    if (!localStorage.getItem('hungry-seal-save')) {
+      localStorage.setItem(
+        'hungry-seal-save',
+        JSON.stringify({ version: 2, coins: 700, bestScore: 100, runs: 3, tutorialDone: true }),
+      );
+    }
+  });
+  const page = await ctx.newPage();
+  watch(page, 'skins');
+  const save = () => page.evaluate(() => JSON.parse(localStorage.getItem('hungry-seal-save')));
+  const settle = () => page.waitForTimeout(250);
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(400);
+  const migrated = await save();
+  check(
+    'skins: an old save starts with the harbor seal',
+    migrated === null || migrated.skins === undefined || migrated.skins.equipped === 'harbor',
+  );
+
+  await clickButton(page, 'Menu', 'skins');
+  await sceneActive(page, 'Skins');
+  await page.waitForTimeout(400);
+  await clickButton(page, 'Skins', 'skin-arctic');
+  await settle();
+  await clickButton(page, 'Skins', 'buy');
+  await settle();
+  const bought = await save();
+  check(
+    'skins: buying spends coins and wears the skin',
+    bought.coins === 400 &&
+      bought.skins.owned.includes('arctic') &&
+      bought.skins.equipped === 'arctic',
+    JSON.stringify({ coins: bought.coins, skins: bought.skins }),
+  );
+  const preview = await page.evaluate(
+    () => window.__PHASER_GAME__.scene.getScene('Skins').preview.texture.key,
+  );
+  check('skins: the preview shows the selected skin', preview === 'seal-arctic', preview);
+
+  await clickButton(page, 'Skins', 'skin-elephant');
+  await settle();
+  const locked = await page.evaluate(() => {
+    const sc = window.__PHASER_GAME__.scene.getScene('Skins');
+    return { buyEnabled: sc.buy.isEnabled, buyVisible: sc.buy.visible };
+  });
+  check('skins: an unaffordable skin cannot be bought', locked.buyVisible && !locked.buyEnabled);
+  await page.screenshot({ path: `${OUT}/29-skins.png` });
+
+  await clickButton(page, 'Skins', 'skin-harbor');
+  await settle();
+  await clickButton(page, 'Skins', 'equip');
+  await settle();
+  check('skins: equip an owned skin', (await save()).skins.equipped === 'harbor');
+  await clickButton(page, 'Skins', 'skin-arctic');
+  await settle();
+  await clickButton(page, 'Skins', 'equip');
+  await settle();
+
+  await page.keyboard.press('Escape');
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(300);
+  const menuSeal = await page.evaluate(
+    () => window.__PHASER_GAME__.scene.getScene('Menu').children.getByName('seal').texture.key,
+  );
+  check('skins: the title screen shows the equipped skin', menuSeal === 'seal-arctic', menuSeal);
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Game');
+  await page.waitForTimeout(500);
+  const runSeal = await inGame(page, (sc) => sc.seal.texture.key);
+  check('skins: the run uses the equipped skin', runSeal === 'seal-arctic', runSeal);
+  await ctx.close();
+}
+
 await mkdir(OUT, { recursive: true });
 const server = await createServer({
   server: { port: PORT, strictPort: true },
@@ -1349,7 +1427,7 @@ const browser = await chromium.launch({
 });
 
 // PLAYTEST_ONLY=desktop,mobile runs just those sections.
-const sections = { screens, desktop, danger, phase4, phase5, gameplay, mobile, portrait };
+const sections = { screens, desktop, danger, phase4, phase5, gameplay, mobile, portrait, skins };
 const only = process.env.PLAYTEST_ONLY?.split(',');
 try {
   for (const [name, run] of Object.entries(sections)) {

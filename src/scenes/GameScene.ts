@@ -18,6 +18,7 @@ import {
   SEAL_MOTION,
 } from '../config/balance';
 import { RegistryKeys, SceneKeys } from '../config/keys';
+import { skinDef } from '../config/skins';
 import { WORLD, depthMeters, zoneAt, type ZoneId } from '../config/zones';
 import type { Creature } from '../entities/Creature';
 import { startle } from '../entities/creatureAI';
@@ -182,7 +183,8 @@ export class GameScene extends Phaser.Scene {
     this.coins = new CoinField(this);
     this.pickups = new Pickups(this);
     this.darkness = new Darkness(this);
-    this.seal = new Seal(this, 0, WORLD.surfaceY + 260, mods);
+    const skin = skinDef(saves.data.skins.equipped);
+    this.seal = new Seal(this, 0, WORLD.surfaceY + 260, mods, skin.texture);
     this.predators = new Predators(this);
     this.controls = new InputController(this);
     this.debugGfx = this.add.graphics().setDepth(50);

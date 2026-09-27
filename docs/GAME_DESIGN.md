@@ -111,9 +111,9 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 - The deep gets dark: darkness starts ~600 px above the Deep and ramps to ~90% at the seabed. The seal carries a small light circle (clear ~110 px, dark by ~360 px).
 - Glows show through the dark: anglerfish lures, lanternfish, jellyfish (pink), mine warning lights (blinking red), chests, orbs.
 - The camera pulls back as the seal grows (100% → 82% zoom at size 5).
-- **Skins:** cosmetic seal variants (harbor, leopard, arctic, pirate, etc.).
+- **Skins (done):** cosmetic only (same stats), bought with coins on the Skins screen (menu), which previews the selected skin and buys or equips it; buying also wears it. Harbor Seal (free, default), Arctic Pup (harp seal pup, 300), Sea Lion (450), Tropical Seal (Hawaiian monk seal with a lei, 600), Leopard Seal (800), Walrus (1,000), Elephant Seal (1,500). The equipped skin shows on the title screen and in runs.
 - **Missions (later):** 3 rotating goals per run set ("eat 20 crabs", "reach abyss").
-- Save data in localStorage: coins, best score, best distance, runs, settings (done); upgrade levels, skins owned/equipped (Phase 4+).
+- Save data in localStorage: coins, best score, best distance, runs, settings (done); upgrade levels, skins owned/equipped (save v3).
 
 ## Audio (done, placeholder)
 All sounds are synthesized in code at startup (`src/audio/`): chomp / big chomp, coin, splash, hurt, jellyfish zap, explosion, boost whoosh, grow and frenzy arpeggios, shark "dun-dun" on its telegraph, bump, UI click, purchase, game over, and a calm 8-bar underwater music loop. Mute from the menu (persists). Replace with recorded audio later under the same keys.

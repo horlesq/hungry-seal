@@ -1,5 +1,6 @@
 // Persistent save data: schema, defaults, validation/migration and pure update helpers.
 // No storage access here (SaveService does the I/O) so it can be unit tested.
+import { DEFAULT_SKIN, SKIN_IDS, skinDef, type SkinId } from '../config/skins';
 import { UPGRADE_IDS, type UpgradeId } from '../config/upgrades';
 import {
   buyUpgrade as buy,
@@ -8,7 +9,7 @@ import {
   type UpgradeLevels,
 } from '../systems/UpgradeSystem';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -19,6 +20,8 @@ export interface SaveData {
   bestDistance: number;
   runs: number;
   upgrades: UpgradeLevels;
+  /** Cosmetic seal skins: bought ones (always including the default) and the one worn. */
+  skins: { owned: SkinId[]; equipped: SkinId };
   /** First-run hints have been shown. */
   tutorialDone: boolean;
   settings: {
@@ -40,6 +43,7 @@ export function defaultSave(): SaveData {
     bestDistance: 0,
     runs: 0,
     upgrades: emptyUpgrades(),
+    skins: { owned: [DEFAULT_SKIN], equipped: DEFAULT_SKIN },
     tutorialDone: false,
     settings: { muted: false },
   };
@@ -68,6 +72,13 @@ export function migrateSave(raw: unknown): SaveData {
     data.upgrades[id] = Math.min(maxLevel(id), count(upgrades?.[id]));
   }
 
+  // Skins (v3): keep known ids only; the default is always owned; wear only what's owned.
+  const skins = r.skins as { owned?: unknown; equipped?: unknown } | undefined;
+  const owned = Array.isArray(skins?.owned) ? skins.owned : [];
+  data.skins.owned = SKIN_IDS.filter((id) => id === DEFAULT_SKIN || owned.includes(id));
+  const equipped = skins?.equipped as SkinId;
+  data.skins.equipped = data.skins.owned.includes(equipped) ? equipped : DEFAULT_SKIN;
+
   data.tutorialDone = typeof r.tutorialDone === 'boolean' ? r.tutorialDone : data.runs > 0;
   const settings = r.settings as Record<string, unknown> | undefined;
   if (settings && typeof settings.muted === 'boolean') data.settings.muted = settings.muted;
@@ -87,6 +98,23 @@ export function recordRun(data: SaveData, run: RunRecord): { data: SaveData; new
       runs: data.runs + 1,
     },
   };
+}
+
+/** Buys a skin (and wears it) if not owned and affordable. Returns null if not possible. */
+export function purchaseSkin(data: SaveData, id: SkinId): SaveData | null {
+  const price = skinDef(id).price;
+  if (data.skins.owned.includes(id) || data.coins < price) return null;
+  return {
+    ...data,
+    coins: data.coins - price,
+    skins: { owned: [...data.skins.owned, id], equipped: id },
+  };
+}
+
+/** Wears an owned skin. Returns null if it isn't owned. */
+export function equipSkin(data: SaveData, id: SkinId): SaveData | null {
+  if (!data.skins.owned.includes(id)) return null;
+  return { ...data, skins: { ...data.skins, equipped: id } };
 }
 
 /** Buys the next level of an upgrade if affordable. Returns null if not possible. */

@@ -35,6 +35,7 @@ hungry-seal/
       predators.ts      predator definitions (tier, speeds, radii, timings, rewards, spawn rule, glow)
       depths.ts         shared draw depths (darkness overlay, glows)
       upgrades.ts       upgrade definitions (name, costs, effect text) and per-level effects
+      skins.ts          seal skins (name, description, texture, price); cosmetic only
     scenes/
       BootScene.ts      reads ?debug, starts Preload
       PreloadScene.ts   load manifest, progress bar, generate missing placeholders + UI textures
@@ -43,6 +44,7 @@ hungry-seal/
       HudScene.ts       overlay UI running parallel to GameScene (status panel, score, pause button)
       GameOverScene.ts  results overlay launched over the still-running GameScene (score count-up, stats)
       ShopScene.ts      "Upgrades": two columns of upgrade rows, gold buy buttons, Back / Play
+      SkinsScene.ts     skin preview + card grid, Buy (gold) / Equip
       PauseScene.ts     pause overlay: Resume / Restart run / Quit to menu, sound toggle
     ui/
       theme.ts          design tokens: palette (COLORS/CSS), type scale + uiText(), drawPanel, EDGE,
@@ -70,6 +72,7 @@ hungry-seal/
       WorldBackground.ts   parallax, depth gradient, light rays, marine snow, water line
       Effects.ts           splashes, bubbles, chomp sparks, growth burst, pooled floating text
       PlaceholderArt.ts    Canvas 2D placeholder textures under final asset keys
+      sealArt.ts           parameterized cartoon pinniped painter + one style per skin
       Spawner.ts           camera-relative, zone-weighted, pooled creature spawning/despawning
       HungerSystem.ts      PURE hunger drain/feed/starve (tested in rules.test.ts)
       GrowthSystem.ts      PURE growth points -> stages (tested in rules.test.ts)
@@ -87,7 +90,7 @@ hungry-seal/
       Tutorial.ts          PURE first-run hint rules (tutorial.test.ts)
     services/
       EventBus.ts          typed events between scenes/systems
-      saveData.ts          PURE save schema v2 (coins, bests, upgrades, tutorialDone, settings),
+      saveData.ts          PURE save schema v3 (coins, bests, upgrades, skins, tutorialDone, settings),
                            migrateSave (v1 -> v2), recordRun, purchase (+ save.test.ts)
       AudioManager.ts      registers synthesized sounds as AudioBuffers, rate-limited play,
                            music loop, mute (save is the source of truth)

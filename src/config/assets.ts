@@ -5,7 +5,14 @@
 // texture under the same key, so nothing else has to change.
 
 export const TextureKeys = {
+  /** The default (harbor seal) skin; other skins below. */
   Seal: 'seal',
+  SealArctic: 'seal-arctic',
+  SealSeaLion: 'seal-sealion',
+  SealTropical: 'seal-tropical',
+  SealLeopard: 'seal-leopard',
+  SealWalrus: 'seal-walrus',
+  SealElephant: 'seal-elephant',
   Minnow: 'creature-minnow',
   Shrimp: 'creature-shrimp',
   Sardine: 'creature-sardine',
@@ -62,6 +69,12 @@ export type AssetEntry =
 
 export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { type: 'image', key: TextureKeys.Seal },
+  { type: 'image', key: TextureKeys.SealArctic },
+  { type: 'image', key: TextureKeys.SealSeaLion },
+  { type: 'image', key: TextureKeys.SealTropical },
+  { type: 'image', key: TextureKeys.SealLeopard },
+  { type: 'image', key: TextureKeys.SealWalrus },
+  { type: 'image', key: TextureKeys.SealElephant },
   { type: 'image', key: TextureKeys.Minnow },
   { type: 'image', key: TextureKeys.Shrimp },
   { type: 'image', key: TextureKeys.Sardine },

@@ -1,10 +1,13 @@
 // localStorage-backed save. Storage can be missing or throw (private mode, blocked
 // cookies), so every access is guarded and the game keeps working with in-memory data.
+import type { SkinId } from '../config/skins';
 import type { UpgradeId } from '../config/upgrades';
 import {
   defaultSave,
+  equipSkin,
   migrateSave,
   purchase,
+  purchaseSkin,
   recordRun,
   type RunRecord,
   type SaveData,
@@ -50,6 +53,16 @@ export class SaveService {
     return true;
   }
 
+  /** Buys (and wears) a skin. Returns false if owned already or unaffordable. */
+  buySkin(id: SkinId): boolean {
+    return this.apply(purchaseSkin(this.current, id));
+  }
+
+  /** Wears an owned skin. Returns false if it isn't owned. */
+  equipSkin(id: SkinId): boolean {
+    return this.apply(equipSkin(this.current, id));
+  }
+
   setMuted(muted: boolean): void {
     this.current = { ...this.current, settings: { ...this.current.settings, muted } };
     this.persist();
@@ -59,6 +72,13 @@ export class SaveService {
     if (this.current.tutorialDone) return;
     this.current = { ...this.current, tutorialDone: true };
     this.persist();
+  }
+
+  private apply(next: SaveData | null): boolean {
+    if (!next) return false;
+    this.current = next;
+    this.persist();
+    return true;
   }
 
   private load(): SaveData {

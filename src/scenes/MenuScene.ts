@@ -3,7 +3,7 @@
 // Keys: arrows / Tab + Enter, S = upgrades, M = mute, F = fullscreen.
 import Phaser from 'phaser';
 import { SoundKeys } from '../audio/sounds';
-import { TextureKeys } from '../config/assets';
+import { skinDef } from '../config/skins';
 import { SceneKeys } from '../config/keys';
 import { audio } from '../services/AudioManager';
 import { saves } from '../services/SaveService';
@@ -66,8 +66,9 @@ export class MenuScene extends Phaser.Scene {
 
     const sealX = L.seal.x;
     const sealY = L.seal.y;
-    this.sealScale = L.seal.scale * textureScale(this, TextureKeys.Seal);
-    this.seal = this.add.image(sealX, sealY, TextureKeys.Seal).setScale(this.sealScale);
+    const skin = skinDef(save.skins.equipped).texture;
+    this.sealScale = L.seal.scale * textureScale(this, skin);
+    this.seal = this.add.image(sealX, sealY, skin).setScale(this.sealScale).setName('seal');
     if (!reducedMotion()) {
       this.tweens.add({
         targets: this.seal,
@@ -92,16 +93,24 @@ export class MenuScene extends Phaser.Scene {
       fontSize: 42,
       onClick: () => this.leave(SceneKeys.Game),
     }).setName('play');
-    const upgrades = new Button(this, L.buttonsX, L.playY + 100, {
-      width: 340,
+    const upgrades = new Button(this, L.buttonsX - 88, L.playY + 100, {
+      width: 164,
       height: 68,
       label: 'Upgrades',
       variant: 'secondary',
-      fontSize: 28,
+      fontSize: 26,
       onClick: () => this.leave(SceneKeys.Shop),
     })
       .setName('upgrades')
       .setBadge(anyAffordable(save.upgrades, save.coins));
+    const skins = new Button(this, L.buttonsX + 88, L.playY + 100, {
+      width: 164,
+      height: 68,
+      label: 'Skins',
+      variant: 'secondary',
+      fontSize: 26,
+      onClick: () => this.leave(SceneKeys.Skins),
+    }).setName('skins');
 
     if (save.runs > 0) {
       uiText(this, L.textX, L.playY + 166, `Best score ${formatNumber(save.bestScore)}`, 'body', {
@@ -140,7 +149,7 @@ export class MenuScene extends Phaser.Scene {
       },
     }).setName('sound');
     let pillRight = right - 60 - 16;
-    const buttons = [play, upgrades, sound];
+    const buttons = [play, upgrades, skins, sound];
     if (this.scale.fullscreen.available) {
       const full = new Button(this, pillRight - 30, barY, {
         width: 60,
@@ -284,7 +293,9 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private leave(target: typeof SceneKeys.Game | typeof SceneKeys.Shop): void {
+  private leave(
+    target: typeof SceneKeys.Game | typeof SceneKeys.Shop | typeof SceneKeys.Skins,
+  ): void {
     if (this.leaving) return;
     this.leaving = true;
     this.cameras.main.fadeOut(220, 4, 26, 49);

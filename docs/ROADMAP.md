@@ -108,7 +108,7 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] Playtest finds buttons by name; pause, focus and touch-pause checks (100 checks)
 
 ## Phase 6 — Meta progression and retention
-- [ ] Skins (cosmetic) with shop tab and equip
+- [x] Skins (cosmetic): 7 seal species from one parameterized painter (`systems/sealArt.ts`), Skins screen with preview, buy with coins, equip; save v3
 - [ ] Missions (3 rotating goals) with coin rewards
 - [ ] Gems (rare currency) for premium skins
 - [ ] Stats page (total eaten, best distance, etc.), achievements (light)

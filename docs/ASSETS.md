@@ -30,4 +30,7 @@ Interface art (wordmark, icons, upgrade symbols, crumbs) is painted in code in `
 - **P4 (demo):** art v1 for seal, ~8 creatures, coins, HUD bars, buttons; SFX (bite, splash, coin, hurt, boost, click); one music loop.
 - **P5:** full creature set, zone backgrounds/parallax layers, chests, power-ups.
 - **P6:** skins, mission/achievement icons, gems.
+
+## Seal skins
+Each skin is its own texture key (`seal` = harbor, `seal-arctic`, `seal-sealion`, `seal-tropical`, `seal-leopard`, `seal-walrus`, `seal-elephant`), 176x88 design units facing right, painted at 2x by `systems/sealArt.ts` until real art exists. Real art must keep the muzzle at the right end (x ~150-165) so the mouth hit circle lines up. Distinct looks per growth stage are still open (art pass).
 - **P8:** final pass on everything, animation sets, VFX, full audio.

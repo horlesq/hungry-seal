@@ -7,8 +7,10 @@
 // when the camera zooms in on big or high-DPI screens. Soft background layers stay at 1x.
 import Phaser from 'phaser';
 import { TextureKeys, type TextureKey } from '../config/assets';
+import { SKINS } from '../config/skins';
 import { TAU } from '../utils/math';
 import { createRng, randRange, type Rng } from '../utils/rng';
+import { drawPinniped, SEAL_ART, SEAL_STYLES } from './sealArt';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -24,7 +26,6 @@ interface Painter {
 }
 
 const PAINTERS: Partial<Record<TextureKey, Painter>> = {
-  [TextureKeys.Seal]: { width: 176, height: 88, draw: drawSeal, res: HI },
   [TextureKeys.Minnow]: { width: 48, height: 26, draw: drawMinnow, res: HI },
   [TextureKeys.Shrimp]: { width: 44, height: 32, draw: drawShrimp, res: HI },
   [TextureKeys.Sardine]: { width: 60, height: 26, draw: drawSardine, res: HI },
@@ -77,6 +78,16 @@ const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   [TextureKeys.MarineSnow]: { width: 512, height: 512, draw: drawMarineSnow },
 };
 
+// One texture per seal skin, all from the same parameterized painter.
+for (const skin of SKINS) {
+  PAINTERS[skin.texture] = {
+    width: SEAL_ART.width,
+    height: SEAL_ART.height,
+    draw: (ctx) => drawPinniped(ctx, SEAL_STYLES[skin.id]),
+    res: HI,
+  };
+}
+
 /** Paints every placeholder whose key has no texture yet. Returns the generated keys. */
 export function ensurePlaceholderTextures(scene: Phaser.Scene): string[] {
   const generated: string[] = [];
@@ -99,142 +110,6 @@ export function ensurePlaceholderTextures(scene: Phaser.Scene): string[] {
 // ---------------------------------------------------------------------------------------
 // Characters
 // ---------------------------------------------------------------------------------------
-
-/** Chunky cartoon harbor seal facing right, drawn in a 160x80 design box. */
-function drawSeal(ctx: Ctx): void {
-  ctx.save();
-  ctx.translate(8, 4);
-  const outline = '#1f3244';
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  // Hind flippers (behind the body).
-  ctx.fillStyle = '#4d6b82';
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 3;
-  for (const dir of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(30, 40 + dir * 2);
-    ctx.quadraticCurveTo(14, 40 + dir * 10, 2, 40 + dir * 22);
-    ctx.quadraticCurveTo(8, 40 + dir * 8, 4, 40 + dir * 1);
-    ctx.quadraticCurveTo(18, 40, 30, 40 + dir * 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Body silhouette.
-  const body = new Path2D();
-  body.moveTo(157, 42);
-  body.bezierCurveTo(157, 26, 146, 14, 128, 14);
-  body.bezierCurveTo(104, 14, 64, 18, 40, 30);
-  body.bezierCurveTo(30, 35, 24, 38, 22, 40);
-  body.bezierCurveTo(24, 43, 30, 47, 42, 54);
-  body.bezierCurveTo(64, 66, 104, 68, 128, 62);
-  body.bezierCurveTo(146, 58, 157, 52, 157, 42);
-  body.closePath();
-
-  const bodyGrad = ctx.createLinearGradient(0, 12, 0, 68);
-  bodyGrad.addColorStop(0, '#56778f');
-  bodyGrad.addColorStop(0.55, '#7f9db3');
-  bodyGrad.addColorStop(1, '#b9cbd8');
-  ctx.fillStyle = bodyGrad;
-  ctx.fill(body);
-
-  // Belly highlight and back spots, clipped to the body.
-  ctx.save();
-  ctx.clip(body);
-  ctx.fillStyle = 'rgba(232, 240, 246, 0.75)';
-  ctx.beginPath();
-  ctx.ellipse(94, 64, 58, 13, -0.03, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(52, 78, 99, 0.55)';
-  const rng = createRng(7);
-  for (let i = 0; i < 9; i++) {
-    ctx.beginPath();
-    ctx.ellipse(
-      randRange(rng, 48, 120),
-      randRange(rng, 20, 36),
-      randRange(rng, 2, 4.5),
-      randRange(rng, 1.5, 3.5),
-      randRange(rng, 0, Math.PI),
-      0,
-      TAU,
-    );
-    ctx.fill();
-  }
-  // Soft top rim light.
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(60, 23);
-  ctx.bezierCurveTo(90, 16, 120, 15, 140, 20);
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 3.5;
-  ctx.stroke(body);
-
-  // Front flipper.
-  ctx.save();
-  ctx.translate(100, 60);
-  ctx.rotate(0.55);
-  ctx.fillStyle = '#5b7a91';
-  ctx.beginPath();
-  ctx.ellipse(-6, 0, 17, 7, 0, 0, TAU);
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
-
-  // Cheek blush.
-  ctx.fillStyle = 'rgba(255, 150, 160, 0.35)';
-  ctx.beginPath();
-  ctx.ellipse(139, 45, 7, 4.5, 0, 0, TAU);
-  ctx.fill();
-
-  // Eye.
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.ellipse(135, 30, 7, 8, 0, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = '#111820';
-  ctx.beginPath();
-  ctx.ellipse(137, 31, 5.2, 6.2, 0, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(139, 28.5, 2, 0, TAU);
-  ctx.fill();
-
-  // Nose and mouth.
-  ctx.fillStyle = '#1a2530';
-  ctx.beginPath();
-  ctx.ellipse(154, 39, 4, 3, 0.2, 0, TAU);
-  ctx.fill();
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(152, 48);
-  ctx.quadraticCurveTo(147, 52, 141, 50);
-  ctx.stroke();
-
-  // Whiskers.
-  ctx.strokeStyle = 'rgba(30, 45, 58, 0.8)';
-  ctx.lineWidth = 1.4;
-  for (const [ty, ey] of [
-    [43, 37],
-    [45, 45],
-    [47, 53],
-  ]) {
-    ctx.beginPath();
-    ctx.moveTo(148, ty);
-    ctx.quadraticCurveTo(158, (ty + ey) / 2, 166, ey);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
 
 interface FishStyle {
   back: string;

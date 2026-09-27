@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSave, migrateSave, purchase, recordRun } from './saveData';
+import { defaultSave, equipSkin, migrateSave, purchase, purchaseSkin, recordRun } from './saveData';
 import { SaveService } from './SaveService';
 import { emptyUpgrades } from '../systems/UpgradeSystem';
 
@@ -20,6 +20,27 @@ describe('save data', () => {
     expect(migrateSave({ coins: -5, bestScore: 'x', runs: NaN })).toEqual(defaultSave());
   });
 
+  it('gives old saves the default skin and drops unknown or unowned skins', () => {
+    expect(migrateSave({ version: 2, coins: 10 }).skins).toEqual({
+      owned: ['harbor'],
+      equipped: 'harbor',
+    });
+    const s = migrateSave({ skins: { owned: ['walrus', 'unicorn'], equipped: 'arctic' } });
+    expect(s.skins.owned).toEqual(['harbor', 'walrus']);
+    expect(s.skins.equipped).toBe('harbor');
+  });
+
+  it('buys a skin once, wears it, and can switch back', () => {
+    const rich = { ...defaultSave(), coins: 1000 };
+    const bought = purchaseSkin(rich, 'arctic');
+    expect(bought?.coins).toBe(700);
+    expect(bought?.skins).toEqual({ owned: ['harbor', 'arctic'], equipped: 'arctic' });
+    expect(purchaseSkin(bought!, 'arctic')).toBeNull();
+    expect(purchaseSkin(defaultSave(), 'walrus')).toBeNull();
+    expect(equipSkin(bought!, 'harbor')?.skins.equipped).toBe('harbor');
+    expect(equipSkin(bought!, 'walrus')).toBeNull();
+  });
+
   it('keeps valid fields', () => {
     const s = migrateSave({ version: 1, coins: 42, bestScore: 900, settings: { muted: true } });
     expect(s.coins).toBe(42);
@@ -29,7 +50,7 @@ describe('save data', () => {
 
   it('migrates a v1 save: keeps progress, adds upgrades, skips the tutorial for veterans', () => {
     const s = migrateSave({ version: 1, coins: 80, bestScore: 900, runs: 3 });
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
     expect(s.coins).toBe(80);
     expect(s.upgrades).toEqual(emptyUpgrades());
     expect(s.tutorialDone).toBe(true);
