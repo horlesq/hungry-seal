@@ -8,7 +8,8 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { RegistryKeys, SceneKeys } from '../config/keys';
-import { boostButtonCenter, pauseButtonCenter, TOUCH_UI } from '../config/layout';
+import { INPUT } from '../config/balance';
+import { boostButtonCenter, pauseButtonCenter, stickHintCenter, TOUCH_UI } from '../config/layout';
 import {
   EventBus,
   subscribeForScene,
@@ -19,9 +20,11 @@ import {
   type GrowthState,
   type HungerState,
   type InputSource,
+  type StickState,
 } from '../services/EventBus';
 import {
   fitUiCamera,
+  getViewport,
   getSafeInsets,
   onResize,
   sharpenTexts,
@@ -71,6 +74,10 @@ export class HudScene extends Phaser.Scene {
   private comboBar!: Phaser.GameObjects.Graphics;
   private vignette!: Phaser.GameObjects.Image;
   private boostButton!: Phaser.GameObjects.Container;
+  /** Touch joystick: faint at its hint spot when idle, under the finger while steering. */
+  private stick!: Phaser.GameObjects.Container;
+  private stickKnob!: Phaser.GameObjects.Graphics;
+  private stickActive = false;
   private boostRing!: Phaser.GameObjects.Graphics;
   private debugText!: Phaser.GameObjects.Text;
   private boost: BoostState = { active: false, stamina: 1 };
@@ -105,6 +112,7 @@ export class HudScene extends Phaser.Scene {
     this.createCombo();
     this.createHintAndBanner();
     this.createBoostButton();
+    this.createStick();
     this.pauseButton = new Button(this, 0, 0, {
       width: 60,
       height: 60,
@@ -139,6 +147,7 @@ export class HudScene extends Phaser.Scene {
       EventBus.on('run:over', this.onRunOver, this),
       EventBus.on('seal:boost', this.onBoost, this),
       EventBus.on('input:source', this.onInputSource, this),
+      EventBus.on('input:stick', this.onStick, this),
       EventBus.on('debug:toggle', (on) => this.debugText.setVisible(on)),
       EventBus.on('debug:info', this.onDebugInfo, this),
     ]);
@@ -166,6 +175,7 @@ export class HudScene extends Phaser.Scene {
     this.debugText.setPosition(left, top + PANEL.h + 14);
     const b = boostButtonCenter(v.viewWidth, v.viewHeight, safe);
     this.boostButton.setPosition(b.x, b.y);
+    if (!this.stickActive) this.placeStickHint();
     sharpenTexts(this);
     this.onCoins(this.coins);
   }
@@ -436,7 +446,7 @@ export class HudScene extends Phaser.Scene {
   private onRunOver(): void {
     this.lowHunger = false;
     this.tweens.add({
-      targets: [this.root, this.boostButton, this.hintRoot, this.bannerRoot],
+      targets: [this.root, this.boostButton, this.stick, this.hintRoot, this.bannerRoot],
       alpha: 0,
       duration: 800,
     });
@@ -475,8 +485,43 @@ export class HudScene extends Phaser.Scene {
     this.drawBoostRing();
   }
 
+  private createStick(): void {
+    const r = INPUT.stick.radius;
+    const base = this.add.graphics();
+    base.fillStyle(COLORS.ink, 0.35).fillCircle(0, 0, r);
+    base.lineStyle(3, COLORS.foam, 0.5).strokeCircle(0, 0, r);
+    this.stickKnob = this.add.graphics();
+    this.stickKnob.fillStyle(COLORS.ink, 0.5).fillCircle(0, 3, TOUCH_UI.stickKnob);
+    this.stickKnob.fillStyle(COLORS.foam, 0.9).fillCircle(0, 0, TOUCH_UI.stickKnob);
+    this.stick = this.add.container(0, 0, [base, this.stickKnob]);
+    this.stick.setVisible(this.sys.game.device.input.touch);
+    this.stickActive = false;
+    this.placeStickHint();
+  }
+
+  private placeStickHint(): void {
+    const v = getViewport();
+    const c = stickHintCenter(v.viewHeight, getSafeInsets());
+    this.stick.setPosition(c.x, c.y).setAlpha(0.35);
+    this.stickKnob.setPosition(0, 0);
+  }
+
+  private onStick(state: StickState): void {
+    this.stickActive = state.active;
+    if (!state.active) {
+      this.placeStickHint();
+      return;
+    }
+    const r = INPUT.stick.radius;
+    this.stick.setVisible(true).setPosition(state.x, state.y).setAlpha(0.9);
+    this.stickKnob.setPosition(state.dx * r, state.dy * r);
+  }
+
   private onInputSource(source: InputSource): void {
-    if (source === 'touch') this.boostButton.setVisible(true);
+    if (source === 'touch') {
+      this.boostButton.setVisible(true);
+      this.stick.setVisible(true);
+    }
   }
 
   private onDebugInfo(d: DebugInfo): void {

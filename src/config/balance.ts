@@ -65,6 +65,11 @@ export const INPUT = {
   pointerFullSpeedDist: 110,
   /** Pointer closer than this to the seal = no steering. Speed ramps up from here. */
   pointerDeadzone: 18,
+  /**
+   * Touch: a floating joystick where the finger lands. Drag distance (design units) for full
+   * speed, and the centred fraction that doesn't steer.
+   */
+  stick: { radius: 90, deadzone: 0.12 },
 } as const;
 
 export const HUNGER = {

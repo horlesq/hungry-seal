@@ -17,6 +17,15 @@ export interface HungerState {
   low: boolean;
 }
 
+/** Touch joystick for the HUD: base position and steering (design units, length 0..1). */
+export interface StickState {
+  active: boolean;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+}
+
 export interface GrowthState {
   stage: number;
   maxStage: number;
@@ -88,6 +97,7 @@ export interface DebugInfo {
 export interface GameEvents {
   'input:source': [source: InputSource];
   'seal:boost': [state: BoostState];
+  'input:stick': [state: StickState];
   'run:hunger': [state: HungerState];
   'run:growth': [state: GrowthState];
   'run:score': [score: number];

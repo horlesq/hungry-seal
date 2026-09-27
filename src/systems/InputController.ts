@@ -3,14 +3,16 @@
 //
 // - Keyboard: WASD / arrows steer, Space / Shift boost.
 // - Mouse: the seal swims toward the cursor (no click needed); hold left button to boost.
-// - Touch: hold/drag anywhere to swim toward the finger; a touch that starts on the boost
-//   button (bottom-right) boosts instead.
+// - Touch: a floating joystick. Touch anywhere (except the Boost and pause buttons) and drag:
+//   the direction and distance from where the finger landed steer the seal, so the finger
+//   can stay in a corner instead of covering the action. Releasing glides to a stop.
 // The most recently used device wins, so a resting mouse doesn't fight the keyboard.
 import Phaser from 'phaser';
 import { INPUT } from '../config/balance';
 import { boostButtonCenter, pauseButtonCenter, TOUCH_UI } from '../config/layout';
 import { EventBus, type InputSource } from '../services/EventBus';
 import { getSafeInsets, getViewport } from '../services/Viewport';
+import { createStick, stepStick, type Stick } from './joystick';
 
 type KeyName = 'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd' | 'space' | 'shift';
 
@@ -22,6 +24,9 @@ export class InputController {
   private readonly keys: Record<KeyName, Phaser.Input.Keyboard.Key>;
   private readonly worldPoint = new Phaser.Math.Vector2();
   private mouseInside = false;
+  /** The touch driving the joystick (pointer id), and the stick state. */
+  private stickPointer = -1;
+  private stick: Stick = createStick(0, 0);
 
   constructor(private readonly scene: Phaser.Scene) {
     const Codes = Phaser.Input.Keyboard.KeyCodes;
@@ -68,8 +73,9 @@ export class InputController {
     const ky = +(k.down.isDown || k.s.isDown) - +(k.up.isDown || k.w.isDown);
     const keyBoost = k.space.isDown || k.shift.isDown;
 
+    this.updateStick(steerPointer);
     if (steerPointer) {
-      this.steerToward(steerPointer, originX, originY);
+      this.steer.set(this.stick.x, this.stick.y);
     } else if (kx !== 0 || ky !== 0) {
       this.steer.set(kx, ky).normalize();
     } else if (this.source === 'mouse' && this.mouseInside) {
@@ -94,6 +100,24 @@ export class InputController {
     const v = getViewport();
     const c = pauseButtonCenter(v.viewWidth, getSafeInsets());
     return Math.hypot(x / v.zoom - c.x, y / v.zoom - c.y) <= TOUCH_UI.pauseButton.hitRadius;
+  }
+
+  /** Joystick from the steering touch (canvas px -> design units); tells the HUD to draw it. */
+  private updateStick(pointer: Phaser.Input.Pointer | null): void {
+    if (!pointer) {
+      if (this.stickPointer !== -1) {
+        this.stickPointer = -1;
+        EventBus.emit('input:stick', { active: false, x: 0, y: 0, dx: 0, dy: 0 });
+      }
+      return;
+    }
+    const zoom = getViewport().zoom;
+    if (pointer.id !== this.stickPointer) {
+      this.stickPointer = pointer.id;
+      this.stick = createStick(pointer.downX / zoom, pointer.downY / zoom);
+    }
+    const s = stepStick(this.stick, pointer.x / zoom, pointer.y / zoom, INPUT.stick);
+    EventBus.emit('input:stick', { active: true, x: s.originX, y: s.originY, dx: s.x, dy: s.y });
   }
 
   private steerToward(pointer: Phaser.Input.Pointer, originX: number, originY: number): void {

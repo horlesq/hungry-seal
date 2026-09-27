@@ -66,7 +66,7 @@ const ZONE_BANNER_COOLDOWN = 8;
 function hintTexts(touch: boolean): Record<HintId, string> {
   return {
     move: touch
-      ? 'Hold and drag to swim: the seal follows your finger'
+      ? 'Touch anywhere and drag to swim, like a joystick'
       : 'Move the mouse to swim (or use WASD / arrow keys)',
     eat: 'Eat fish smaller than you! Your hunger bar drains all the time',
     boost: touch

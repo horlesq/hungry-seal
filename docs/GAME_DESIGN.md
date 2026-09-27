@@ -16,7 +16,7 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 
 ## Controls
 - **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Speed ramps from 0 at 18 px to full at 110 px from the seal, so pointing straight at nearby prey still chases at full speed. Mouse leaving the canvas = glide.
-- **Touch:** hold/drag anywhere to swim toward the finger; release to glide to a stop. A touch that *starts* on the bottom-right BOOST button boosts (works with a second finger while steering).
+- **Touch:** floating joystick, so the finger never covers the action. Touch anywhere except the buttons and a stick appears under the finger; drag to steer (direction and distance from where it landed; full speed at 90 design units, small centre deadzone). Dragging further pulls the stick along, so reversing is quick. Release to glide to a stop. A faint stick sits bottom-left as a hint. A touch that *starts* on the bottom-right Boost button boosts (works with a second finger while steering).
 - **Keyboard:** WASD/arrows to steer. Space/Shift = boost.
 - The most recently used device wins, so a resting mouse doesn't fight the keyboard.
 - **Pause:** Esc or P, or the pause button (top-right). The run also pauses by itself when the tab or window loses focus. Pause menu: Resume, Restart run, Quit to menu, sound.

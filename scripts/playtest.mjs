@@ -1112,11 +1112,40 @@ async function mobile(browser) {
   check('touch: boost button visible', boostVisible);
 
   const s0 = await sealState(page);
-  const right = await toPage(page, -130, 380);
-  await touch('touchStart', [{ ...right, id: 1 }]);
+  // Floating joystick: touch down in the lower-left, then drag right.
+  const down = await toPage(page, 260, 500);
+  const right = { x: down.x + 80, y: down.y };
+  await touch('touchStart', [{ ...down, id: 1 }]);
+  await page.waitForTimeout(300);
+  const resting = await sealState(page);
+  check(
+    'touch: a finger resting where it landed does not steer',
+    resting.speed < 60,
+    `speed=${resting.speed.toFixed(0)}`,
+  );
+  await touch('touchMove', [{ ...right, id: 1 }]);
   const hold = await until(page, (s) => s.x > s0.x + 200, 4000);
-  check('touch: hold steers toward finger', hold.ok, `dx=${(hold.last.x - s0.x).toFixed(0)}`);
+  check(
+    'touch: dragging the joystick right swims right',
+    hold.ok,
+    `dx=${(hold.last.x - s0.x).toFixed(0)}`,
+  );
   check('input source = touch', hold.last.source === 'touch', hold.last.source);
+  const stick = await page.evaluate(() => {
+    const hud = window.__PHASER_GAME__.scene.getScene('Hud');
+    return {
+      visible: hud.stick.visible,
+      alpha: hud.stick.alpha,
+      x: hud.stick.x,
+      knob: hud.stickKnob.x,
+    };
+  });
+  check(
+    'touch: the joystick shows under the finger',
+    stick.visible && stick.alpha > 0.8 && Math.abs(stick.x - 260) < 60 && stick.knob > 40,
+    JSON.stringify(stick),
+  );
+  await page.screenshot({ path: `${OUT}/24-mobile-stick.png` });
 
   // Second finger on the boost button while still steering with the first.
   // Boost button centre: 118 design units in from the bottom-right corner.
@@ -1134,6 +1163,8 @@ async function mobile(browser) {
   await touch('touchEnd', []);
   const stop = await until(page, (s) => s.speed < 5, 5000);
   check('touch: release glides to a stop', stop.ok, `speed=${stop.last.speed.toFixed(1)}`);
+  const idle = await page.evaluate(() => window.__PHASER_GAME__.scene.getScene('Hud').stick.alpha);
+  check('touch: releasing returns the joystick to its faint hint', idle < 0.5, `alpha=${idle}`);
 
   // Tapping the pause button pauses without steering; Resume carries on.
   const before = await sealState(page);

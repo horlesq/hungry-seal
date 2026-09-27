@@ -9,7 +9,7 @@ upgrades between runs.
 ## Controls
 - **Mouse:** the seal swims toward the cursor; hold the left button to boost
 - **Keyboard:** WASD / arrow keys to swim, Space or Shift to boost
-- **Touch:** hold and drag to swim, Boost button to dash
+- **Touch:** a floating joystick: touch anywhere (e.g. bottom-left) and drag to swim; Boost button to dash
 - **Pause:** Esc or P, or the pause button (top-right)
 - Leap out of the water to catch birds. Fill the frenzy meter to eat *anything*.
 

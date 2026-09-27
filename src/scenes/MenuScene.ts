@@ -102,7 +102,7 @@ export class MenuScene extends Phaser.Scene {
 
     const touch = this.sys.game.device.input.touch;
     const help = touch
-      ? 'Hold and drag to swim. Tap Boost to dash.'
+      ? 'Touch and drag anywhere to swim, like a joystick. Tap Boost to dash.'
       : 'Move the mouse or use WASD to swim. Click, Space or Shift to boost.';
     uiText(this, left + 4, v.viewHeight - safe.bottom - EDGE, help, 'caption', {
       size: 18,

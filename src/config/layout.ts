@@ -12,6 +12,10 @@ export const TOUCH_UI = {
     /** Touches that start within this radius count as boost, not steering. */
     hitRadius: 100,
   },
+  /** Where the idle joystick hint sits (centre, from the left/bottom edges). */
+  stickHint: { left: 150, bottom: 150 },
+  /** Joystick knob size. */
+  stickKnob: 36,
   pauseButton: {
     /** Distance of the button centre from the right/top edges (inside the safe area). */
     right: 54,
@@ -30,6 +34,15 @@ export function boostButtonCenter(
 ): { x: number; y: number } {
   const b = TOUCH_UI.boostButton;
   return { x: viewWidth - safe.right - b.right, y: viewHeight - safe.bottom - b.bottom };
+}
+
+/** Idle joystick hint centre (bottom-left, inside the safe area). */
+export function stickHintCenter(
+  viewHeight: number,
+  safe: Insets = NO_INSETS,
+): { x: number; y: number } {
+  const s = TOUCH_UI.stickHint;
+  return { x: safe.left + s.left, y: viewHeight - safe.bottom - s.bottom };
 }
 
 /** Pause button centre (top-right corner of the HUD). */

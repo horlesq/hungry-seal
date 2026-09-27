@@ -65,7 +65,8 @@ hungry-seal/
       Hazard.ts         pooled hazard sprite (drift, bob, pulse/blink)
       Coin.ts           pooled coin (float or pop-out, magnet, spin, expiry blink)
     systems/
-      InputController.ts   unifies mouse/touch/keyboard -> steer vector + boost
+      InputController.ts   unifies mouse/touch/keyboard -> steer vector + boost; touch = floating joystick
+      joystick.ts          PURE floating-joystick math (deadzone, base follows the finger) (+ tests)
       WorldBackground.ts   parallax, depth gradient, light rays, marine snow, water line
       Effects.ts           splashes, bubbles, chomp sparks, growth burst, pooled floating text
       PlaceholderArt.ts    Canvas 2D placeholder textures under final asset keys
