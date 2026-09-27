@@ -132,7 +132,7 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 
 ## Phase 9 — Performance, mobile, and release
 - [ ] Mobile perf profiling (target 60 FPS mid-range); texture atlases, resolution scaling
-- [ ] Touch UX refinement, orientation handling (fullscreen button and safe areas done in the UI/UX refresh)
+- [~] Touch UX refinement, orientation handling: floating joystick, portrait layouts for every screen, phone camera zoom, fullscreen button and safe areas done; remaining: real-device testing
 - [ ] Browser matrix test (Chrome, Safari iOS, Firefox, Edge)
 - [ ] Bundle size + load time optimization, loading screen
 - [ ] PWA/offline (optional), analytics (optional, privacy-respecting)

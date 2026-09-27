@@ -70,12 +70,15 @@ export class Spawner {
    */
   populate(cx: number, cy: number, seal: Threat): void {
     const view = getViewport();
+    // The world view, which is bigger than the UI view on phones.
+    const worldW = view.width / view.worldZoom;
+    const worldH = view.height / view.worldZoom;
     let placed = 0;
     for (let attempt = 0; attempt < SPAWN.initialGroups * 5; attempt++) {
       if (placed >= SPAWN.initialGroups) break;
-      const x = cx + (this.random() - 0.5) * view.viewWidth * 1.5;
+      const x = cx + (this.random() - 0.5) * worldW * 1.5;
       const y = Phaser.Math.Clamp(
-        cy + (this.random() - 0.5) * view.viewHeight,
+        cy + (this.random() - 0.5) * worldH,
         WATER_TOP + 30,
         WATER_BOTTOM - 30,
       );

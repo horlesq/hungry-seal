@@ -123,17 +123,24 @@ export class GameOverScene extends Phaser.Scene {
 
     // Buttons: one row under the panel.
     const save = saves.data;
+    // One row of three; upright phones stack Swim again above Upgrades + Menu.
     const rowY = top + 590;
-    const retry = new Button(this, cx - 203, rowY, {
-      width: 300,
+    const stacked = v.portrait;
+    const at = {
+      retry: stacked ? { x: cx, y: rowY } : { x: cx - 203, y: rowY },
+      upgrades: stacked ? { x: cx - 90, y: rowY + 100 } : { x: cx + 75, y: rowY },
+      menu: stacked ? { x: cx + 165, y: rowY + 100 } : { x: cx + 278, y: rowY },
+    };
+    const retry = new Button(this, at.retry.x, at.retry.y, {
+      width: stacked ? 480 : 300,
       height: 76,
       label: 'Swim again',
       variant: 'primary',
       fontSize: 34,
       onClick: () => this.go(SceneKeys.Game),
     }).setName('retry');
-    const upgrades = new Button(this, cx + 75, rowY, {
-      width: 220,
+    const upgrades = new Button(this, at.upgrades.x, at.upgrades.y, {
+      width: stacked ? 300 : 220,
       height: 64,
       label: 'Upgrades',
       variant: 'secondary',
@@ -142,7 +149,7 @@ export class GameOverScene extends Phaser.Scene {
     })
       .setName('upgrades')
       .setBadge(anyAffordable(save.upgrades, save.coins));
-    const menu = new Button(this, cx + 278, rowY, {
+    const menu = new Button(this, at.menu.x, at.menu.y, {
       width: 150,
       height: 64,
       label: 'Menu',

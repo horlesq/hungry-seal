@@ -24,9 +24,27 @@ export function getSafeInsets(): Insets {
 
 /** Reads the window size and pixel ratio and makes that the current viewport. */
 export function measureViewport(): Viewport {
-  current = computeViewport(window.innerWidth, window.innerHeight, window.devicePixelRatio);
+  current = computeViewport(
+    window.innerWidth,
+    window.innerHeight,
+    window.devicePixelRatio,
+    isMobileDevice(),
+  );
   safe = cssInsetsToDesign(readSafeAreaCss(), current);
   return current;
+}
+
+/**
+ * Phone or tablet: the main input is a finger (coarse pointer), or a touch screen smaller
+ * than 600 CSS px on its short side. Touch-screen laptops stay in desktop mode.
+ */
+function isMobileDevice(): boolean {
+  try {
+    if (window.matchMedia('(pointer: coarse)').matches) return true;
+  } catch {
+    // Old browsers: fall through to the size check.
+  }
+  return navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 600;
 }
 
 /** CSS env(safe-area-inset-*) values, read through a hidden probe element. */
@@ -70,10 +88,10 @@ export function fitUiCamera(scene: Phaser.Scene): Viewport {
   return v;
 }
 
-/** World camera: same zoom, but it keeps following/scrolling as usual. */
+/** World camera: `worldZoom` (a little further out on phones); it keeps following as usual. */
 export function fitWorldCamera(camera: Phaser.Cameras.Scene2D.Camera): Viewport {
   const v = current;
-  camera.setSize(v.width, v.height).setZoom(v.zoom);
+  camera.setSize(v.width, v.height).setZoom(v.worldZoom);
   return v;
 }
 

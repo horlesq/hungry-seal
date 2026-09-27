@@ -266,6 +266,10 @@ async function screens(browser) {
     await page.waitForTimeout(700);
     const info = await canvasInfo(page);
     check(`no bars, sharp canvas: ${c.name}`, fillsWindow(info), fitDetail(info));
+    check(
+      `desktop: world and UI share one zoom, no portrait layout: ${c.name}`,
+      info.view.worldZoom === info.view.zoom && !info.view.portrait,
+    );
     const hudInside = await page.evaluate(() => {
       const hud = window.__PHASER_GAME__.scene.getScene('Hud');
       const v = window.__PHASER_GAME__.registry.get('viewport');
@@ -1099,6 +1103,13 @@ async function mobile(browser) {
   await page.waitForTimeout(400);
   const fit = await canvasInfo(page);
   check('touch: canvas fills the phone screen', fillsWindow(fit), fitDetail(fit));
+  check(
+    'landscape phone: ocean zoomed out, UI as on desktop',
+    !fit.view.portrait &&
+      fit.view.worldZoom < fit.view.zoom * 0.9 &&
+      Math.abs(fit.view.viewHeight - 720) < 1,
+    `zoom ${fit.view.zoom.toFixed(2)} world ${fit.view.worldZoom.toFixed(2)}`,
+  );
   await page.screenshot({ path: `${OUT}/22-mobile-menu.png` });
   const playBtn = await buttonAt(page, 'Menu', 'play');
   await page.touchscreen.tap(playBtn.x, playBtn.y);
@@ -1187,6 +1198,136 @@ async function mobile(browser) {
   await ctx.close();
 }
 
+/** Upright phone: portrait UI layout, everything on screen and nothing overlapping. */
+async function portrait(browser) {
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    hasTouch: true,
+    isMobile: true,
+  });
+  await ctx.addInitScript(() => {
+    localStorage.setItem(
+      'hungry-seal-save',
+      JSON.stringify({ version: 2, coins: 400, bestScore: 900, runs: 2, tutorialDone: true }),
+    );
+  });
+  const page = await ctx.newPage();
+  watch(page, 'portrait');
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(1600);
+  const fit = await canvasInfo(page);
+  check('portrait: canvas fills the screen', fillsWindow(fit), fitDetail(fit));
+  check(
+    'portrait: UI laid out 720 wide (text as big as in landscape)',
+    fit.view.portrait && Math.abs(fit.view.viewWidth - 720) < 1,
+    `view ${fit.view.viewWidth.toFixed(0)}x${fit.view.viewHeight.toFixed(0)}`,
+  );
+  check(
+    'portrait: ocean shows ~850 units across (was 1280)',
+    fit.view.width / fit.view.worldZoom < 900,
+    `${(fit.view.width / fit.view.worldZoom).toFixed(0)} wide`,
+  );
+
+  /** Bounds (design units) of named objects in a scene; each must lie inside the view. */
+  const bounds = (key, names) =>
+    page.evaluate(
+      ([k, list]) => {
+        const scene = window.__PHASER_GAME__.scene.getScene(k);
+        const find = (objs, n) => {
+          for (const o of objs) {
+            if (o.name === n) return o;
+            const inner = o.list && find(o.list, n);
+            if (inner) return inner;
+          }
+          return null;
+        };
+        return Object.fromEntries(
+          list.map((n) => {
+            const o = find(scene.children.list, n);
+            if (!o) return [n, null];
+            const b = o.getBounds();
+            return [n, { left: b.left, right: b.right, top: b.top, bottom: b.bottom }];
+          }),
+        );
+      },
+      [key, names],
+    );
+  const inside = (b) =>
+    b &&
+    b.left >= -1 &&
+    b.right <= fit.view.viewWidth + 1 &&
+    b.top >= -1 &&
+    b.bottom <= fit.view.viewHeight + 1;
+  const apart = (a, b) =>
+    a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+
+  const menu = await bounds('Menu', ['wordmark', 'play', 'upgrades', 'coins', 'sound']);
+  check(
+    'portrait menu: everything on screen',
+    Object.values(menu).every(inside),
+    JSON.stringify(menu),
+  );
+  check('portrait menu: title clear of the buttons', apart(menu.wordmark, menu.play));
+  await page.screenshot({ path: `${OUT}/25-portrait-menu.png` });
+
+  const up = await buttonAt(page, 'Menu', 'upgrades');
+  await page.touchscreen.tap(up.x, up.y);
+  await sceneActive(page, 'Shop');
+  await page.waitForTimeout(500);
+  const shop = await bounds('Shop', ['back', 'coins', 'play', 'buy-speed', 'buy-frenzy']);
+  check(
+    'portrait upgrades: one column, all on screen',
+    Object.values(shop).every(inside),
+    JSON.stringify(shop),
+  );
+  await page.screenshot({ path: `${OUT}/26-portrait-shop.png` });
+
+  const play = await buttonAt(page, 'Shop', 'play');
+  await page.touchscreen.tap(play.x, play.y);
+  await sceneActive(page, 'Hud');
+  await page.waitForTimeout(900);
+  const hud = await page.evaluate(() => {
+    const h = window.__PHASER_GAME__.scene.getScene('Hud');
+    const box = (o) => {
+      const b = o.getBounds();
+      return { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
+    };
+    return {
+      status: box(h.status),
+      score: box(h.scoreText),
+      pause: box(h.pauseButton),
+      comboY: h.comboRoot.y,
+    };
+  });
+  check(
+    'portrait HUD: status, score and pause fit side by side',
+    [hud.status, hud.score, hud.pause].every(inside) &&
+      apart(hud.status, hud.score) &&
+      apart(hud.score, hud.pause),
+    JSON.stringify(hud),
+  );
+  check('portrait HUD: combo sits below the status panel', hud.comboY > hud.status.bottom);
+  await page.screenshot({ path: `${OUT}/27-portrait-hud.png` });
+
+  await page.evaluate(() => {
+    window.__PHASER_GAME__.scene.getScene('Game').hunger.value = 0.01;
+  });
+  await sceneActive(page, 'GameOver');
+  await page.waitForTimeout(2200);
+  const over = await bounds('GameOver', ['retry', 'upgrades', 'menu']);
+  check(
+    'portrait results: stacked buttons on screen, not overlapping',
+    Object.values(over).every(inside) &&
+      apart(over.retry, over.upgrades) &&
+      apart(over.upgrades, over.menu),
+    JSON.stringify(over),
+  );
+  await page.screenshot({ path: `${OUT}/28-portrait-results.png` });
+  await ctx.close();
+}
+
 await mkdir(OUT, { recursive: true });
 const server = await createServer({
   server: { port: PORT, strictPort: true },
@@ -1208,7 +1349,7 @@ const browser = await chromium.launch({
 });
 
 // PLAYTEST_ONLY=desktop,mobile runs just those sections.
-const sections = { screens, desktop, danger, phase4, phase5, gameplay, mobile };
+const sections = { screens, desktop, danger, phase4, phase5, gameplay, mobile, portrait };
 const only = process.env.PLAYTEST_ONLY?.split(',');
 try {
   for (const [name, run] of Object.entries(sections)) {

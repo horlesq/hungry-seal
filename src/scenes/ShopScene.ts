@@ -59,7 +59,14 @@ export class ShopScene extends Phaser.Scene {
     const v = fitUiCamera(this);
     const safe = getSafeInsets();
     const cx = v.viewWidth / 2;
-    const top = (v.viewHeight - DESIGN_HEIGHT) / 2;
+    // Two columns in a 720-tall block; upright phones get one column (~1060 tall) instead.
+    const columns = v.portrait ? 1 : 2;
+    const rows = Math.ceil(UPGRADES.length / columns);
+    const blockH = FIRST_ROW_Y + (rows - 1) * ROW_STEP + 170;
+    const top = Math.max(
+      v.portrait ? safe.top : 0,
+      (v.viewHeight - Math.max(blockH, DESIGN_HEIGHT)) / 2,
+    );
 
     addBackdrop(this, v, BACKDROPS.deep);
     this.cameras.main.fadeIn(200, 4, 26, 49);
@@ -81,13 +88,13 @@ export class ShopScene extends Phaser.Scene {
     this.coins.setName('coins');
 
     UPGRADES.forEach((def, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const x = cx + (col === 0 ? -1 : 1) * (CARD_W / 2 + COL_GAP / 2);
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const x = columns === 1 ? cx : cx + (col === 0 ? -1 : 1) * (CARD_W / 2 + COL_GAP / 2);
       this.cards.push(this.createCard(def, x, top + FIRST_ROW_Y + row * ROW_STEP));
     });
 
-    const play = new Button(this, cx, top + 648, {
+    const play = new Button(this, cx, top + FIRST_ROW_Y + (rows - 1) * ROW_STEP + 128, {
       width: 300,
       height: 72,
       label: 'Play',

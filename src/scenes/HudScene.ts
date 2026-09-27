@@ -167,10 +167,17 @@ export class HudScene extends Phaser.Scene {
     const pause = pauseButtonCenter(v.viewWidth, safe);
     this.pauseButton.setPosition(pause.x, pause.y - 3);
     this.scoreRoot.setPosition(pause.x - TOUCH_UI.pauseButton.radius - 22, safe.top + 8);
-    this.comboRoot.setPosition(v.viewWidth / 2, top + 26);
-    this.frenzyLabel.setPosition(v.viewWidth / 2, top + 118);
-    this.hintRoot.setPosition(v.viewWidth / 2, v.viewHeight - safe.bottom - 64);
-    this.bannerY = top + 150;
+    // Upright phones: no room beside the status panel, so the centre column starts below it,
+    // and hints sit above the joystick and Boost button.
+    const narrow = v.portrait;
+    const column = narrow ? top + PANEL.h + 30 : top;
+    this.comboRoot.setPosition(v.viewWidth / 2, column + 26);
+    this.frenzyLabel.setPosition(v.viewWidth / 2, column + 118);
+    const hintBottom = narrow ? 300 : 64;
+    this.hintRoot.setPosition(v.viewWidth / 2, v.viewHeight - safe.bottom - hintBottom);
+    this.hintText.setWordWrapWidth(Math.min(1100, v.viewWidth - 120), true);
+    this.bannerBlurb.setWordWrapWidth(v.viewWidth - 80, true);
+    this.bannerY = column + 150;
     this.bannerRoot.setPosition(v.viewWidth / 2, this.bannerY);
     this.debugText.setPosition(left, top + PANEL.h + 14);
     const b = boostButtonCenter(v.viewWidth, v.viewHeight, safe);
@@ -325,11 +332,13 @@ export class HudScene extends Phaser.Scene {
     this.hintRoot = this.add.container(0, 0, [this.hintBg, this.hintText]).setAlpha(0);
 
     this.bannerTitle = uiText(this, 0, 0, '', 'title', { size: 52 }).setOrigin(0.5);
-    this.bannerBlurb = uiText(this, 0, 46, '', 'body', {
+    // Top-anchored so a blurb that wraps onto two lines grows downward, away from the title.
+    this.bannerBlurb = uiText(this, 0, 32, '', 'body', {
       weight: 700,
+      align: 'center',
       color: CSS.foam,
       outline: 5,
-    }).setOrigin(0.5);
+    }).setOrigin(0.5, 0);
     this.bannerRoot = this.add.container(0, 0, [this.bannerTitle, this.bannerBlurb]).setAlpha(0);
   }
 

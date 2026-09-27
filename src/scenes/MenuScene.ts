@@ -21,10 +21,22 @@ import { CSS, EDGE, formatNumber, reducedMotion, uiText } from '../ui/theme';
 import { UiTextures, type WordmarkData } from '../ui/uiTextures';
 import { addBackdrop, BACKDROPS, CoinPill } from '../ui/widgets';
 import { damp } from '../utils/math';
-import { DESIGN_HEIGHT } from '../utils/viewport';
+import { DESIGN_HEIGHT, type Insets, type Viewport } from '../utils/viewport';
 
 /** The wordmark gets bitten once per page load; later visits show it already bitten. */
 let introPlayed = false;
+interface MenuLayout {
+  /** Wordmark's top-left (the floe's left edge). */
+  mark: { x: number; y: number };
+  seal: { x: number; y: number; scale: number };
+  /** Centre x of Play / Upgrades, and Play's y (Upgrades sits 100 below). */
+  buttonsX: number;
+  playY: number;
+  /** Best score / help text anchor x, and their horizontal origin. */
+  textX: number;
+  textOrigin: number;
+}
+
 /** How far the seal turns its head toward the pointer (radians). */
 const LOOK_LIMIT = 0.38;
 
@@ -47,17 +59,14 @@ export class MenuScene extends Phaser.Scene {
     const v = fitUiCamera(this);
     const safe = getSafeInsets();
     const save = saves.data;
-    // Content is authored for a 720-tall column, centered in taller views.
-    const top = (v.viewHeight - DESIGN_HEIGHT) / 2;
-    const left = safe.left + Math.max(EDGE * 2, Math.min(110, v.viewWidth * 0.07));
+    const L = v.portrait ? this.portraitLayout(v, safe) : this.wideLayout(v, safe);
 
     addBackdrop(this, v, BACKDROPS.shallows);
     this.cameras.main.fadeIn(250, 4, 26, 49);
 
-    // The seal, floating in the right half.
-    const sealX = left + (v.viewWidth - left) * 0.64;
-    const sealY = top + 330;
-    this.sealScale = 2.1 * textureScale(this, TextureKeys.Seal);
+    const sealX = L.seal.x;
+    const sealY = L.seal.y;
+    this.sealScale = L.seal.scale * textureScale(this, TextureKeys.Seal);
     this.seal = this.add.image(sealX, sealY, TextureKeys.Seal).setScale(this.sealScale);
     if (!reducedMotion()) {
       this.tweens.add({
@@ -73,9 +82,9 @@ export class MenuScene extends Phaser.Scene {
       if (!p.wasTouch) this.lookAt = { x: p.worldX, y: p.worldY };
     });
 
-    this.createWordmark(left, top + 34);
+    this.createWordmark(L.mark.x, L.mark.y);
 
-    const play = new Button(this, left + 170, top + 446, {
+    const play = new Button(this, L.buttonsX, L.playY, {
       width: 340,
       height: 84,
       label: 'Play',
@@ -83,7 +92,7 @@ export class MenuScene extends Phaser.Scene {
       fontSize: 42,
       onClick: () => this.leave(SceneKeys.Game),
     }).setName('play');
-    const upgrades = new Button(this, left + 170, top + 546, {
+    const upgrades = new Button(this, L.buttonsX, L.playY + 100, {
       width: 340,
       height: 68,
       label: 'Upgrades',
@@ -95,20 +104,24 @@ export class MenuScene extends Phaser.Scene {
       .setBadge(anyAffordable(save.upgrades, save.coins));
 
     if (save.runs > 0) {
-      uiText(this, left + 4, top + 612, `Best score ${formatNumber(save.bestScore)}`, 'body', {
+      uiText(this, L.textX, L.playY + 166, `Best score ${formatNumber(save.bestScore)}`, 'body', {
         color: CSS.foam,
-      }).setName('best');
+      })
+        .setOrigin(L.textOrigin, 0)
+        .setName('best');
     }
 
     const touch = this.sys.game.device.input.touch;
     const help = touch
       ? 'Touch and drag anywhere to swim, like a joystick. Tap Boost to dash.'
       : 'Move the mouse or use WASD to swim. Click, Space or Shift to boost.';
-    uiText(this, left + 4, v.viewHeight - safe.bottom - EDGE, help, 'caption', {
+    uiText(this, L.textX, v.viewHeight - safe.bottom - EDGE, help, 'caption', {
       size: 18,
       color: CSS.foam,
+      align: v.portrait ? 'center' : 'left',
+      wrap: v.viewWidth - 80,
     })
-      .setOrigin(0, 1)
+      .setOrigin(L.textOrigin, 1)
       .setAlpha(0.8);
 
     // Top-right: coin balance, fullscreen, sound.
@@ -152,6 +165,43 @@ export class MenuScene extends Phaser.Scene {
     onResize(this, () => {
       if (!this.leaving) this.scene.restart();
     });
+  }
+
+  /** Desktop and landscape: wordmark and buttons in a left column, the seal on the right. */
+  private wideLayout(v: Viewport, safe: Insets): MenuLayout {
+    // Content is authored for a 720-tall column, centered in taller views.
+    const top = (v.viewHeight - DESIGN_HEIGHT) / 2;
+    const left = safe.left + Math.max(EDGE * 2, Math.min(110, v.viewWidth * 0.07));
+    return {
+      mark: { x: left, y: top + 34 },
+      seal: { x: left + (v.viewWidth - left) * 0.64, y: top + 330, scale: 2.1 },
+      buttonsX: left + 170,
+      playY: top + 446,
+      textX: left + 4,
+      textOrigin: 0,
+    };
+  }
+
+  /** Upright phones: everything stacked and centred, the seal between title and buttons. */
+  private portraitLayout(v: Viewport, safe: Insets): MenuLayout {
+    const cx = v.viewWidth / 2;
+    const frame = this.textures.getFrame(UiTextures.WordmarkBitten);
+    const scale =
+      1 / (this.textures.get(UiTextures.WordmarkBitten).customData as WordmarkData).resolution;
+    const markW = frame.width * scale;
+    const markH = frame.height * scale;
+    // Title, seal and buttons take ~1050 units: centre them below the top-right buttons.
+    const top = Math.max(safe.top + 120, (v.viewHeight - 1050) / 2);
+    const sealY = top + markH + 130;
+    return {
+      // createWordmark() offsets by the texture margin (8); cancel it to centre the texture.
+      mark: { x: cx - markW / 2 + 8, y: top },
+      seal: { x: cx, y: sealY, scale: 1.7 },
+      buttonsX: cx,
+      playY: sealY + 190,
+      textX: cx,
+      textOrigin: 0.5,
+    };
   }
 
   override update(time: number, delta: number): void {

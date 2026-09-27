@@ -664,7 +664,7 @@ export class GameScene extends Phaser.Scene {
     // Ease the camera back as the seal grows (on top of the screen-fit zoom).
     const target = GROWTH.stages[this.seal.stage - 1].zoom;
     this.stageZoom = damp(this.stageZoom, target, 1.2, dt);
-    this.cameras.main.setZoom(getViewport().zoom * this.stageZoom);
+    this.cameras.main.setZoom(getViewport().worldZoom * this.stageZoom);
   }
 
   private updateTrail(dt: number): void {

@@ -4,6 +4,7 @@ import {
   cssInsetsToDesign,
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
+  MOBILE_WORLD_SCALE,
   textResolution,
 } from './viewport';
 
@@ -43,6 +44,31 @@ describe('viewport', () => {
   it('falls back to 1 for invalid pixel ratios', () => {
     expect(computeViewport(1280, 720, NaN).dpr).toBe(1);
     expect(computeViewport(1280, 720, 0).dpr).toBe(1);
+  });
+
+  it('leaves desktop alone: world zoom = UI zoom, never portrait', () => {
+    const tall = computeViewport(900, 1200, 1);
+    expect(tall.portrait).toBe(false);
+    expect(tall.worldZoom).toBe(tall.zoom);
+    expect(tall.viewWidth).toBeCloseTo(DESIGN_WIDTH);
+  });
+
+  it('zooms the world out on a landscape phone but keeps the UI size', () => {
+    const desk = computeViewport(844, 390, 2);
+    const phone = computeViewport(844, 390, 2, true);
+    expect(phone.portrait).toBe(false);
+    expect(phone.zoom).toBeCloseTo(desk.zoom);
+    expect(phone.worldZoom).toBeCloseTo(desk.zoom * MOBILE_WORLD_SCALE);
+  });
+
+  it('lays the UI out for a portrait design area on an upright phone', () => {
+    const v = computeViewport(390, 844, 3, true);
+    expect(v.portrait).toBe(true);
+    expect(v.viewWidth).toBeCloseTo(DESIGN_HEIGHT);
+    expect(v.viewHeight).toBeGreaterThan(DESIGN_WIDTH);
+    // Same UI scale as the same phone in landscape (720 design units across the short side).
+    expect(v.zoom).toBeCloseTo(computeViewport(844, 390, 3, true).zoom);
+    expect(v.worldZoom).toBeCloseTo(v.zoom * MOBILE_WORLD_SCALE);
   });
 
   it('converts notch safe-area insets from CSS pixels to design units', () => {
