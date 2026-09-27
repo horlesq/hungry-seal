@@ -4,7 +4,7 @@
 - **Phaser 4.2.1** (no physics plugin, see Physics below), **TypeScript 6** (strict), **Vite 8**.
 - No React/other UI framework. HUD/menus are Phaser scenes/containers.
 - Package manager: npm. Lint/format: ESLint 10 (flat config) + Prettier. Tests: Vitest. Browser playtest: playwright-core driving the locally installed Chrome.
-- Deploy target: static build (`vite build` -> `dist/`, relative `base: './'`), suitable for itch.io / Netlify / GitHub Pages.
+- Deploy target: static build (`vite build` -> `dist/`, relative `base: './'`). Live at https://hungry-seal.horly.dev/ (Vercel, from `main`); CI also publishes `main` to GitHub Pages.
 
 > Verify all Phaser APIs against the installed Phaser 4 version: grep `node_modules/phaser/types/phaser.d.ts`. Do not copy Phaser 3 snippets blindly.
 

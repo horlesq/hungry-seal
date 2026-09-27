@@ -4,7 +4,7 @@ A Hungry Shark–style arcade game starring a very hungry seal. Swim an endless 
 everything smaller than you, grow, dodge jellyfish, mines and sharks, and spend your coins on
 upgrades between runs.
 
-**Play it:** https://horlesq.github.io/hungry-seal/ (desktop and mobile browsers)
+**Play it:** https://hungry-seal.horly.dev/ (desktop and mobile browsers)
 
 ## Controls
 - **Mouse:** the seal swims toward the cursor; hold the left button to boost
