@@ -5,6 +5,9 @@
 //   human   = only on-screen prey, re-aims every 250 ms, no leading (roughly a decent player)
 //   perfect = sees all prey, re-aims every 60 ms, leads targets (upper bound on skill)
 //
+// The human bot plays like a player who follows the hints: flees hunting predators upward
+// (to leap out) and steers around puffed-up pufferfish.
+//
 // Reference (Phase 3 tuning, hazards + sharks): human survives 1:06-4:49 (median ~2:20),
 // reaching stage 2-4. Results vary a lot: take several samples.
 import { chromium } from 'playwright-core';
@@ -66,10 +69,14 @@ while (Date.now() - start < seconds * 1000) {
     };
     // Radii tuned to a reasonable player: dodge what's close, don't flee from everything.
     for (const h of s.hazards.alive) if (h.active) avoid(h.x, h.y, 120);
+    // A player stung once steers around puffed-up pufferfish.
+    for (const c of s.spawner.alive) if (c.active && c.puffed) avoid(c.x, c.y, 80);
     for (const p of s.predators.alive) {
       if (!p.active || p.def.tier <= s.seal.stage) continue;
       if (p.motion.state === 'notice' || p.motion.state === 'chase') {
         avoid(p.x, p.y, 420);
+        // Like the in-game hint says: head up and leap out (predators only hunt in water).
+        if (Math.hypot(m.x - p.x, m.y - p.y) < 420) fleeY -= 0.7;
         if (Math.hypot(m.x - p.x, m.y - p.y) < 300) panic = true;
       } else avoid(p.x, p.y, 160);
     }
@@ -81,8 +88,8 @@ while (Date.now() - start < seconds * 1000) {
         dead: false,
         flee: true,
         boost: panic,
-        sx: (tx - cam.scrollX) * cam.zoom,
-        sy: (ty - cam.scrollY) * cam.zoom,
+        sx: (tx - cam.worldView.x) * cam.zoom,
+        sy: (ty - cam.worldView.y) * cam.zoom,
         hunger: s.hunger.value,
         score: s.score,
         eaten: s.eaten,
@@ -100,7 +107,7 @@ while (Date.now() - start < seconds * 1000) {
     let best = null;
     let bestD = Infinity;
     for (const c of s.spawner.alive) {
-      if (!c.active || c.def.tier > s.seal.stage) continue;
+      if (!c.active || c.def.tier > s.seal.stage || c.puffed) continue;
       if (human && !cam.worldView.contains(c.x, c.y)) continue;
       const d = Math.hypot(c.x - m.x, c.y - m.y);
       if (d < bestD) {
@@ -112,12 +119,13 @@ while (Date.now() - start < seconds * 1000) {
     const lead = human ? 0 : 0.15;
     const tx = best ? best.x + best.motion.vx * lead : m.x + 300;
     const ty = best ? best.y + best.motion.vy * lead : 1100;
+    // Screen = (world - worldView) * zoom: the camera zooms out as the seal grows.
     return {
       dead: false,
       flee: false,
       boost: false,
-      sx: (tx - cam.scrollX) * cam.zoom,
-      sy: (ty - cam.scrollY) * cam.zoom,
+      sx: (tx - cam.worldView.x) * cam.zoom,
+      sy: (ty - cam.worldView.y) * cam.zoom,
       hunger: s.hunger.value,
       score: s.score,
       eaten: s.eaten,

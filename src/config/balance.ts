@@ -70,9 +70,9 @@ export const INPUT = {
 export const HUNGER = {
   max: 100,
   /** Drain at the start of a run; a full bar lasts max / this seconds without food. */
-  baseDrainPerSec: 2.3,
+  baseDrainPerSec: 2.1,
   /** Drain grows linearly with run time: +100% after this many seconds. */
-  rampSeconds: 270,
+  rampSeconds: 360,
   /** Deeper water burns more energy. */
   zoneMultiplier: {
     surface: 1,
@@ -121,7 +121,15 @@ export const SPAWN = {
    * Swimmers kept alive around the camera. Bigger prey (penguin, squid, turtle) take slots a
    * small seal can't eat, so this is higher than the edible density we actually want.
    */
-  targetAlive: 40,
+  targetAlive: 44,
+  /**
+   * Edible swimmers (for the seal's current size) to keep within foodRadius of the view.
+   * Below this, spawns are food only, even past targetAlive (up to maxAlive): eaten prey
+   * vanish while big creatures linger.
+   */
+  minFood: 14,
+  foodRadius: 1000,
+  maxAlive: 58,
   /** Seconds between spawn attempts. */
   interval: 0.2,
   /** Spawn this far beyond the screen edge (min/max px). */

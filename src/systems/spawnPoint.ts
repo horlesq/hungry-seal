@@ -2,6 +2,7 @@
 // movement, clamped to a vertical band. Used by every spawner (prey, hazards, predators, coins).
 import type Phaser from 'phaser';
 import { zoneAt, type ZoneId } from '../config/zones';
+import { canEat } from './feeding';
 
 /** Weighted random pick among entries allowed in the zone at world-y `y`, or null. */
 export function pickForZone<T extends { zones: readonly ZoneId[]; weight: number }>(
@@ -68,4 +69,25 @@ export function pickOffscreenPoint(
     if (!view.contains(x, y)) return { x, y };
   }
   return null;
+}
+
+/**
+ * Species to spawn at world-y `y`. While food is short (`foodForStage` set), only species a
+ * seal of that stage can eat, if any live at that depth; otherwise any species of the zone.
+ */
+export function pickSpawn<T extends { zones: readonly ZoneId[]; weight: number; tier: number }>(
+  list: readonly T[],
+  y: number,
+  random: () => number,
+  foodForStage: number | null,
+): T | null {
+  if (foodForStage !== null) {
+    const food = pickForZone(
+      list.filter((d) => canEat(foodForStage, d.tier)),
+      y,
+      random,
+    );
+    if (food) return food;
+  }
+  return pickForZone(list, y, random);
 }

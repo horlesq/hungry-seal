@@ -1,6 +1,8 @@
 // Camera-relative, pooled creature spawning. Keeps roughly SPAWN.targetAlive swimmers
 // around the view: spawns just off-screen (biased ahead of the seal) using the zone at the
-// spawn point, and recycles anything that falls far behind. Seabirds are spawned separately
+// spawn point, and recycles anything that falls far behind. Prey the seal eats disappear
+// while bigger creatures linger, so when fewer than SPAWN.minFood edible swimmers are
+// near the view it spawns only food (up to SPAWN.maxAlive) to keep a steady supply. Seabirds are spawned separately
 // in the sky whenever the view is near the surface. The world is never pre-built.
 import Phaser from 'phaser';
 import { SPAWN } from '../config/balance';
@@ -17,7 +19,7 @@ import { getViewport } from '../services/Viewport';
 import { Creature, School } from '../entities/Creature';
 import { stepCreatureMotion, type CreatureSteerContext } from '../entities/creatureAI';
 import { canEat } from './feeding';
-import { pickForZone, pickOffscreenPoint } from './spawnPoint';
+import { pickForZone, pickOffscreenPoint, pickSpawn } from './spawnPoint';
 
 const POOL_SIZE = 120;
 export const WATER_TOP = WORLD.surfaceY + 16;
@@ -96,6 +98,7 @@ export class Spawner {
     ctx.threatY = seal.y;
     let swimmers = 0;
     let flyers = 0;
+    let food = 0;
 
     for (const c of this.alive) {
       const leader = c.school?.leader;
@@ -112,13 +115,19 @@ export class Spawner {
 
       if (Math.hypot(c.x - cx, c.y - cy) > SPAWN.despawnDistance) c.despawn();
       else if (c.flies) flyers++;
-      else swimmers++;
+      else {
+        swimmers++;
+        if (ctx.threatActive && Math.hypot(c.x - cx, c.y - cy) < SPAWN.foodRadius) food++;
+      }
     }
 
     this.timer -= dt;
     if (this.timer <= 0) {
       this.timer = SPAWN.interval;
-      if (swimmers < SPAWN.targetAlive) this.spawnOffscreen(camera, seal);
+      const short = food < SPAWN.minFood;
+      if (swimmers < SPAWN.targetAlive || (short && swimmers < SPAWN.maxAlive)) {
+        this.spawnOffscreen(camera, seal, short);
+      }
     }
 
     // Seabirds: only worth spawning when the sky is (nearly) in view.
@@ -147,7 +156,11 @@ export class Spawner {
     }
   }
 
-  private spawnOffscreen(camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): void {
+  private spawnOffscreen(
+    camera: Phaser.Cameras.Scene2D.Camera,
+    seal: Threat,
+    foodOnly: boolean,
+  ): void {
     for (let attempt = 0; attempt < 3; attempt++) {
       const p = pickOffscreenPoint(camera, seal, this.random, {
         marginMin: SPAWN.marginMin,
@@ -157,7 +170,7 @@ export class Spawner {
         bottom: WATER_BOTTOM - 30,
       });
       if (!p) return;
-      const def = pickForZone(SWIMMERS, p.y, this.random);
+      const def = pickSpawn(SWIMMERS, p.y, this.random, foodOnly ? seal.stage : null);
       if (!def) continue;
       // Swim into the view so the player gets to see it.
       const heading = p.x < camera.midPoint.x ? 0 : Math.PI;

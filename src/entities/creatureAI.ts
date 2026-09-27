@@ -39,9 +39,10 @@ export interface CreatureMotion {
   fleeJitter: number;
   /** Seconds until the next jet burst (jetters only). */
   jetTimer: number;
-  /** Puffers: currently inflated, and how long it stays so after the seal leaves. */
+  /** Puffers: currently inflated, seconds of puff left, and recovery before it can puff again. */
   puffed: boolean;
   puffTimer: number;
+  puffCooldown: number;
   age: number;
 }
 
@@ -68,9 +69,13 @@ const FLEE_MEMORY = 0.9;
 const SCHOOL_PULL = 2.2;
 const FLEE_TURN_BOOST = 1.6;
 const DRIFT_BOB = 18;
-/** Puffers inflate when the seal is this close, and stay inflated this long after. */
+/**
+ * Puffers inflate when the seal comes this close, stay puffed for PUFF_TIME, then need
+ * PUFF_RECOVER seconds before they can puff again: the window to eat one without a sting.
+ */
 export const PUFF_RADIUS = 170;
-const PUFF_HOLD = 1.6;
+export const PUFF_TIME = 2;
+export const PUFF_RECOVER = 2.5;
 
 export function motionParamsFor(def: CreatureDef): CreatureMotionParams {
   const has = (b: BehaviorId) => def.behaviors.includes(b);
@@ -103,6 +108,7 @@ export function createCreatureMotion(x: number, y: number, heading: number): Cre
     jetTimer: 0,
     puffed: false,
     puffTimer: 0,
+    puffCooldown: 0,
     age: 0,
   };
 }
@@ -163,11 +169,16 @@ export function stepCreatureMotion(
   }
 
   // Puffers blow up (and nearly stop) when the seal comes close, whether or not it can eat
-  // them; they stay puffed for a moment after it leaves.
+  // them. A puff lasts PUFF_TIME; then it has to catch its breath before puffing again.
   if (p.puff) {
-    const near = Math.hypot(m.x - ctx.threatX, m.y - ctx.threatY) < PUFF_RADIUS;
-    if (near) m.puffTimer = PUFF_HOLD;
-    else m.puffTimer = Math.max(0, m.puffTimer - dt);
+    if (m.puffTimer > 0) {
+      m.puffTimer -= dt;
+      if (m.puffTimer <= 0) m.puffCooldown = PUFF_RECOVER;
+    } else if (m.puffCooldown > 0) {
+      m.puffCooldown -= dt;
+    } else if (Math.hypot(m.x - ctx.threatX, m.y - ctx.threatY) < PUFF_RADIUS) {
+      m.puffTimer = PUFF_TIME;
+    }
     m.puffed = m.puffTimer > 0;
     if (m.puffed) targetSpeed = p.speed * 0.25;
   }

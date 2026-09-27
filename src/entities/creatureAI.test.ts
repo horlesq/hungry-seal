@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createRng } from '../utils/rng';
 import {
   createCreatureMotion,
+  PUFF_RECOVER,
+  PUFF_TIME,
   startle,
   stepCreatureMotion,
   type CreatureMotion,
@@ -162,6 +164,28 @@ describe('creature AI', () => {
     c.threatX = 5000;
     for (let t = 0; t < 3; t += DT) stepCreatureMotion(m, puffer, c, DT);
     expect(m.puffed).toBe(false);
+  });
+
+  it('puffers deflate after a while even with the seal close, then recover', () => {
+    const puffer = { ...P, puff: true, flee: false };
+    const m = createCreatureMotion(0, 1500, 0);
+    const c = ctx({ threatX: 60, threatY: 1500 });
+    // Keep the seal right next to it the whole time.
+    const hold = (seconds: number) => {
+      for (let t = 0; t < seconds; t += DT) {
+        c.threatX = m.x + 60;
+        stepCreatureMotion(m, puffer, c, DT);
+      }
+    };
+    hold(0.1);
+    expect(m.puffed).toBe(true);
+    hold(PUFF_TIME);
+    expect(m.puffed).toBe(false);
+    // Catching its breath: safe to eat for a moment.
+    hold(PUFF_RECOVER - 0.3);
+    expect(m.puffed).toBe(false);
+    hold(0.5);
+    expect(m.puffed).toBe(true);
   });
 
   it('never leaves the water column', () => {
