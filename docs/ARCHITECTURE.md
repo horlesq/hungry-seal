@@ -35,7 +35,9 @@ hungry-seal/
       predators.ts      predator definitions (tier, speeds, radii, timings, rewards, spawn rule, glow)
       depths.ts         shared draw depths (darkness overlay, glows)
       upgrades.ts       upgrade definitions (name, costs, effect text) and per-level effects
-      skins.ts          seal skins (name, description, texture, price); cosmetic only
+      skins.ts          seal skins (name, description, texture, price, currency); cosmetic only
+      missions.ts       mission pool (metric, target, run/total scope, rewards), starters
+      achievements.ts   achievements (lifetime metric, target, gem reward)
     scenes/
       BootScene.ts      reads ?debug, starts Preload
       PreloadScene.ts   load manifest, progress bar, generate missing placeholders + UI textures
@@ -44,7 +46,8 @@ hungry-seal/
       HudScene.ts       overlay UI running parallel to GameScene (status panel, score, pause button)
       GameOverScene.ts  results overlay launched over the still-running GameScene (score count-up, stats)
       ShopScene.ts      "Upgrades": two columns of upgrade rows, gold buy buttons, Back / Play
-      SkinsScene.ts     skin preview + card grid, Buy (gold) / Equip
+      SkinsScene.ts     skin preview + card grid, Buy (gold; coins or gems) / Equip
+      StatsScene.ts     top runs, lifetime stats, achievement badges
       PauseScene.ts     pause overlay: Resume / Restart run / Quit to menu, sound toggle
     ui/
       theme.ts          design tokens: palette (COLORS/CSS), type scale + uiText(), drawPanel, EDGE,
@@ -53,7 +56,8 @@ hungry-seal/
                         buttons, icon + label + caption, badge, keyboard focus ring
       FocusNav.ts       keyboard navigation (arrows spatial, Tab cycle, Enter/Space press)
       uiTextures.ts     Canvas 2D UI textures: ice-floe wordmark (+ bitten), icons, upgrade symbols
-      widgets.ts        ocean backdrop, CoinPill, drawSegments, drawBar
+      widgets.ts        ocean backdrop, CurrencyPill (coins/gems), drawSegments, drawBar
+      missions.ts       MissionPanel (title screen mission list)
     audio/
       synth.ts          PURE offline synth: effects + seamless stereo music loop (+ tests)
       sounds.ts         SoundKeys + tone recipes for every effect
@@ -87,10 +91,11 @@ hungry-seal/
       Darkness.ts          depth darkness overlay with the seal's light (darknessAt() in zones.ts)
       FrenzySystem.ts      PURE frenzy meter/duration (tested in frenzy.test.ts)
       UpgradeSystem.ts     PURE upgrade levels -> run modifiers, purchase rules (upgrades.test.ts)
+      progress.ts          PURE run stats, lifetime stats, missions, achievements, top runs (+ tests)
       Tutorial.ts          PURE first-run hint rules (tutorial.test.ts)
     services/
       EventBus.ts          typed events between scenes/systems
-      saveData.ts          PURE save schema v3 (coins, bests, upgrades, skins, tutorialDone, settings),
+      saveData.ts          PURE save schema v4 (coins, gems, bests, upgrades, skins, stats, missions, achievements, topRuns, tutorialDone, settings), settleRun (banks a run),
                            migrateSave (v1 -> v2), recordRun, purchase (+ save.test.ts)
       AudioManager.ts      registers synthesized sounds as AudioBuffers, rate-limited play,
                            music loop, mute (save is the source of truth)

@@ -66,6 +66,16 @@ export interface RunResult {
   bestScore: number;
   /** Banked coins after this run. */
   totalCoins: number;
+  /** Gems found this run (treasure chests). */
+  gems: number;
+  /** Paid by missions and achievements completed this run. */
+  rewardCoins: number;
+  rewardGems: number;
+  totalGems: number;
+  missions: Array<{ text: string; coins: number; gems: number }>;
+  achievements: Array<{ name: string; gems: number }>;
+  /** Place on the top-runs list (1-5), or null. */
+  rank: number | null;
 }
 
 export interface DebugInfo {
@@ -111,6 +121,8 @@ export interface GameEvents {
   /** First-run hint text to show at the bottom of the screen (null = hide). */
   hint: [text: string | null];
   'zone:enter': [zone: { name: string; blurb: string }];
+  /** An active mission was just completed mid-run (paid when the run ends). */
+  'mission:complete': [mission: { text: string; coins: number; gems: number }];
   /** The HUD's pause button was pressed. */
   'ui:pause': [];
   'debug:toggle': [enabled: boolean];

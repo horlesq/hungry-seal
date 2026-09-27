@@ -1,15 +1,18 @@
 // Skins: pick how your seal looks (cosmetic only). A big preview of the selected skin, a
-// card per skin, and one action: Buy (gold, spends coins, then wears it) or Equip.
+// card per skin, and one action: Buy (gold; coins, or gems for premium skins; then wears
+// it) or Equip. Wide screens: preview on the left, a 3x3 grid on the right. Upright phones:
+// preview on top, grid below.
 // Keys: arrows / Tab + Enter, Esc = back.
 import Phaser from 'phaser';
 import { SoundKeys } from '../audio/sounds';
 import { TextureKeys } from '../config/assets';
 import { SceneKeys } from '../config/keys';
-import { SKINS, skinDef, type SkinDef, type SkinId } from '../config/skins';
+import { SKINS, skinDef, type Currency, type SkinDef, type SkinId } from '../config/skins';
 import { audio } from '../services/AudioManager';
 import { saves } from '../services/SaveService';
 import {
   fitUiCamera,
+  getViewport,
   getSafeInsets,
   onResize,
   sharpenTexts,
@@ -19,7 +22,7 @@ import { Button } from '../ui/Button';
 import { FocusNav } from '../ui/FocusNav';
 import { CSS, EDGE, formatNumber, reducedMotion, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
-import { addBackdrop, BACKDROPS, CoinPill } from '../ui/widgets';
+import { addBackdrop, BACKDROPS, CurrencyPill } from '../ui/widgets';
 import { DESIGN_HEIGHT } from '../utils/viewport';
 
 const CARD = { w: 148, h: 150, gap: 14, rowStep: 196 };
@@ -41,7 +44,10 @@ export class SkinsScene extends Phaser.Scene {
   private descText!: Phaser.GameObjects.Text;
   private buy!: Button;
   private equip!: Button;
-  private coins!: CoinPill;
+  private coins!: CurrencyPill;
+  private gems!: CurrencyPill;
+  /** Right edge of the balance pills (0 = centre them, on upright phones). */
+  private pillsRight = 0;
   private leaving = false;
 
   constructor() {
@@ -55,16 +61,23 @@ export class SkinsScene extends Phaser.Scene {
     const v = fitUiCamera(this);
     const safe = getSafeInsets();
     const cx = v.viewWidth / 2;
-    // All cards in one row on wide screens; three per row on upright phones.
-    const columns = v.portrait ? 3 : SKINS.length;
+    const columns = 3;
     const rows = Math.ceil(SKINS.length / columns);
-    const gridTop = 400;
-    const actionY = gridTop + (rows - 1) * CARD.rowStep + CARD.h + 88;
-    const blockH = actionY + 60;
-    const top = Math.max(
-      v.portrait ? safe.top : 0,
-      (v.viewHeight - Math.max(blockH, DESIGN_HEIGHT)) / 2,
-    );
+    const wide = !v.portrait;
+    // Upright: preview, name, grid, then the action button, stacked.
+    // Upright phones: the balances get their own row under the title, pushing content down.
+    const shift = wide ? 0 : 64;
+    const gridTop = wide ? 120 : 400 + shift;
+    const rowStep = wide ? 190 : CARD.rowStep;
+    const stackedActionY = gridTop + (rows - 1) * rowStep + CARD.h + 88;
+    const blockH = wide ? DESIGN_HEIGHT : stackedActionY + 60;
+    const top = Math.max(wide ? 0 : safe.top, (v.viewHeight - Math.max(blockH, DESIGN_HEIGHT)) / 2);
+    const gridW = columns * CARD.w + (columns - 1) * CARD.gap;
+    const gridCx = wide ? v.viewWidth - safe.right - EDGE - 10 - gridW / 2 : cx;
+    const infoX = wide ? safe.left + EDGE + 40 + 230 : cx;
+    const previewY = top + (wide ? 250 : 210 + shift);
+    const nameY = top + (wide ? 362 : 322 + shift);
+    const actionY = top + (wide ? 500 : stackedActionY);
 
     addBackdrop(this, v, BACKDROPS.deep);
     this.cameras.main.fadeIn(200, 4, 26, 49);
@@ -82,12 +95,13 @@ export class SkinsScene extends Phaser.Scene {
       onClick: () => this.leave(),
     }).setName('back');
     uiText(this, cx, headerY, 'Skins', 'title', { size: 56 }).setOrigin(0.5);
-    this.coins = new CoinPill(this, v.viewWidth - safe.right - EDGE, headerY, saves.data.coins);
-    this.coins.setName('coins');
+    const pillsY = wide ? headerY : headerY + 70;
+    this.coins = new CurrencyPill(this, 0, pillsY, saves.data.coins).setName('coins');
+    this.gems = new CurrencyPill(this, 0, pillsY, saves.data.gems, 'gems').setName('gems');
+    this.pillsRight = wide ? v.viewWidth - safe.right - EDGE : 0;
 
     // Preview of the selected skin, gently bobbing.
-    const previewY = top + 210;
-    this.preview = this.add.image(cx, previewY, TextureKeys.Seal).setName('preview');
+    this.preview = this.add.image(infoX, previewY, TextureKeys.Seal).setName('preview');
     if (!reducedMotion()) {
       this.tweens.add({
         targets: this.preview,
@@ -98,19 +112,23 @@ export class SkinsScene extends Phaser.Scene {
         ease: 'Sine.InOut',
       });
     }
-    this.nameText = uiText(this, cx, top + 322, '', 'heading', { size: 34 }).setOrigin(0.5);
-    this.descText = uiText(this, cx, top + 360, '', 'body', { color: CSS.mist }).setOrigin(0.5);
+    this.nameText = uiText(this, infoX, nameY, '', 'heading', { size: 34 }).setOrigin(0.5);
+    this.descText = uiText(this, infoX, nameY + 38, '', 'body', {
+      color: CSS.mist,
+      align: 'center',
+      wrap: 440,
+    }).setOrigin(0.5, 0);
 
     SKINS.forEach((def, i) => {
       const row = Math.floor(i / columns);
       const inRow = Math.min(columns, SKINS.length - row * columns);
       const col = i % columns;
-      const x = cx + (col - (inRow - 1) / 2) * (CARD.w + CARD.gap);
-      const y = top + gridTop + CARD.h / 2 + row * CARD.rowStep;
+      const x = gridCx + (col - (inRow - 1) / 2) * (CARD.w + CARD.gap);
+      const y = top + gridTop + CARD.h / 2 + row * rowStep;
       this.cards.push(this.createCard(def, x, y));
     });
 
-    this.buy = new Button(this, cx, top + actionY, {
+    this.buy = new Button(this, infoX, actionY, {
       width: 320,
       height: 72,
       label: '',
@@ -122,7 +140,7 @@ export class SkinsScene extends Phaser.Scene {
       fontSize: 30,
       onClick: () => this.buySelected(),
     }).setName('buy');
-    this.equip = new Button(this, cx, top + actionY, {
+    this.equip = new Button(this, infoX, actionY, {
       width: 320,
       height: 72,
       label: 'Equip',
@@ -156,9 +174,8 @@ export class SkinsScene extends Phaser.Scene {
       0,
       0.5,
     );
-    const coin = this.add
-      .image(0, status.y, TextureKeys.Coin)
-      .setScale(0.72 * textureScale(this, TextureKeys.Coin));
+    const coin = this.add.image(0, status.y, currencyIcon(def.currency));
+    coin.setScale(22 / coin.frame.width);
     return { def, button, status, coin };
   }
 
@@ -170,7 +187,8 @@ export class SkinsScene extends Phaser.Scene {
   private buySelected(): void {
     if (!saves.buySkin(this.selected)) return;
     audio.play(SoundKeys.Buy);
-    this.tweens.add({ targets: this.coins, scale: { from: 1.12, to: 1 }, duration: 220 });
+    const pill = skinDef(this.selected).currency === 'gems' ? this.gems : this.coins;
+    this.tweens.add({ targets: pill, scale: { from: 1.12, to: 1 }, duration: 220 });
     this.celebrate();
     this.refresh();
   }
@@ -179,6 +197,15 @@ export class SkinsScene extends Phaser.Scene {
     if (!saves.equipSkin(this.selected)) return;
     this.celebrate();
     this.refresh();
+  }
+
+  /** Balances: right-aligned in the header, or centred on their own row. */
+  private placePills(): void {
+    const gap = 12;
+    const total = this.gems.pillWidth + gap + this.coins.pillWidth;
+    const right = this.pillsRight || (getViewport().viewWidth + total) / 2;
+    this.coins.setX(right);
+    this.gems.setX(right - this.coins.pillWidth - gap);
   }
 
   /** A little hop of the preview when a skin is bought or equipped. */
@@ -193,7 +220,9 @@ export class SkinsScene extends Phaser.Scene {
     const def = skinDef(this.selected);
     const owned = data.skins.owned.includes(def.id);
     const equipped = data.skins.equipped === def.id;
-    this.coins.setCoins(data.coins);
+    this.coins.setValue(data.coins);
+    this.gems.setValue(data.gems);
+    this.placePills();
 
     this.preview.setTexture(def.texture);
     this.preview.setScale(PREVIEW_SCALE * textureScale(this, def.texture));
@@ -212,7 +241,15 @@ export class SkinsScene extends Phaser.Scene {
             : formatNumber(card.def.price);
       card.status
         .setText(label)
-        .setColor(data.skins.equipped === id ? CSS.glacier : cardOwned ? CSS.mist : CSS.gold);
+        .setColor(
+          data.skins.equipped === id
+            ? CSS.glacier
+            : cardOwned
+              ? CSS.mist
+              : card.def.currency === 'gems'
+                ? CSS.gem
+                : CSS.gold,
+        );
       // Price: coin icon + number, centred under the card together.
       const priced = !cardOwned;
       card.coin.setVisible(priced);
@@ -227,10 +264,13 @@ export class SkinsScene extends Phaser.Scene {
     if (owned) {
       this.equip.setLabel(equipped ? 'Equipped' : 'Equip').setEnabled(!equipped);
     } else {
-      const short = def.price - data.coins;
+      const gems = def.currency === 'gems';
+      const short = def.price - (gems ? data.gems : data.coins);
+      const unit = gems ? (short === 1 ? ' gem' : ' gems') : '';
       this.buy
+        .setIcon(currencyIcon(def.currency))
         .setLabel(formatNumber(def.price))
-        .setCaption(short > 0 ? `Need ${formatNumber(short)} more` : 'Buy and wear')
+        .setCaption(short > 0 ? `Need ${formatNumber(short)} more${unit}` : 'Buy and wear')
         .setEnabled(short <= 0);
     }
     sharpenTexts(this);
@@ -244,4 +284,8 @@ export class SkinsScene extends Phaser.Scene {
       this.scene.start(SceneKeys.Menu);
     });
   }
+}
+
+function currencyIcon(currency: Currency): string {
+  return currency === 'gems' ? UiTextures.Gem : TextureKeys.Coin;
 }

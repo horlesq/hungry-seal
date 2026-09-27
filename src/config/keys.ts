@@ -8,6 +8,7 @@ export const SceneKeys = {
   Pause: 'Pause',
   Shop: 'Shop',
   Skins: 'Skins',
+  Stats: 'Stats',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

@@ -1406,6 +1406,92 @@ async function skins(browser) {
   await ctx.close();
 }
 
+/** Phase 6: missions (toast, payout, rotation), achievements, gems, top runs, Stats screen. */
+async function progress(browser) {
+  const ctx = await browser.newContext({ viewport: { width: GAME_W, height: GAME_H } });
+  const page = await ctx.newPage();
+  watch(page, 'progress');
+  const save = () => page.evaluate(() => JSON.parse(localStorage.getItem('hungry-seal-save')));
+  await page.goto(URL);
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(400);
+  const panel = await page.evaluate(() => {
+    const m = window.__PHASER_GAME__.scene.getScene('Menu').children.getByName('missions');
+    return m ? m.list.filter((o) => o.type === 'Text').map((t) => t.text) : null;
+  });
+  check(
+    'progress: a new player sees three starter missions',
+    !!panel && panel.includes('Eat 20 fish in one run'),
+    panel?.join(' | '),
+  );
+
+  await page.keyboard.press('Enter');
+  await sceneActive(page, 'Hud');
+  await page.waitForTimeout(600);
+  await inGame(page, (sc) => {
+    sc.hunger.value = 1e9;
+    sc.eaten = 25;
+    sc.eatenBy = { minnow: 25 };
+    sc.score = 1500;
+  });
+  await page.waitForTimeout(900);
+  const toast = await page.evaluate(() => {
+    const hud = window.__PHASER_GAME__.scene.getScene('Hud');
+    return { alpha: hud.toast.alpha, text: hud.toastText.text };
+  });
+  check(
+    'progress: finishing a mission mid-run pops a toast',
+    toast.alpha > 0.5 && toast.text === 'Eat 20 fish in one run',
+    JSON.stringify(toast),
+  );
+  await page.screenshot({ path: `${OUT}/30-mission-toast.png` });
+
+  const before = await save();
+  await inGame(page, (sc) => {
+    sc.hunger.value = 0.01;
+  });
+  await sceneActive(page, 'GameOver');
+  await page.waitForTimeout(2600);
+  const after = await save();
+  const result = await page.evaluate(() => {
+    const go = window.__PHASER_GAME__.scene.getScene('GameOver');
+    return go.children.getByName('rewards') !== null;
+  });
+  const ids = after.missions.active.map((m) => m.id);
+  check(
+    'progress: the mission is paid and replaced when the run ends',
+    after.missions.completed === 1 &&
+      !ids.includes('eat-20') &&
+      ids.length === 3 &&
+      after.coins >= (before?.coins ?? 0) + 60,
+    JSON.stringify({ coins: after.coins, ids }),
+  );
+  check(
+    'progress: First Bite unlocks and pays a gem',
+    after.achievements.includes('first-bite') && after.gems >= 1,
+    JSON.stringify({ achievements: after.achievements, gems: after.gems }),
+  );
+  check(
+    'progress: the run is on the top list, stats are counted',
+    after.topRuns.length === 1 && after.stats.eaten === 25,
+    JSON.stringify({ top: after.topRuns, eaten: after.stats.eaten }),
+  );
+  check('progress: the results screen shows the rewards', result);
+  await page.screenshot({ path: `${OUT}/31-results-rewards.png` });
+
+  await page.keyboard.press('Escape');
+  await sceneActive(page, 'Menu');
+  await page.waitForTimeout(400);
+  await clickButton(page, 'Menu', 'stats');
+  await sceneActive(page, 'Stats');
+  await page.waitForTimeout(400);
+  check('progress: the trophy button opens the Stats screen', true);
+  await page.screenshot({ path: `${OUT}/32-stats.png` });
+  await page.keyboard.press('Escape');
+  await sceneActive(page, 'Menu');
+  await ctx.close();
+}
+
 await mkdir(OUT, { recursive: true });
 const server = await createServer({
   server: { port: PORT, strictPort: true },
@@ -1427,7 +1513,18 @@ const browser = await chromium.launch({
 });
 
 // PLAYTEST_ONLY=desktop,mobile runs just those sections.
-const sections = { screens, desktop, danger, phase4, phase5, gameplay, mobile, portrait, skins };
+const sections = {
+  screens,
+  desktop,
+  danger,
+  phase4,
+  phase5,
+  gameplay,
+  mobile,
+  portrait,
+  skins,
+  progress,
+};
 const only = process.env.PLAYTEST_ONLY?.split(',');
 try {
   for (const [name, run] of Object.entries(sections)) {

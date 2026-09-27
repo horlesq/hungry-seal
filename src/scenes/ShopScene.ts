@@ -14,7 +14,7 @@ import { Button } from '../ui/Button';
 import { FocusNav } from '../ui/FocusNav';
 import { COLORS, CSS, drawPanel, EDGE, UPGRADE_HUES, uiText } from '../ui/theme';
 import { UiTextures, type UiTexture } from '../ui/uiTextures';
-import { addBackdrop, BACKDROPS, CoinPill, drawSegments } from '../ui/widgets';
+import { addBackdrop, BACKDROPS, CurrencyPill, drawSegments } from '../ui/widgets';
 import { DESIGN_HEIGHT } from '../utils/viewport';
 
 const CARD_W = 596;
@@ -46,7 +46,7 @@ interface Card {
 
 export class ShopScene extends Phaser.Scene {
   private cards: Card[] = [];
-  private coins!: CoinPill;
+  private coins!: CurrencyPill;
   private leaving = false;
 
   constructor() {
@@ -84,7 +84,7 @@ export class ShopScene extends Phaser.Scene {
       onClick: () => this.leave(SceneKeys.Menu),
     }).setName('back');
     uiText(this, cx, headerY, 'Upgrades', 'title', { size: 56 }).setOrigin(0.5);
-    this.coins = new CoinPill(this, v.viewWidth - safe.right - EDGE, headerY, saves.data.coins);
+    this.coins = new CurrencyPill(this, v.viewWidth - safe.right - EDGE, headerY, saves.data.coins);
     this.coins.setName('coins');
 
     UPGRADES.forEach((def, i) => {
@@ -168,7 +168,7 @@ export class ShopScene extends Phaser.Scene {
   /** Redraws every card for the current levels and coin balance. */
   private refresh(): void {
     const data = saves.data;
-    this.coins.setCoins(data.coins);
+    this.coins.setValue(data.coins);
 
     for (const card of this.cards) {
       const level = data.upgrades[card.def.id];

@@ -44,6 +44,11 @@ export interface PinnipedStyle {
   wrinkles?: boolean;
   /** Mouth line running far back (leopard seal grin). */
   longMouth?: boolean;
+  /** Pirate: bandana over the head and a patch over the eye. */
+  bandana?: boolean;
+  eyepatch?: boolean;
+  /** Golden: glossy highlight and sparkles. */
+  shine?: boolean;
 }
 
 export const SEAL_STYLES: Record<SkinId, PinnipedStyle> = {
@@ -111,6 +116,25 @@ export const SEAL_STYLES: Record<SkinId, PinnipedStyle> = {
     tusks: true,
     moustache: true,
     wrinkles: true,
+  },
+  pirate: {
+    back: '#5a7890',
+    belly: '#cfdce6',
+    muzzle: '#b0c1ce',
+    flipper: '#4e6b84',
+    outline: '#1f3244',
+    spots: { color: 'rgba(36, 58, 76, 0.5)', count: 9, size: [2, 4], seed: 3 },
+    bandana: true,
+    eyepatch: true,
+  },
+  golden: {
+    back: '#e2a81c',
+    belly: '#ffe488',
+    muzzle: '#f8d65e',
+    flipper: '#c98a10',
+    outline: '#6b4404',
+    shine: true,
+    blush: true,
   },
   elephant: {
     back: '#74665a',
@@ -258,6 +282,7 @@ export function drawPinniped(ctx: Ctx, s: PinnipedStyle): void {
   drawFlipper(ctx, s, hd.x - 20, hd.y + hd.r - 3, -1.05, front, false, 'front');
 
   if (s.lei) drawLei(ctx, hd);
+  if (s.shine) drawShine(ctx, silhouette, top);
   drawFace(ctx, s, hd, { x: mx, y: my, rx: sn.rx, ry: sn.ry });
 }
 
@@ -376,6 +401,76 @@ function drawLei(ctx: Ctx, hd: { x: number; y: number; r: number }): void {
   }
 }
 
+/** Golden skin: a glossy streak along the back and a few sparkles around the body. */
+function drawShine(ctx: Ctx, silhouette: Path2D, top: number): void {
+  ctx.save();
+  ctx.clip(silhouette);
+  ctx.strokeStyle = 'rgba(255, 255, 240, 0.8)';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(62, top + 13);
+  ctx.bezierCurveTo(80, top + 6, 100, top + 5, 116, top + 8);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = '#fffbe0';
+  for (const [x, y, r] of [
+    [60, 14, 5],
+    [104, 8, 4],
+    [26, 26, 3.5],
+    [88, 80, 4],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.quadraticCurveTo(x, y, x, y + r);
+    ctx.quadraticCurveTo(x, y, x - r, y);
+    ctx.quadraticCurveTo(x, y, x, y - r);
+    ctx.fill();
+  }
+}
+
+/** Pirate: a spotted bandana capping the top of the head, knotted at the back. */
+function drawBandana(ctx: Ctx, s: PinnipedStyle, hd: { x: number; y: number; r: number }): void {
+  const r = hd.r + 1;
+  const a0 = Math.PI * 1.1;
+  const a1 = Math.PI * 1.9;
+  ctx.fillStyle = '#d8323b';
+  ctx.strokeStyle = s.outline;
+  ctx.lineWidth = 2.6;
+  // Knot tails trailing from the back of the cap.
+  const kx = hd.x + Math.cos(a0) * r;
+  const ky = hd.y + Math.sin(a0) * r;
+  for (const [dx, dy, a] of [
+    [-6, 1, 0.5],
+    [-4, 6, 1.1],
+  ] as const) {
+    ctx.save();
+    ctx.translate(kx + dx, ky + dy);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 6.5, 3, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.arc(hd.x, hd.y, r, a0, a1);
+  ctx.quadraticCurveTo(hd.x + 2, hd.y - r * 0.2, kx, ky);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  for (const [dx, dy] of [
+    [-9, -13],
+    [1, -17],
+    [10, -13],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(hd.x + dx, hd.y + dy, 1.7, 0, TAU);
+    ctx.fill();
+  }
+}
+
 function drawFace(
   ctx: Ctx,
   s: PinnipedStyle,
@@ -402,7 +497,33 @@ function drawFace(
     ctx.fill();
   }
 
-  // Big dark eye with highlights, and a brow.
+  if (s.bandana) drawBandana(ctx, s, hd);
+
+  if (s.eyepatch) {
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ex - eye, ey + 1);
+    ctx.lineTo(hd.x - hd.r + 2, hd.y + 1);
+    ctx.stroke();
+    ctx.fillStyle = '#111111';
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, eye + 1.2, eye + 0.6, -0.2, 0, TAU);
+    ctx.fill();
+  } else {
+    drawEye(ctx, ex, ey, eye);
+  }
+  ctx.strokeStyle = s.outline;
+  ctx.globalAlpha = 0.6;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(ex, ey + 1, eye + 3, Math.PI * 1.2, Math.PI * 1.6);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  drawMouthAndNose(ctx, s, hd, mz);
+}
+
+function drawEye(ctx: Ctx, ex: number, ey: number, eye: number): void {
   ctx.fillStyle = '#121a22';
   ctx.beginPath();
   ctx.ellipse(ex, ey, eye * 0.88, eye, 0, 0, TAU);
@@ -416,14 +537,14 @@ function drawFace(
     ctx.arc(ex - eye * 0.35, ey + eye * 0.4, eye * 0.14, 0, TAU);
     ctx.fill();
   }
-  ctx.strokeStyle = s.outline;
-  ctx.globalAlpha = 0.6;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(ex, ey + 1, eye + 3, Math.PI * 1.2, Math.PI * 1.6);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+}
 
+function drawMouthAndNose(
+  ctx: Ctx,
+  s: PinnipedStyle,
+  hd: { x: number; y: number; r: number },
+  mz: { x: number; y: number; rx: number; ry: number },
+): void {
   // Mouth under the snout (a long grin for the leopard seal).
   ctx.strokeStyle = s.outline;
   ctx.lineWidth = 2;

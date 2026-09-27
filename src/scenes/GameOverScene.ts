@@ -13,6 +13,7 @@ import { anyAffordable } from '../systems/UpgradeSystem';
 import { Button } from '../ui/Button';
 import { FocusNav } from '../ui/FocusNav';
 import { COLORS, CSS, drawPanel, formatNumber, reducedMotion, uiText } from '../ui/theme';
+import { UiTextures } from '../ui/uiTextures';
 import { DESIGN_HEIGHT } from '../utils/viewport';
 
 /** Ignore input briefly so a click/finger still held from the run doesn't skip the screen. */
@@ -124,7 +125,9 @@ export class GameOverScene extends Phaser.Scene {
     // Buttons: one row under the panel.
     const save = saves.data;
     // One row of three; upright phones stack Swim again above Upgrades + Menu.
-    const rowY = top + 590;
+    // Rewards earned this run (missions, achievements, gems, top-run rank), then buttons.
+    const rewards = this.rewardsRow(result, cx, top + 542, v.viewWidth - 40);
+    const rowY = top + 616;
     const stacked = v.portrait;
     const at = {
       retry: stacked ? { x: cx, y: rowY } : { x: cx - 203, y: rowY },
@@ -167,7 +170,7 @@ export class GameOverScene extends Phaser.Scene {
       this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 360, ease: 'Back.Out' });
       subtitle.setAlpha(0);
       this.tweens.add({ targets: subtitle, alpha: 1, delay: 150, duration: 300 });
-      const rest = [panel, ...buttons];
+      const rest = [panel, ...buttons, ...(rewards ? [rewards] : [])];
       rest.forEach((o) => o.setAlpha(0).setY(o.y + 24));
       this.tweens.add({
         targets: rest,
@@ -227,6 +230,86 @@ export class GameOverScene extends Phaser.Scene {
         });
       },
     });
+  }
+
+  /** One line of reward chips under the panel, or null if the run earned none. */
+  private rewardsRow(
+    r: ResultsData,
+    cx: number,
+    y: number,
+    maxWidth: number,
+  ): Phaser.GameObjects.Container | null {
+    const chips: Array<{ icon: string; tint: number | null; text: string; color: string }> = [];
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    if (r.missions.length > 0) {
+      const gems = r.missions.reduce((sum, m) => sum + m.gems, 0);
+      const coins = r.missions.reduce((sum, m) => sum + m.coins, 0);
+      const pay = `+${formatNumber(coins)} coins${gems ? `, +${plural(gems, 'gem')}` : ''}`;
+      chips.push({
+        icon: UiTextures.Check,
+        tint: COLORS.gold,
+        text: `${plural(r.missions.length, 'mission')} done  ${pay}`,
+        color: CSS.foam,
+      });
+    }
+    for (const a of r.achievements) {
+      chips.push({
+        icon: UiTextures.Star,
+        tint: COLORS.gold,
+        text: `${a.name}  +${plural(a.gems, 'gem')}`,
+        color: CSS.foam,
+      });
+    }
+    if (r.gems > 0) {
+      chips.push({
+        icon: UiTextures.Gem,
+        tint: null,
+        text: `${plural(r.gems, 'gem')} found`,
+        color: CSS.gem,
+      });
+    }
+    if (r.rank) {
+      chips.push({
+        icon: UiTextures.Trophy,
+        tint: COLORS.glacier,
+        text: `#${r.rank} of your top runs`,
+        color: CSS.foam,
+      });
+    }
+    if (chips.length === 0) return null;
+
+    const row = this.add.container(cx, y).setName('rewards');
+    let x = 0;
+    for (const c of chips) {
+      const label = uiText(this, 0, 1, c.text, 'caption', {
+        size: 15,
+        weight: 800,
+        color: c.color,
+      });
+      label.setOrigin(0, 0.5);
+      const icon = this.add.image(0, 0, c.icon);
+      icon.setScale(20 / icon.frame.width);
+      if (c.tint !== null) icon.setTint(c.tint);
+      const w = 14 + 20 + 8 + label.width + 14;
+      const h = 34;
+      const bg = drawPanel(this.add.graphics(), x, -h / 2, w, h, {
+        radius: h / 2,
+        alpha: 0.8,
+        line: 0.16,
+      });
+      icon.setPosition(x + 14 + 10, 0);
+      label.setX(x + 14 + 20 + 8);
+      row.add([bg, icon, label]);
+      x += w + 10;
+    }
+    const total = x - 10;
+    // Centre the row, and shrink it if a lot happened this run.
+    const scale = Math.min(1, maxWidth / total);
+    row.iterate((child: Phaser.GameObjects.Components.Transform) => {
+      child.x -= total / 2;
+    });
+    row.setScale(scale);
+    return row;
   }
 
   private newBestChip(right: number, y: number): Phaser.GameObjects.Container {

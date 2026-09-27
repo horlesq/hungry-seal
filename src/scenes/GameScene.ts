@@ -18,6 +18,7 @@ import {
   SEAL_MOTION,
 } from '../config/balance';
 import { RegistryKeys, SceneKeys } from '../config/keys';
+import { missionDef } from '../config/missions';
 import { skinDef } from '../config/skins';
 import { WORLD, depthMeters, zoneAt, type ZoneId } from '../config/zones';
 import type { Creature } from '../entities/Creature';
@@ -39,6 +40,7 @@ import { fitWorldCamera, getViewport, onResize, sharpenTexts } from '../services
 import { CoinField } from '../systems/CoinField';
 import { Darkness } from '../systems/Darkness';
 import { Pickups, type PickupEvent } from '../systems/Pickups';
+import { completedNow, emptyRunStats, type RunStats } from '../systems/progress';
 import { ComboSystem } from '../systems/ComboSystem';
 import { Effects } from '../systems/Effects';
 import { canEat, circlesOverlap } from '../systems/feeding';
@@ -63,6 +65,8 @@ const COMBO_CALLOUT_MIN = 5;
 const FRENZY_STAGE = 99;
 /** Seconds before the same zone's banner can show again (no spam at zone borders). */
 const ZONE_BANNER_COOLDOWN = 8;
+/** Seconds between checks for missions completed mid-run (for the HUD toast). */
+const MISSION_CHECK_INTERVAL = 0.5;
 
 function hintTexts(touch: boolean): Record<HintId, string> {
   return {
@@ -126,6 +130,14 @@ export class GameScene extends Phaser.Scene {
   private magnetShown = -1;
   /** A pause has been queued (Phaser applies it on the next update). */
   private pausePending = false;
+  // Progression tracking for missions, stats and achievements.
+  private runGems = 0;
+  private eatenBy: Record<string, number> = {};
+  private chests = 0;
+  private frenzies = 0;
+  private missionTimer = 0;
+  private readonly missionsShown = new Set<string>();
+  private readonly liveRun: RunStats = emptyRunStats();
 
   private readonly lookAhead = new Phaser.Math.Vector2();
   private readonly tail = new Phaser.Math.Vector2();
@@ -158,6 +170,12 @@ export class GameScene extends Phaser.Scene {
     this.magnetLeft = 0;
     this.magnetShown = -1;
     this.pausePending = false;
+    this.runGems = 0;
+    this.eatenBy = {};
+    this.chests = 0;
+    this.frenzies = 0;
+    this.missionTimer = MISSION_CHECK_INTERVAL;
+    this.missionsShown.clear();
 
     // Shop upgrades shape this run.
     const mods = runModifiers(saves.data.upgrades);
@@ -282,6 +300,11 @@ export class GameScene extends Phaser.Scene {
       if (this.frenzy.update(dt)) this.endFrenzy();
       this.updateZone();
       this.updateTutorial(dt);
+      this.missionTimer -= dt;
+      if (this.missionTimer <= 0) {
+        this.missionTimer = MISSION_CHECK_INTERVAL;
+        this.checkMissions();
+      }
       this.updateCamera(dt);
       this.updateTrail(dt);
     }
@@ -361,6 +384,11 @@ export class GameScene extends Phaser.Scene {
 
   private onPickup(e: PickupEvent): void {
     if (e.kind === 'chest') {
+      this.chests++;
+      if (Math.random() < PICKUPS.chestGemChance) {
+        this.runGems++;
+        this.effects.floatText(e.x, e.y - 95, '+1 GEM', '#ff8ae0', 34);
+      }
       const [min, max] = PICKUPS.chestCoins;
       this.coins.drop(e.x, e.y - 12, Phaser.Math.Between(min, max));
       this.score += PICKUPS.chestScore;
@@ -456,6 +484,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startFrenzy(): void {
+    this.frenzies++;
     this.seal.setFrenzy(true);
     this.seal.setSpeedBonus(FRENZY.speedMult);
     audio.play(SoundKeys.Frenzy);
@@ -488,6 +517,7 @@ export class GameScene extends Phaser.Scene {
     if (big) this.hitStop = HITSTOP.eatBig;
     const chance = COINS.dropChanceByTier[Math.min(def.tier, COINS.dropChanceByTier.length - 1)];
     if (Math.random() < chance) this.coins.drop(c.x, c.y, 1);
+    this.countMeal(def.id);
     this.feed(c.x, c.y, def);
     c.despawn();
   }
@@ -500,8 +530,43 @@ export class GameScene extends Phaser.Scene {
     this.coins.drop(p.x, p.y, def.coins);
     this.hitStop = HITSTOP.explode;
     this.cameras.main.shake(260, 0.01);
+    this.countMeal(def.id);
     this.feed(p.x, p.y, def);
     p.despawn();
+  }
+
+  private countMeal(id: string): void {
+    this.eatenBy[id] = (this.eatenBy[id] ?? 0) + 1;
+  }
+
+  /** What this run has achieved so far (reuses one object; copy it to keep it). */
+  private runStats(cause: DeathCause): RunStats {
+    const r = this.liveRun;
+    r.score = this.score;
+    r.coins = this.runCoins;
+    r.gems = this.runGems;
+    r.seconds = this.elapsed;
+    r.distance = this.distance;
+    r.maxDepth = Math.max(0, this.maxDepth);
+    r.eaten = this.eaten;
+    r.eatenBy = this.eatenBy;
+    r.chests = this.chests;
+    r.frenzies = this.frenzies;
+    r.maxStage = this.growth.stage;
+    r.cause = cause;
+    return r;
+  }
+
+  /** Toast missions the moment they're done (they're paid when the run ends). */
+  private checkMissions(): void {
+    for (const id of completedNow(saves.data.missions.active, this.runStats('starved'))) {
+      if (this.missionsShown.has(id)) continue;
+      this.missionsShown.add(id);
+      const def = missionDef(id);
+      if (!def) continue;
+      EventBus.emit('mission:complete', { text: def.text, coins: def.coins, gems: def.gems ?? 0 });
+      audio.play(SoundKeys.Buy);
+    }
   }
 
   private onGrow(): void {
@@ -611,11 +676,8 @@ export class GameScene extends Phaser.Scene {
     const recent = this.lastHit && this.elapsed - this.lastHit.at <= DAMAGE.killWindow;
     const cause: DeathCause = recent && this.lastHit ? this.lastHit.source : 'starved';
     const distance = Math.round(this.distance);
-    const { data, newBest } = saves.recordRun({
-      score: this.score,
-      coins: this.runCoins,
-      distance,
-    });
+    const settled = saves.recordRun({ ...this.runStats(cause), eatenBy: { ...this.eatenBy } });
+    const { data, newBest } = settled;
     const result: RunResult = {
       score: this.score,
       seconds: this.elapsed,
@@ -628,6 +690,13 @@ export class GameScene extends Phaser.Scene {
       newBest,
       bestScore: data.bestScore,
       totalCoins: data.coins,
+      gems: this.runGems,
+      rewardCoins: settled.rewardCoins,
+      rewardGems: settled.rewardGems,
+      totalGems: data.gems,
+      missions: settled.missions.map((m) => ({ text: m.text, coins: m.coins, gems: m.gems ?? 0 })),
+      achievements: settled.achievements.map((a) => ({ name: a.name, gems: a.gems })),
+      rank: settled.rank,
     };
     EventBus.emit('run:over', result);
     this.time.delayedCall(GAME_OVER_DELAY, () => this.scene.launch(SceneKeys.GameOver, result));

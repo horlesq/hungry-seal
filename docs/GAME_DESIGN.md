@@ -97,7 +97,7 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 
 ## Currency and progression
 - **Coins:** collected in run (floating clusters of 4-7 ahead of the seal, dropped by prey: 10% tier 1, 22% tier 2, ..., treasure chests later). Touch to collect, with a short magnet pull; dropped coins vanish after 10 s. Banked into the save when the run ends (done).
-- **Gems (later):** rare, premium-feel currency for skins; earned from rare events, not sold.
+- **Gems (done):** rare currency, never sold. Earned from treasure chests (30% chance of 1), harder missions (1-2) and achievements (1-5 each, ~38 in total). Spent on premium skins.
 - **Upgrades** (permanent, bought with coins in the Shop; 5 levels, costs 60 / 150 / 300 / 550 / 900) — done for 4:
   - Flippers: +4% top speed per level. Big Belly: +12 max hunger per level. Blubber: -7% hunger drain per level. Turbo Tail: +18% boost (lasts longer, refills faster) per level.
   - Big Jaws: +10% growth per meal per level. Coin Whiskers: +30% coin magnet range per level. Feeding Frenzy: +12% frenzy charge per level. (All 7 done.)
@@ -111,9 +111,12 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 - The deep gets dark: darkness starts ~600 px above the Deep and ramps to ~90% at the seabed. The seal carries a small light circle (clear ~110 px, dark by ~360 px).
 - Glows show through the dark: anglerfish lures, lanternfish, jellyfish (pink), mine warning lights (blinking red), chests, orbs.
 - The camera pulls back as the seal grows (100% → 82% zoom at size 5).
-- **Skins (done):** cosmetic only (same stats), bought with coins on the Skins screen (menu), which previews the selected skin and buys or equips it; buying also wears it. Harbor Seal (free, default), Arctic Pup (harp seal pup, 300), Sea Lion (450), Tropical Seal (Hawaiian monk seal with a lei, 600), Leopard Seal (800), Walrus (1,000), Elephant Seal (1,500). The equipped skin shows on the title screen and in runs.
-- **Missions (later):** 3 rotating goals per run set ("eat 20 crabs", "reach abyss").
-- Save data in localStorage: coins, best score, best distance, runs, settings (done); upgrade levels, skins owned/equipped (save v3).
+- **Skins (done):** cosmetic only (same stats), bought on the Skins screen (menu), which previews the selected skin and buys or equips it; buying also wears it. Coins: Harbor Seal (free, default), Arctic Pup (harp seal pup, 300), Sea Lion (450), Tropical Seal (Hawaiian monk seal with a lei, 600), Leopard Seal (800), Walrus (1,000), Elephant Seal (1,500). Gems: Pirate Seal (12), Golden Seal (20). The equipped skin shows on the title screen and in runs.
+- **Missions (done):** 3 active goals from a pool of 22 (`config/missions.ts`), shown on the title screen with progress rings. "In one run" goals keep your best attempt; "total" goals add up across runs. Completing one mid-run pops a toast; it's paid (coins, sometimes gems) when the run ends and a new mission replaces it. New players start with Eat 20 fish / Score 2,000 / Catch 2 seabirds.
+- **Achievements (done):** 12 one-time milestones from lifetime stats (First Bite, Big Eater, Abyss Diver, Rock Bottom, Fully Grown, Shark Snack, Orca Crunch, Treasure Hunter, Frenzied, Marathon, Deep Pockets, Bird Watcher), each worth gems. Unlocked at the end of a run.
+- **Stats screen (done, trophy button on the title screen):** top 5 runs (score, time, size, date), lifetime totals (runs, best score, fish eaten, favorite snack, deepest dive, longest run, time played, coins/gems earned, chests, frenzies, missions done) and the achievement badges (locked ones say how to unlock them).
+- **Results screen:** a row of reward chips: missions done (+coins/gems), achievements unlocked, gems found, and the run's place on your top 5.
+- Save data in localStorage (save v4, migrates v1-v3): coins, gems, bests, runs, settings, upgrade levels, skins owned/equipped, lifetime stats, missions, achievements, top runs.
 
 ## Audio (done, placeholder)
 All sounds are synthesized in code at startup (`src/audio/`): chomp / big chomp, coin, splash, hurt, jellyfish zap, explosion, boost whoosh, grow and frenzy arpeggios, shark "dun-dun" on its telegraph, bump, UI click, purchase, game over, and a calm 8-bar underwater music loop. Mute from the menu (persists). Replace with recorded audio later under the same keys.

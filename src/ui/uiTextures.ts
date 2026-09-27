@@ -32,6 +32,12 @@ export const UiTextures = {
   Jaws: 'ui-jaws',
   Chevrons: 'ui-chevrons',
   FishPlus: 'ui-fish-plus',
+  Trophy: 'ui-trophy',
+  Check: 'ui-check',
+  Lock: 'ui-lock',
+  Star: 'ui-star',
+  /** Colored (not tinted): the rare currency. */
+  Gem: 'ui-gem',
 } as const;
 
 export type UiTexture = (typeof UiTextures)[keyof typeof UiTextures];
@@ -54,6 +60,10 @@ const ICONS: Array<[UiTexture, (ctx: Ctx) => void]> = [
   [UiTextures.Jaws, drawJaws],
   [UiTextures.Chevrons, drawChevrons],
   [UiTextures.FishPlus, drawFishPlus],
+  [UiTextures.Trophy, drawTrophy],
+  [UiTextures.Check, drawCheck],
+  [UiTextures.Lock, drawLock],
+  [UiTextures.Star, drawStar],
 ];
 
 /** Where the bite was taken out of the bitten wordmark, in design units from its top-left. */
@@ -74,6 +84,7 @@ export function ensureUiTextures(scene: Phaser.Scene): void {
     });
   }
   paint(scene, UiTextures.Crumb, 16, 14, drawCrumb);
+  paint(scene, UiTextures.Gem, ICON, ICON, drawGem);
   paintWordmark(scene);
 }
 
@@ -548,4 +559,143 @@ function drawChevrons(ctx: Ctx): void {
       5.5,
     );
   }
+}
+
+function drawTrophy(ctx: Ctx): void {
+  // Cup with handles, stem and base.
+  ctx.beginPath();
+  ctx.moveTo(13, 7);
+  ctx.lineTo(35, 7);
+  ctx.bezierCurveTo(35, 20, 31, 27, 24, 29);
+  ctx.bezierCurveTo(17, 27, 13, 20, 13, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = 3.5;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(
+      24 + side * 12,
+      14,
+      5.5,
+      side < 0 ? Math.PI * 0.5 : -Math.PI * 0.5,
+      side < 0 ? Math.PI * 1.5 : Math.PI * 0.5,
+    );
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.roundRect(21.5, 28, 5, 8, 1);
+  ctx.roundRect(15, 35, 18, 6, 2);
+  ctx.fill();
+}
+
+function drawCheck(ctx: Ctx): void {
+  polyline(
+    ctx,
+    [
+      [11, 25],
+      [20, 34],
+      [37, 14],
+    ],
+    6,
+  );
+}
+
+function drawLock(ctx: Ctx): void {
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.arc(24, 21, 8, Math.PI, 0);
+  ctx.lineTo(32, 24);
+  ctx.moveTo(16, 24);
+  ctx.lineTo(16, 21);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.roundRect(12, 22, 24, 19, 4);
+  ctx.fill();
+  cut(ctx, () => circle(ctx, 24, 30, 2.6));
+}
+
+function drawStar(ctx: Ctx): void {
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 === 0 ? 19 : 8.5;
+    pts.push([24 + Math.cos(a) * r, 25 + Math.sin(a) * r]);
+  }
+  polygon(ctx, pts);
+  ctx.lineWidth = 3;
+  ctx.fill();
+  ctx.stroke();
+}
+
+/** Faceted pink gem with an ink outline (colored, not meant to be tinted). */
+function drawGem(ctx: Ctx): void {
+  ctx.lineJoin = 'round';
+  const facets: Array<[string, Array<[number, number]>]> = [
+    [
+      '#ffc2e3',
+      [
+        [16, 8],
+        [32, 8],
+        [28, 18],
+        [20, 18],
+      ],
+    ],
+    [
+      '#ff8cc8',
+      [
+        [8, 18],
+        [16, 8],
+        [20, 18],
+      ],
+    ],
+    [
+      '#e8388f',
+      [
+        [32, 8],
+        [40, 18],
+        [28, 18],
+      ],
+    ],
+    [
+      '#ff5fb0',
+      [
+        [8, 18],
+        [20, 18],
+        [24, 42],
+      ],
+    ],
+    [
+      '#d62a82',
+      [
+        [28, 18],
+        [40, 18],
+        [24, 42],
+      ],
+    ],
+    [
+      '#ff76c0',
+      [
+        [20, 18],
+        [28, 18],
+        [24, 42],
+      ],
+    ],
+  ];
+  for (const [color, pts] of facets) {
+    ctx.fillStyle = color;
+    polygon(ctx, pts).fill();
+  }
+  ctx.strokeStyle = CSS.ink;
+  ctx.lineWidth = 2.6;
+  polygon(ctx, [
+    [8, 18],
+    [16, 8],
+    [32, 8],
+    [40, 18],
+    [24, 42],
+  ]).stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(19, 12, 2, 0, TAU);
+  ctx.fill();
 }

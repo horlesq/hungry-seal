@@ -78,6 +78,14 @@ export class HudScene extends Phaser.Scene {
   private stick!: Phaser.GameObjects.Container;
   private stickKnob!: Phaser.GameObjects.Graphics;
   private stickActive = false;
+  /** "Mission complete" toasts, shown one after another. */
+  private toast!: Phaser.GameObjects.Container;
+  private toastBg!: Phaser.GameObjects.Graphics;
+  private toastText!: Phaser.GameObjects.Text;
+  private toastReward!: Phaser.GameObjects.Text;
+  private toastQueue: Array<{ text: string; coins: number; gems: number }> = [];
+  private toastBusy = false;
+  private toastY = 0;
   private boostRing!: Phaser.GameObjects.Graphics;
   private debugText!: Phaser.GameObjects.Text;
   private boost: BoostState = { active: false, stamina: 1 };
@@ -113,6 +121,7 @@ export class HudScene extends Phaser.Scene {
     this.createHintAndBanner();
     this.createBoostButton();
     this.createStick();
+    this.createToast();
     this.pauseButton = new Button(this, 0, 0, {
       width: 60,
       height: 60,
@@ -148,6 +157,7 @@ export class HudScene extends Phaser.Scene {
       EventBus.on('seal:boost', this.onBoost, this),
       EventBus.on('input:source', this.onInputSource, this),
       EventBus.on('input:stick', this.onStick, this),
+      EventBus.on('mission:complete', this.onMission, this),
       EventBus.on('debug:toggle', (on) => this.debugText.setVisible(on)),
       EventBus.on('debug:info', this.onDebugInfo, this),
     ]);
@@ -178,6 +188,8 @@ export class HudScene extends Phaser.Scene {
     this.hintText.setWordWrapWidth(Math.min(1100, v.viewWidth - 120), true);
     this.bannerBlurb.setWordWrapWidth(v.viewWidth - 80, true);
     this.bannerY = column + 150;
+    this.toastY = column + 262;
+    this.toast.setPosition(v.viewWidth / 2, this.toastY);
     this.bannerRoot.setPosition(v.viewWidth / 2, this.bannerY);
     this.debugText.setPosition(left, top + PANEL.h + 14);
     const b = boostButtonCenter(v.viewWidth, v.viewHeight, safe);
@@ -454,6 +466,10 @@ export class HudScene extends Phaser.Scene {
 
   private onRunOver(): void {
     this.lowHunger = false;
+    // The results screen lists completed missions; don't keep toasting over it.
+    this.toastQueue = [];
+    this.tweens.killTweensOf(this.toast);
+    this.tweens.add({ targets: this.toast, alpha: 0, duration: 300 });
     this.tweens.add({
       targets: [this.root, this.boostButton, this.stick, this.hintRoot, this.bannerRoot],
       alpha: 0,
@@ -492,6 +508,68 @@ export class HudScene extends Phaser.Scene {
     this.boost = state;
     this.boostButton.setScale(state.active ? 0.92 : 1);
     this.drawBoostRing();
+  }
+
+  private createToast(): void {
+    this.toastQueue = [];
+    this.toastBusy = false;
+    this.toastBg = this.add.graphics();
+    const check = this.add.image(0, 0, UiTextures.Check).setTint(COLORS.gold).setName('check');
+    check.setScale(28 / check.frame.width);
+    const label = uiText(this, 0, -14, 'Mission complete', 'caption', {
+      size: 14,
+      weight: 800,
+      color: CSS.gold,
+    })
+      .setOrigin(0, 0.5)
+      .setName('label');
+    this.toastText = uiText(this, 0, 10, '', 'body', { size: 20, weight: 800 }).setOrigin(0, 0.5);
+    this.toastReward = uiText(this, 0, 0, '', 'heading', { size: 22, color: CSS.gold }).setOrigin(
+      1,
+      0.5,
+    );
+    this.toast = this.add
+      .container(0, 0, [this.toastBg, check, label, this.toastText, this.toastReward])
+      .setAlpha(0);
+  }
+
+  private onMission(info: { text: string; coins: number; gems: number }): void {
+    this.toastQueue.push(info);
+    if (!this.toastBusy) this.nextToast();
+  }
+
+  private nextToast(): void {
+    const info = this.toastQueue.shift();
+    if (!info) {
+      this.toastBusy = false;
+      return;
+    }
+    this.toastBusy = true;
+    this.toastText.setText(info.text);
+    this.toastReward.setText(
+      `+${formatNumber(info.coins)} coins${info.gems ? `  +${info.gems} gem${info.gems > 1 ? 's' : ''}` : ''}`,
+    );
+    const label = this.toast.getByName('label') as Phaser.GameObjects.Text;
+    const textW = Math.max(label.width, this.toastText.width);
+    const w = 20 + 30 + 14 + textW + 28 + this.toastReward.width + 22;
+    const h = 66;
+    this.toastBg.clear();
+    drawPanel(this.toastBg, -w / 2, -h / 2, w, h, { radius: 22, alpha: 0.9, line: 0 });
+    this.toastBg.lineStyle(2, COLORS.gold, 0.8).strokeRoundedRect(-w / 2, -h / 2, w, h, 22);
+    const left = -w / 2 + 20;
+    (this.toast.getByName('check') as Phaser.GameObjects.Image).setX(left + 15);
+    label.setX(left + 44);
+    this.toastText.setX(left + 44);
+    this.toastReward.setX(w / 2 - 22);
+    this.toast.setAlpha(0).setY(this.toastY - 14);
+    this.tweens.chain({
+      targets: this.toast,
+      tweens: [
+        { alpha: 1, y: this.toastY, duration: 260, ease: 'Back.Out' },
+        { alpha: 0, delay: 2400, duration: 320 },
+      ],
+      onComplete: () => this.nextToast(),
+    });
   }
 
   private createStick(): void {

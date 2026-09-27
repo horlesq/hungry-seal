@@ -8,10 +8,18 @@ import {
   migrateSave,
   purchase,
   purchaseSkin,
-  recordRun,
-  type RunRecord,
+  settleRun,
+  type RunSettlement,
   type SaveData,
 } from './saveData';
+import type { RunStats } from '../systems/progress';
+
+/** Today as YYYY-MM-DD in the player's time zone (for the top-runs list). */
+function localDate(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 const STORAGE_KEY = 'hungry-seal-save';
 
@@ -36,9 +44,9 @@ export class SaveService {
     return this.current;
   }
 
-  /** Banks a finished run and persists it. */
-  recordRun(run: RunRecord): { data: SaveData; newBest: boolean } {
-    const result = recordRun(this.current, run);
+  /** Banks a finished run (coins, gems, stats, missions, achievements) and persists it. */
+  recordRun(run: RunStats): RunSettlement {
+    const result = settleRun(this.current, run, { random: Math.random, date: localDate() });
     this.current = result.data;
     this.persist();
     return result;

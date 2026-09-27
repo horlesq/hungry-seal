@@ -5,6 +5,7 @@ import { TextureKeys } from '../config/assets';
 import { textureScale } from '../services/Viewport';
 import type { Viewport } from '../utils/viewport';
 import { COLORS, CSS, drawPanel, formatNumber, reducedMotion, uiText } from './theme';
+import { UiTextures } from './uiTextures';
 
 export interface Backdrop {
   top: number;
@@ -50,26 +51,35 @@ export function addBackdrop(scene: Phaser.Scene, v: Viewport, b: Backdrop): void
   bubbles.fastForward(9000);
 }
 
-/** Coin balance chip anchored by its right edge. */
-export class CoinPill extends Phaser.GameObjects.Container {
+/** Coin or gem balance chip anchored by its right edge. */
+export class CurrencyPill extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Graphics;
   private readonly icon: Phaser.GameObjects.Image;
   private readonly text: Phaser.GameObjects.Text;
 
-  constructor(scene: Phaser.Scene, right: number, y: number, coins: number) {
+  constructor(
+    scene: Phaser.Scene,
+    right: number,
+    y: number,
+    value: number,
+    currency: 'coins' | 'gems' = 'coins',
+  ) {
     super(scene, right, y);
     this.bg = scene.add.graphics();
-    this.icon = scene.add
-      .image(0, 0, TextureKeys.Coin)
-      .setScale(1.05 * textureScale(scene, TextureKeys.Coin));
-    this.text = uiText(scene, 0, 1, '', 'heading', { size: 28, color: CSS.gold }).setOrigin(1, 0.5);
+    const key = currency === 'coins' ? TextureKeys.Coin : UiTextures.Gem;
+    this.icon = scene.add.image(0, 0, key);
+    this.icon.setScale(32 / this.icon.frame.width);
+    this.text = uiText(scene, 0, 1, '', 'heading', {
+      size: 28,
+      color: currency === 'coins' ? CSS.gold : CSS.gem,
+    }).setOrigin(1, 0.5);
     this.add([this.bg, this.icon, this.text]);
     scene.add.existing(this);
-    this.setCoins(coins);
+    this.setValue(value);
   }
 
-  setCoins(coins: number): this {
-    this.text.setText(formatNumber(coins));
+  setValue(value: number): this {
+    this.text.setText(formatNumber(value));
     const h = 52;
     const w = 16 + 32 + 10 + this.text.width + 20;
     this.bg.clear();
@@ -77,6 +87,11 @@ export class CoinPill extends Phaser.GameObjects.Container {
     this.icon.setPosition(-w + 16 + 16, 0);
     this.text.setX(-20);
     return this;
+  }
+
+  /** Width of the pill (for placing things to its left). */
+  get pillWidth(): number {
+    return 16 + 32 + 10 + this.text.width + 20;
   }
 }
 

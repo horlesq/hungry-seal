@@ -48,6 +48,8 @@ export const CSS = {
   gold: '#ffc83d',
   coral: '#ff4f6d',
   kelp: '#5fdc84',
+  /** Gems (the rare currency). */
+  gem: '#ff8ad0',
 } as const;
 
 /** Upgrade icon wells: one hue per upgrade so the shop scans at a glance. */

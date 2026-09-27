@@ -109,11 +109,12 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 
 ## Phase 6 — Meta progression and retention
 - [x] Skins (cosmetic): 7 seal species from one parameterized painter (`systems/sealArt.ts`), Skins screen with preview, buy with coins, equip; save v3
-- [ ] Missions (3 rotating goals) with coin rewards
-- [ ] Gems (rare currency) for premium skins
-- [ ] Stats page (total eaten, best distance, etc.), achievements (light)
-- [ ] Local top-5 leaderboard
-- [ ] Save versioning/migration tested
+- [x] Missions: 3 rotating goals from a pool of 22 (run and total scope), title-screen panel, mid-run toast, paid at run end (coins, some gems)
+- [x] Gems (rare currency): chests (30%), harder missions, achievements; two premium gem skins (Pirate Seal, Golden Seal)
+- [x] Stats page (top runs, lifetime totals, favorite snack...) and 12 achievements with gem rewards
+- [x] Local top-5 leaderboard (on the Stats page; results show a new entry's rank)
+- [x] Save v4 with migration from v1-v3 and corrupt-data cleanup, unit tested; playtest progress section
+**Exit:** reasons to come back between runs: missions to finish, gems to save for, records to beat.
 
 ## Phase 7 — Balance and systems hardening
 - [ ] Tune hunger drain, spawn rates, prey values, predator damage, upgrade costs with playtest data

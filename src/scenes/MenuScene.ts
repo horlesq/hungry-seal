@@ -17,9 +17,10 @@ import {
 import { anyAffordable } from '../systems/UpgradeSystem';
 import { Button } from '../ui/Button';
 import { FocusNav } from '../ui/FocusNav';
+import { MissionPanel } from '../ui/missions';
 import { CSS, EDGE, formatNumber, reducedMotion, uiText } from '../ui/theme';
 import { UiTextures, type WordmarkData } from '../ui/uiTextures';
-import { addBackdrop, BACKDROPS, CoinPill } from '../ui/widgets';
+import { addBackdrop, BACKDROPS, CurrencyPill } from '../ui/widgets';
 import { damp } from '../utils/math';
 import { DESIGN_HEIGHT, type Insets, type Viewport } from '../utils/viewport';
 
@@ -29,6 +30,8 @@ interface MenuLayout {
   /** Wordmark's top-left (the floe's left edge). */
   mark: { x: number; y: number };
   seal: { x: number; y: number; scale: number };
+  /** Missions panel top-left and width. */
+  missions: { x: number; y: number; width: number };
   /** Centre x of Play / Upgrades, and Play's y (Upgrades sits 100 below). */
   buttonsX: number;
   playY: number;
@@ -163,7 +166,28 @@ export class MenuScene extends Phaser.Scene {
       pillRight -= 60 + 16;
       this.input.keyboard!.on('keydown-F', () => full.press());
     }
-    new CoinPill(this, pillRight, barY - 3, save.coins).setName('coins');
+    const stats = new Button(this, pillRight - 30, barY, {
+      width: 60,
+      height: 60,
+      round: true,
+      icon: UiTextures.Trophy,
+      variant: 'quiet',
+      onClick: () => this.leave(SceneKeys.Stats),
+    }).setName('stats');
+    buttons.push(stats);
+    pillRight -= 60 + 16;
+    const coins = new CurrencyPill(this, pillRight, barY - 3, save.coins).setName('coins');
+    new CurrencyPill(this, pillRight - coins.pillWidth - 12, barY - 3, save.gems, 'gems').setName(
+      'gems',
+    );
+
+    new MissionPanel(
+      this,
+      L.missions.x,
+      L.missions.y,
+      L.missions.width,
+      save.missions.active,
+    ).setName('missions');
 
     new FocusNav(this).add(...buttons);
     const kb = this.input.keyboard!;
@@ -176,14 +200,20 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  /** Desktop and landscape: wordmark and buttons in a left column, the seal on the right. */
+  /**
+   * Desktop and landscape: wordmark and buttons in a left column; on the right the seal with
+   * the missions under it.
+   */
   private wideLayout(v: Viewport, safe: Insets): MenuLayout {
     // Content is authored for a 720-tall column, centered in taller views.
     const top = (v.viewHeight - DESIGN_HEIGHT) / 2;
     const left = safe.left + Math.max(EDGE * 2, Math.min(110, v.viewWidth * 0.07));
+    const panelW = 470;
+    const panelX = v.viewWidth - safe.right - EDGE - panelW;
     return {
       mark: { x: left, y: top + 34 },
-      seal: { x: left + (v.viewWidth - left) * 0.64, y: top + 330, scale: 2.1 },
+      seal: { x: panelX + panelW / 2, y: top + 250, scale: 1.9 },
+      missions: { x: panelX, y: top + 392, width: panelW },
       buttonsX: left + 170,
       playY: top + 446,
       textX: left + 4,
@@ -199,13 +229,14 @@ export class MenuScene extends Phaser.Scene {
       1 / (this.textures.get(UiTextures.WordmarkBitten).customData as WordmarkData).resolution;
     const markW = frame.width * scale;
     const markH = frame.height * scale;
-    // Title, seal and buttons take ~1050 units: centre them below the top-right buttons.
-    const top = Math.max(safe.top + 120, (v.viewHeight - 1050) / 2);
+    // Title, seal, buttons and missions take ~1290 units: centre them below the top bar.
+    const top = Math.max(safe.top + 110, (v.viewHeight - 1290) / 2);
     const sealY = top + markH + 130;
     return {
       // createWordmark() offsets by the texture margin (8); cancel it to centre the texture.
       mark: { x: cx - markW / 2 + 8, y: top },
       seal: { x: cx, y: sealY, scale: 1.7 },
+      missions: { x: cx - 300, y: sealY + 190 + 214, width: 600 },
       buttonsX: cx,
       playY: sealY + 190,
       textX: cx,
@@ -294,7 +325,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private leave(
-    target: typeof SceneKeys.Game | typeof SceneKeys.Shop | typeof SceneKeys.Skins,
+    target:
+      | typeof SceneKeys.Game
+      | typeof SceneKeys.Shop
+      | typeof SceneKeys.Skins
+      | typeof SceneKeys.Stats,
   ): void {
     if (this.leaving) return;
     this.leaving = true;

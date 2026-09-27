@@ -1,17 +1,29 @@
-// Seal skins: cosmetic only (same stats), bought with coins on the Skins screen. The first
-// one is free and owned from the start. Art: one texture per skin (see systems/sealArt.ts).
+// Seal skins: cosmetic only (same stats), bought on the Skins screen with coins or, for the
+// premium ones, gems. The first is free and owned from the start. Art: one texture per skin
+// (see systems/sealArt.ts).
 import { TextureKeys, type TextureKey } from './assets';
 
 export type SkinId =
-  'harbor' | 'arctic' | 'sealion' | 'tropical' | 'leopard' | 'walrus' | 'elephant';
+  | 'harbor'
+  | 'arctic'
+  | 'sealion'
+  | 'tropical'
+  | 'leopard'
+  | 'walrus'
+  | 'elephant'
+  | 'pirate'
+  | 'golden';
+
+export type Currency = 'coins' | 'gems';
 
 export interface SkinDef {
   id: SkinId;
   name: string;
   description: string;
   texture: TextureKey;
-  /** Coin price (0 = free, owned from the start). */
+  /** Price in `currency` (0 = free, owned from the start). */
   price: number;
+  currency: Currency;
 }
 
 export const SKINS: readonly SkinDef[] = [
@@ -21,6 +33,7 @@ export const SKINS: readonly SkinDef[] = [
     description: 'The classic spotted grey seal',
     texture: TextureKeys.Seal,
     price: 0,
+    currency: 'coins',
   },
   {
     id: 'arctic',
@@ -28,6 +41,7 @@ export const SKINS: readonly SkinDef[] = [
     description: 'A fluffy white harp seal pup',
     texture: TextureKeys.SealArctic,
     price: 300,
+    currency: 'coins',
   },
   {
     id: 'sealion',
@@ -35,6 +49,7 @@ export const SKINS: readonly SkinDef[] = [
     description: 'Ear flaps and long front flippers',
     texture: TextureKeys.SealSeaLion,
     price: 450,
+    currency: 'coins',
   },
   {
     id: 'tropical',
@@ -42,6 +57,7 @@ export const SKINS: readonly SkinDef[] = [
     description: 'A Hawaiian monk seal, flower lei included',
     texture: TextureKeys.SealTropical,
     price: 600,
+    currency: 'coins',
   },
   {
     id: 'leopard',
@@ -49,6 +65,7 @@ export const SKINS: readonly SkinDef[] = [
     description: 'Spotted coat and a big toothy grin',
     texture: TextureKeys.SealLeopard,
     price: 800,
+    currency: 'coins',
   },
   {
     id: 'walrus',
@@ -56,6 +73,7 @@ export const SKINS: readonly SkinDef[] = [
     description: 'Tusks, whiskers and a lot of blubber',
     texture: TextureKeys.SealWalrus,
     price: 1000,
+    currency: 'coins',
   },
   {
     id: 'elephant',
@@ -63,6 +81,23 @@ export const SKINS: readonly SkinDef[] = [
     description: 'The one with the famous nose',
     texture: TextureKeys.SealElephant,
     price: 1500,
+    currency: 'coins',
+  },
+  {
+    id: 'pirate',
+    name: 'Pirate Seal',
+    description: 'Bandana, eyepatch, no manners',
+    texture: TextureKeys.SealPirate,
+    price: 12,
+    currency: 'gems',
+  },
+  {
+    id: 'golden',
+    name: 'Golden Seal',
+    description: 'Shines even in the abyss',
+    texture: TextureKeys.SealGolden,
+    price: 20,
+    currency: 'gems',
   },
 ];
 

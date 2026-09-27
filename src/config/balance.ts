@@ -214,6 +214,8 @@ export const PICKUPS = {
   chestNearFloor: 900,
   chestCoins: [12, 18],
   chestScore: 150,
+  /** Chance a chest also holds a gem (the rare currency). */
+  chestGemChance: 0.3,
   chestRadius: 30,
   /** Magnet orbs float in the water now and then; collect for a big coin magnet. */
   magnetInterval: 35,
