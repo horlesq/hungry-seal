@@ -89,10 +89,10 @@ Goal: enough variety for a full game.
 - [x] All 7 upgrades (+ Big Jaws growth, Coin Whiskers magnet, Feeding Frenzy charge); two-row shop
 - [x] Treasure chests on the seabed (coin burst + 150) and floating magnet orbs (12 s long-range coin magnet); frenzy remains the power-up
 - [x] Predator variety via per-predator spawn rules (schedule or home zones) and AI params (shark chaser, orca late hunter, anglerfish ambusher)
+- [x] Balance pass: pufferfish puff for 2 s then need 2.5 s to recover (a window to eat one safely); spawner guarantees food near the view (SPAWN.minFood); hunger 2.1/s ramping +100% over 360 s. The balance bot's aim was broken by the Phase 5 camera zoom (it aimed off target from size 2, which made Phase 5 look far harder than it is); fixed. Human bot after the fix: 2:26, 2:53, 4:10, 4:40 (Phase 4 code with the same bot: 1:01-4:45, median ~3:30). Take more samples when tuning next.
 **Exit:** a run has real progression and variety from start to abyss.
 
 Notes carried forward:
-- Balance: with the Phase 5 content, first runs got shorter. Human bot (4 x 300 s): 2:34, 1:11, 1:34, 1:05, all starved, with pufferfish/jellyfish hits (Phase 4 reference: 2:53-3:22). Tune before merging Phase 5.
 - Reef floor (crabs in the shallows, reef decoration) still missing: the only seabed is at the abyss.
 - `spawnAt` things far from the camera are recycled by the despawn check on the next frame (by design); scripted events must spawn near the view.
 

@@ -8,8 +8,8 @@
 // The human bot plays like a player who follows the hints: flees hunting predators upward
 // (to leap out) and steers around puffed-up pufferfish.
 //
-// Reference (Phase 3 tuning, hazards + sharks): human survives 1:06-4:49 (median ~2:20),
-// reaching stage 2-4. Results vary a lot: take several samples.
+// Reference (Phase 5 tuning): human survives 2:26-4:40, reaching stage 3-4 (Phase 4 code
+// with this bot: 1:01-4:45, median ~3:30). Results vary a lot: take several samples.
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 

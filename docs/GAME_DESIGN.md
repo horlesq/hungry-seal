@@ -28,7 +28,7 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 
 ### Hunger (health)
 - Single bar (max 100). Drains continuously; rate rises with time in the run and with depth zone.
-  - Current tuning: 2.3/s at the start (full bar lasts ~43 s without food), +100% after 270 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6.
+  - Current tuning: 2.1/s at the start (full bar lasts ~48 s without food), +100% after 360 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6.
 - Eating restores hunger by the prey's nutrition value.
 - Hazards and predators deal damage to the same bar. Zero = run ends.
 - Starvation warning: bar flashes and a red screen vignette pulses below 25%.
@@ -62,7 +62,7 @@ Appear from 25 s into a run: 2 allowed at first, +2 per minute, max 7 (`DANGER` 
 |---|---|---|
 | Jellyfish ✅ | Drifts slowly, bobs and pulses; reef/ocean/deep | 12 damage, 0.7 s stun, knockback |
 | Sea mine ✅ | Sways on its chain, blinks; ocean/deep/abyss | 30 damage, explodes (gone), big knockback |
-| Pufferfish | Inflates near seal | Damage if eaten too early |
+| Pufferfish ✅ | Puffs up near the seal for 2 s, then needs 2.5 s to recover | Eating it puffed stings (see prey table) |
 | Fishing net / hook (later) | Hangs from surface | Slows/traps |
 | Toxic waste / oil (later) | Zone | Drains hunger fast |
 
@@ -85,7 +85,7 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 | 3 | Squid ✅ | Ocean/Deep | 16 | 60 | cruises slowly, escapes in jet bursts (420 px/s kicks) |
 | 3 | Penguin ✅ | Upper reef (near surface) | 20 | 90 | groups of 2-3, fast (390 px/s flee) |
 | 4 | Sea turtle ✅ | Reef/Ocean | 32 | 120 | slow, doesn't flee: a big safe meal once you're size 4 |
-| 2 | Pufferfish ✅ | Reef/Ocean | 14 | 40 | doesn't flee; puffs into a spiky ball near you (bigger hitbox). Eating it puffed stings: 14 damage + knockback |
+| 2 | Pufferfish ✅ | Reef/Ocean | 14 | 40 | doesn't flee; puffs into a spiky ball near you for 2 s (bigger hitbox), then has to catch its breath for 2.5 s: eat it then. Eating it puffed stings: 14 damage + knockback |
 | 1 | Lanternfish ✅ | Deep/Abyss | 7 | 15 | glowing schools of 4-7; food for small seals in the dark |
 | 2 | Crab ✅ | Abyss seabed | 16 | 45 | walks along the floor, scuttles sideways away from you |
 | 2 | Crab | Reef floor | 10 | 25 | walks, snaps |
