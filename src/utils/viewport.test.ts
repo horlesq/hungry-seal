@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeViewport, DESIGN_HEIGHT, DESIGN_WIDTH, textResolution } from './viewport';
+import {
+  computeViewport,
+  cssInsetsToDesign,
+  DESIGN_HEIGHT,
+  DESIGN_WIDTH,
+  textResolution,
+} from './viewport';
 
 describe('viewport', () => {
   it('renders at device pixels and fits the design area on a 16:9 screen', () => {
@@ -37,6 +43,16 @@ describe('viewport', () => {
   it('falls back to 1 for invalid pixel ratios', () => {
     expect(computeViewport(1280, 720, NaN).dpr).toBe(1);
     expect(computeViewport(1280, 720, 0).dpr).toBe(1);
+  });
+
+  it('converts notch safe-area insets from CSS pixels to design units', () => {
+    // Landscape phone: 915x412 CSS at 2x, notch on the left.
+    const v = computeViewport(915, 412, 2);
+    const inset = cssInsetsToDesign({ top: 0, right: 0, bottom: 21, left: 47 }, v);
+    // 47 CSS px = 94 device px = 94 / zoom design units.
+    expect(inset.left).toBeCloseTo(94 / v.zoom);
+    expect(inset.bottom).toBeCloseTo(42 / v.zoom);
+    expect(inset.top).toBe(0);
   });
 
   it('rasterizes text at the zoom level (in half steps)', () => {

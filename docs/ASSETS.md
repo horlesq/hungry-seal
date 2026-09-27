@@ -12,6 +12,10 @@ Close to Hungry Shark Evolution: bright saturated colors, chunky rounded shapes,
 - **Generated:** AI-generated sprites for seal and signature creatures. Requires cleanup: transparent background, consistent scale/style, separated parts if animating.
 - **Audio:** Kenney audio, freesound.org (CC0/CC-BY), generated music. Keep attribution list.
 - Record every external asset in `public/assets/CREDITS.md` (source, author, license, URL).
+- **Font:** Baloo 2 by Ek Type (SIL Open Font License 1.1), npm `@fontsource-variable/baloo-2`, bundled by Vite (no Google Fonts request).
+
+## UI graphics
+Interface art (wordmark, icons, upgrade symbols, crumbs) is painted in code in `src/ui/uiTextures.ts` and is part of the UI design, not a placeholder. Icons are white so they can be tinted. Replacing them with drawn art later means adding manifest entries under the same keys and skipping the painter when the texture exists.
 
 ## Technical rules
 - Everything loaded via the manifest in `src/config/assets.ts` (key -> path -> type). Code uses keys only.

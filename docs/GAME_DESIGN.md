@@ -19,6 +19,7 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 - **Touch:** hold/drag anywhere to swim toward the finger; release to glide to a stop. A touch that *starts* on the bottom-right BOOST button boosts (works with a second finger while steering).
 - **Keyboard:** WASD/arrows to steer. Space/Shift = boost.
 - The most recently used device wins, so a resting mouse doesn't fight the keyboard.
+- **Pause:** Esc or P, or the pause button (top-right). The run also pauses by itself when the tab or window loses focus. Pause menu: Resume, Restart run, Quit to menu, sound.
 - Movement feel: smooth acceleration, turn rate limited (sharper when slow, wider arcs at speed), body rotates to heading, belly-roll flip when changing facing, levels out when idle.
 - Leaping: swimming up slowly rides along the surface; upward speed above ~210 px/s breaches and keeps momentum; gravity applies only in air (slight air control); splashing back in keeps ~72% speed.
 - Boost: stamina bar (drains ~2.4 s from full, regenerates after a short delay), ~1.75x top speed, bigger leaps. Water only.
@@ -49,7 +50,7 @@ You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fi
 
 ### Damage (done)
 - Hazards and predator bites take a chunk of hunger, knock the seal back (it keeps facing the same way), may stun it (no steering), and give 1.2 s of invulnerability (seal blinks). Screen shake, brief hit-stop, red vignette flash, "-N" popup.
-- Death cause = the last hit if hunger hit zero within 0.6 s of it, otherwise "starved". Results screen title per cause: STARVED! / CHOMPED! / KABOOM! / STUNG!
+- Death cause = the last hit if hunger hit zero within 0.6 s of it, otherwise "starved". Results screen title per cause: Starved! / Chomped! / Kaboom! / Stung! / Crunched! / Lured! / Spiked!
 
 ### Boost
 - Limited stamina bar, regenerates when not boosting. Gives a speed burst; ideal for chasing prey and escaping.
@@ -120,8 +121,16 @@ All sounds are synthesized in code at startup (`src/audio/`): chomp / big chomp,
 ## Onboarding (done)
 First run only (until the first run ends): bottom-centre hints — how to swim (mouse/keys or touch), eat smaller fish + hunger drains, boost + leap for birds, jellyfish/mine warning at 24 s, "you grew", and "SHARK!" when one first hunts you. Zone banners (every run) name each depth zone as you enter it.
 
+## Interface (done)
+- Look: deep-water ink panels, sea-foam text, gold for coins, buoy orange for the main action. Chunky buttons that sink when pressed. One rounded typeface (Baloo 2).
+- **Title:** "Hungry Seal" on an ice floe that gets a bite taken out of it (first visit per session). Play, Upgrades (gold dot when you can afford something), best score, coin balance, sound and fullscreen buttons. The seal floats on the right and turns to look at the mouse.
+- **Upgrades:** two columns, one row per upgrade: icon, name, what it does, level segments, current effect, and a gold buy button with the price and the next level's effect ("Need 40 more" when you can't afford it).
+- **HUD:** top-left panel with hunger (fish icon), size progress (4 segments to max size), boost stamina and frenzy charge; top-right score, coins, coin-magnet timer, pause button. Combo top-centre. Everything stays inside phone notches (safe area).
+- **Results:** cause of death as the title, score counting up, "New best!" badge, six stats (coins earned, time, size, distance, deepest, fish eaten), then Swim again / Upgrades / Menu.
+- Keyboard works everywhere: arrows or Tab to move, Enter or Space to press (focus ring appears once you use the keyboard). Reduced-motion settings skip intros and count-ups.
+
 ## Run structure
-1. Menu -> Play (or Shop). Keys: Enter/Space play, S shop, M mute. Results: Swim again / Shop / Menu.
+1. Menu -> Play (or Upgrades). Keys: arrows/Tab + Enter, S upgrades, M mute, F fullscreen. Results: Swim again / Upgrades / Menu (S, Esc).
 2. Start near surface. Hunger full, stage 1.
 3. Endless run; difficulty ramps with time.
 4. Death -> results (score, coins, distance, best) -> Shop / Retry.

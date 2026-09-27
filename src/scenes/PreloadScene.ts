@@ -3,10 +3,12 @@
 import Phaser from 'phaser';
 import { ASSET_MANIFEST } from '../config/assets';
 import { SceneKeys } from '../config/keys';
-import { UI_FONT } from '../config/layout';
 import { audio } from '../services/AudioManager';
-import { fitUiCamera, uiTextResolution } from '../services/Viewport';
+import { fitUiCamera } from '../services/Viewport';
 import { ensurePlaceholderTextures } from '../systems/PlaceholderArt';
+import { COLORS, uiText } from '../ui/theme';
+import { ensureUiTextures } from '../ui/uiTextures';
+import { drawBar } from '../ui/widgets';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -48,34 +50,25 @@ export class PreloadScene extends Phaser.Scene {
     if (import.meta.env.DEV && generated.length > 0) {
       console.info(`[assets] placeholders generated: ${generated.join(', ')}`);
     }
+    ensureUiTextures(this);
     audio.register(this.game);
     this.scene.start(SceneKeys.Menu);
   }
 
   private createProgressBar(): void {
     const v = fitUiCamera(this);
-    const w = 420;
-    const h = 22;
+    const w = 360;
+    const h = 14;
     const x = (v.viewWidth - w) / 2;
     const y = v.viewHeight / 2;
 
-    this.add
-      .text(v.viewWidth / 2, y - 40, 'Loading...', {
-        fontFamily: UI_FONT,
-        fontSize: '26px',
-        color: '#e8fbff',
-        resolution: uiTextResolution(),
-      })
-      .setOrigin(0.5);
-    const frame = this.add.graphics();
-    frame.lineStyle(3, 0xe8fbff, 1).strokeRoundedRect(x - 4, y - 4, w + 8, h + 8, 8);
+    uiText(this, v.viewWidth / 2, y - 34, 'Hungry Seal', 'heading', { size: 32 }).setOrigin(0.5);
     const bar = this.add.graphics();
-
-    this.load.on(Phaser.Loader.Events.PROGRESS, (value: number) => {
-      bar
-        .clear()
-        .fillStyle(0x6ff3ff, 1)
-        .fillRoundedRect(x, y, Math.max(h, w * value), h, 6);
-    });
+    const draw = (value: number) => {
+      bar.clear();
+      drawBar(bar, x, y, w, h, value, COLORS.glacier);
+    };
+    draw(0);
+    this.load.on(Phaser.Loader.Events.PROGRESS, draw);
   }
 }

@@ -1,18 +1,53 @@
 // Current viewport + Phaser glue: measuring the window, resizing the game canvas, and fitting
 // scene cameras. Scenes lay out in design units using `getViewport().viewWidth/viewHeight`.
 import Phaser from 'phaser';
-import { computeViewport, textResolution, type Viewport } from '../utils/viewport';
+import {
+  computeViewport,
+  cssInsetsToDesign,
+  NO_INSETS,
+  textResolution,
+  type Insets,
+  type Viewport,
+} from '../utils/viewport';
 
 let current: Viewport = computeViewport(1280, 720, 1);
+let safe: Insets = NO_INSETS;
 
 export function getViewport(): Viewport {
   return current;
 }
 
+/** Device safe-area insets (notches, rounded corners, home bar) in design units. */
+export function getSafeInsets(): Insets {
+  return safe;
+}
+
 /** Reads the window size and pixel ratio and makes that the current viewport. */
 export function measureViewport(): Viewport {
   current = computeViewport(window.innerWidth, window.innerHeight, window.devicePixelRatio);
+  safe = cssInsetsToDesign(readSafeAreaCss(), current);
   return current;
+}
+
+/** CSS env(safe-area-inset-*) values, read through a hidden probe element. */
+function readSafeAreaCss(): Insets {
+  if (!document.body) return NO_INSETS;
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    'position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top) env(safe-area-inset-right) ' +
+    'env(safe-area-inset-bottom) env(safe-area-inset-left);';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const px = (v: string) => parseFloat(v) || 0;
+  const insets = {
+    top: px(cs.paddingTop),
+    right: px(cs.paddingRight),
+    bottom: px(cs.paddingBottom),
+    left: px(cs.paddingLeft),
+  };
+  probe.remove();
+  return insets;
 }
 
 /** Resizes the canvas to the current window (backing = device pixels, CSS = window size). */

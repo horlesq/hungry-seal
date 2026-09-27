@@ -21,10 +21,11 @@ hungry-seal/
     playtest.mjs        headless browser smoke playtest (npm run playtest)
     balance-bot.mjs     bot plays a run and logs hunger/score/stage (npm run balance)
   src/
-    main.ts             Phaser.Game bootstrap, window resize -> applyViewport; window.__PHASER_GAME__ in dev
+    main.ts             loads the UI font, then Phaser.Game bootstrap, window resize -> applyViewport;
+                        window.__PHASER_GAME__ in dev
     config/
       game.ts           Phaser config, scale, physics
-      layout.ts         edge-anchored touch UI layout (boostButtonCenter), UI font
+      layout.ts         edge-anchored touch UI (boostButtonCenter, pauseButtonCenter, safe-area aware), UI font
       keys.ts           scene keys, registry keys
       balance.ts        movement, camera, input, hunger, growth, feeding, spawn, effects tuning
       zones.ts          WORLD bounds (surface, floor), depth zones + colors, zoneBand()
@@ -36,14 +37,21 @@ hungry-seal/
       upgrades.ts       upgrade definitions (name, costs, effect text) and per-level effects
     scenes/
       BootScene.ts      reads ?debug, starts Preload
-      PreloadScene.ts   load manifest, progress bar, generate missing placeholders
-      MenuScene.ts      title screen (placeholder until Phase 4)
-      GameScene.ts      the run
-      HudScene.ts       overlay UI running parallel to GameScene
-      GameOverScene.ts  results overlay launched over the still-running GameScene (buttons)
-      ShopScene.ts      upgrade cards, buy with banked coins, Back / Play
+      PreloadScene.ts   load manifest, progress bar, generate missing placeholders + UI textures
+      MenuScene.ts      title: bitten wordmark intro, Play / Upgrades, coins, sound + fullscreen, seal watching the pointer
+      GameScene.ts      the run (pauses itself on Esc / P / HUD button / tab or window blur)
+      HudScene.ts       overlay UI running parallel to GameScene (status panel, score, pause button)
+      GameOverScene.ts  results overlay launched over the still-running GameScene (score count-up, stats)
+      ShopScene.ts      "Upgrades": two columns of upgrade rows, gold buy buttons, Back / Play
+      PauseScene.ts     pause overlay: Resume / Restart run / Quit to menu, sound toggle
     ui/
-      Button.ts         reusable rounded button (Zone hit area, hover/press/disabled, click sound)
+      theme.ts          design tokens: palette (COLORS/CSS), type scale + uiText(), drawPanel, EDGE,
+                        reducedMotion(), formatNumber()
+      Button.ts         chunky pressable button: variants primary/gold/secondary/quiet, round icon
+                        buttons, icon + label + caption, badge, keyboard focus ring
+      FocusNav.ts       keyboard navigation (arrows spatial, Tab cycle, Enter/Space press)
+      uiTextures.ts     Canvas 2D UI textures: ice-floe wordmark (+ bitten), icons, upgrade symbols
+      widgets.ts        ocean backdrop, CoinPill, drawSegments, drawBar
     audio/
       synth.ts          PURE offline synth: effects + seamless stereo music loop (+ tests)
       sounds.ts         SoundKeys + tone recipes for every effect
@@ -83,7 +91,8 @@ hungry-seal/
       AudioManager.ts      registers synthesized sounds as AudioBuffers, rate-limited play,
                            music loop, mute (save is the source of truth)
       SaveService.ts       localStorage wrapper (guarded; in-memory fallback), `saves` singleton
-      Viewport.ts          current viewport, canvas resize, fitUiCamera/fitWorldCamera, sharpenTexts, textureScale
+      Viewport.ts          current viewport, safe-area insets, canvas resize, fitUiCamera/fitWorldCamera,
+                           sharpenTexts, textureScale
     utils/
       math.ts           clamp, lerp, angle helpers, frame-rate independent damp (+ tests)
       rng.ts            seeded mulberry32 RNG (+ tests)
@@ -96,13 +105,22 @@ hungry-seal/
 ```
 
 ## Scenes
-- **Boot -> Preload -> Menu <-> Shop -> Game (+Hud in parallel) -> GameOver overlay -> Game (retry) / Shop / Menu**
+- **Boot -> Preload -> Menu <-> Shop -> Game (+Hud in parallel) -> GameOver overlay -> Game (retry) / Shop / Menu**; Game <-> Pause overlay -> resume / restart / Menu.
 - Upgrades are read once at run start (`runModifiers(saves.data.upgrades)`) and passed to the Seal (speed, boost) and HungerSystem (max, drain).
 - Audio: `audio.register(game)` in Preload renders every sound into Phaser's audio cache (Web Audio only; silent otherwise). `audio.play(key)` rate-limits per key. Phaser's `sound.mute` can't be read reliably before the first user gesture unlocks audio, so the save's `settings.muted` is the source of truth.
-- GameScene owns world simulation; HudScene subscribes to events (`run:hunger` every frame; `run:score`, `run:growth` on change and on the first frame; `run:over`; `seal:boost`; debug) via EventBus and never reads game objects directly. GameScene launches Hud on create and stops Hud + GameOver on shutdown. ESC returns to the menu (until a pause menu exists).
+- GameScene owns world simulation; HudScene subscribes to events (`run:hunger` every frame; `run:score`, `run:growth` on change and on the first frame; `run:over`; `seal:boost`; debug) via EventBus and never reads game objects directly. GameScene launches Hud on create and stops Hud + GameOver + Pause on shutdown.
+- Pause: Esc / P, the HUD pause button (`ui:pause` event) and game BLUR/HIDDEN call `GameScene.pauseRun()`, which pauses Game + Hud and launches PauseScene. Scene pause/resume are queued by Phaser (they apply on the next update). Paused scenes get no input, so GameScene calls `keyboard.resetKeys()` on RESUME (no stuck keys). Taps on the pause button don't steer (InputController.isOnPauseButton).
 - Game over: GameScene marks itself dead, plays the death tween, then launches GameOverScene on top while the world keeps animating. Retry = `scene.start(Game)` from the overlay (restarts the running GameScene). Scene order in `main.ts` sets draw order (GameOver above Hud above Game).
 - HUD can't receive events emitted during GameScene.create (it isn't created yet), so GameScene sets `hudDirty` and publishes the full state on its first update.
 - EventBus subscribers pass their unsubscribe functions to `subscribeForScene(scene, [...])` so listeners are removed on scene shutdown (scenes restart cleanly).
+
+## UI system
+- Design direction (from the `frontend-design` + `game-ui-ux` skills): deep-water ink panels, sea-foam text, glacier cyan for progress/focus, gold for coins and purchases, coral for danger; buoy orange only for the one main action per screen. One typeface, Baloo 2 (800 for titles/buttons/numbers, 600 body), bundled via `@fontsource-variable/baloo-2` and loaded in `main.ts` before the game starts (canvas text doesn't re-render when a font arrives late).
+- Create text with `uiText(scene, x, y, text, kind, options)` (kinds: title, heading, button, number, body, caption) and colors from `COLORS`/`CSS`; don't hand-roll font styles. Text shadows need padding (Phaser doesn't size for them); `uiText` adds it.
+- Buttons: `new Button(scene, x, y, { width, height, label, icon, caption, variant, round, onClick })`, then `.setName('id')` (the playtest finds buttons by name). Register a screen's buttons with `new FocusNav(scene).add(...)`; the focus ring only shows once the keyboard is used. A click needs pointer-down on the button (a finger held from gameplay can't trigger it).
+- Layout: anchor to view edges with `getViewport()` plus `getSafeInsets()` (notches, in design units) and `EDGE` margin. Menus author a 720-tall column centred vertically.
+- Motion: one intro moment per screen (menu wordmark chomp, results count-up, pause fade); skip it when `reducedMotion()`. Input is ignored on objects inside a container at alpha 0, so overlays accept clicks once faded in.
+- UI textures are painted in `ui/uiTextures.ts` after the font loads; icons are white (tint them).
 
 ## Key design rules
 - **Data-driven:** creatures, upgrades, zones are plain config objects. Adding a creature = add a config entry + asset key; no new class unless a new behavior is needed.
@@ -157,7 +175,8 @@ hungry-seal/
 - `npm run check` = typecheck + lint + unit tests + playtest. Run it before calling a phase done.
 - Unit tests (Vitest, `src/**/*.test.ts`, Node environment) for pure logic: movement, math, later hunger, growth thresholds, combo timing, upgrade cost curves, save migration.
 - `npm run playtest` boots the game via Vite in headless Chrome (GPU via ANGLE D3D11 on Windows; `PLAYTEST_GL=swiftshader` for software), drives keyboard/mouse/multi-touch, asserts on live state through `window.__PHASER_GAME__`, fails on console errors or HTTP errors, and writes screenshots to `.playtest/` (gitignored). Extend it with checks for every new mechanic.
-- Playtest flows: desktop movement, gameplay (eating/growth/game over) and mobile run with `?calm`; the danger flow runs without it and places threats with `hazards.spawnAt` / `predators.spawnAt`. Page-side helpers must return plain data, never game objects (serializing the scene graph takes seconds and breaks timing checks).
+- `PLAYTEST_ONLY=desktop,mobile npm run playtest` runs just those sections (screens, desktop, danger, phase4, phase5, gameplay, mobile). Click UI with `clickButton(page, scene, name)` / `buttonAt()`; a timed-out `sceneActive()` reports every scene's status.
+- Playtest flows: desktop movement + pause, gameplay (eating/growth/game over) and mobile run with `?calm`; the danger flow runs without it and places threats with `hazards.spawnAt` / `predators.spawnAt`. Page-side helpers must return plain data, never game objects (serializing the scene graph takes seconds and breaks timing checks).
 - `npm run balance -- [human|perfect] [seconds]` runs a bot that chases prey with the mouse, dodges close threats (boosting away from hunting sharks), and logs hunger/score/stage every 5 s plus hits taken and cause of death. Results vary a lot run to run: take several samples. Reference numbers are in the script header and ROADMAP.
 - Manual play on a real phone over LAN: `npm run dev:host`, open the printed network URL.
 

@@ -92,8 +92,20 @@ Goal: enough variety for a full game.
 **Exit:** a run has real progression and variety from start to abyss.
 
 Notes carried forward:
+- Balance: with the Phase 5 content, first runs got shorter. Human bot (4 x 300 s): 2:34, 1:11, 1:34, 1:05, all starved, with pufferfish/jellyfish hits (Phase 4 reference: 2:53-3:22). Tune before merging Phase 5.
 - Reef floor (crabs in the shallows, reef decoration) still missing: the only seabed is at the abyss.
 - `spawnAt` things far from the camera are recycled by the despawn check on the next frame (by design); scripted events must spawn near the view.
+
+## UI/UX refresh (between Phase 5 and 6) — [x] done
+Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen on a small design system (`src/ui/`).
+- [x] Design tokens (palette, Baloo 2 type scale, panels), chunky pressable buttons with variants, icons painted in code
+- [x] Title: ice-floe wordmark that gets bitten, seal watching the pointer, coin balance, sound + fullscreen buttons, upgrade badge
+- [x] Upgrades screen: two-column rows with icons, level segments, gold buy buttons showing price + next effect, "Need N more"
+- [x] HUD: status panel (hunger, size segments, boost stamina bar on desktop too, frenzy), score/coins/magnet chip, pause button
+- [x] Results: score count-up, new-best badge, six stats, Swim again / Upgrades / Menu
+- [x] Pause menu (Esc / P / button / auto on tab or window blur): Resume, Restart run, Quit to menu, sound
+- [x] Keyboard focus navigation on every screen, safe-area insets for notches, reduced-motion support
+- [x] Playtest finds buttons by name; pause, focus and touch-pause checks (100 checks)
 
 ## Phase 6 — Meta progression and retention
 - [ ] Skins (cosmetic) with shop tab and equip
@@ -115,12 +127,12 @@ Notes carried forward:
 - [ ] Animations: swim cycle, bite, hurt, death, creature idles
 - [ ] Lighting/effects: light rays, caustics, depth fog, splash, bubble trails
 - [ ] Full SFX set and 2-3 music tracks per zone/menu, volume settings
-- [ ] Menu/shop/game-over UI polish, transitions, tutorial refinement
-- [ ] Accessibility: reduced motion/shake toggle, colorblind-safe warnings
+- [~] Menu/shop/game-over UI polish, transitions (done in the UI/UX refresh); tutorial refinement
+- [ ] Accessibility: reduced motion honoured by UI intros (done); in-game shake toggle, colorblind-safe warnings
 
 ## Phase 9 — Performance, mobile, and release
 - [ ] Mobile perf profiling (target 60 FPS mid-range); texture atlases, resolution scaling
-- [ ] Touch UX refinement, orientation handling, fullscreen, safe areas
+- [ ] Touch UX refinement, orientation handling (fullscreen button and safe areas done in the UI/UX refresh)
 - [ ] Browser matrix test (Chrome, Safari iOS, Firefox, Edge)
 - [ ] Bundle size + load time optimization, loading screen
 - [ ] PWA/offline (optional), analytics (optional, privacy-respecting)
