@@ -78,7 +78,7 @@ Goal: a shareable build that shows the whole game concept in ~5-10 minutes.
 - [x] Audio: synthesized SFX (chomp, coin, splash, hurt, zap, explosion, boost, grow, frenzy, shark alert, UI) + procedural music loop; mute persists
 - [x] First-run onboarding hints (move, eat, boost, danger, grow, shark)
 - [ ] Free/generated art pass v1 on seal + main creatures + UI (or clean placeholders) — waiting on assets (see ASSETS.md)
-- [x] Deployed to a public URL for testers: https://hungry-seal.horly.dev/ (Vercel, deploys `main`). GitHub Actions (`.github/workflows/deploy.yml`) typechecks, lints, unit-tests and builds every push/PR, and also publishes `main` to GitHub Pages (https://horlesq.github.io/hungry-seal/)
+- [x] Deployed to a public URL for testers: https://hungry-seal.horly.dev/ (Vercel, deploys `main`). GitHub Actions (`.github/workflows/ci.yml`) typechecks, lints, unit-tests and builds every push/PR
 **Exit:** a stranger can open the link, understand it, play several runs, buy upgrades, and want another run.
 
 ## Phase 5 — Content expansion — [~] in progress

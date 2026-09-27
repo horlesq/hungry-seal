@@ -1,0 +1,33 @@
+# CI on every push/PR: typecheck, lint, unit tests, build. Hosting is Vercel, which deploys
+# main to https://hungry-seal.horly.dev/ on its own.
+# The browser playtest (npm run playtest) runs locally: it needs a GPU-backed Chrome to be
+# meaningful and would be slow/flaky on CI's software renderer.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
