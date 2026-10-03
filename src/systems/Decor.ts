@@ -1,9 +1,13 @@
-// Map decorations: hand-placed landmarks (wrecks, lighthouses, palms) and decor scattered
-// along the ground (coral, kelp, rocks) or hanging from overhangs (icicles). Placed once per
-// run from the map config; only sprites near the view are visible. Animated decor (kelp,
-// seaweed, anemones, vents) loops its frames.
+// Map decorations: hand-placed landmarks (wrecks, lighthouses, palms, beach props) and decor
+// scattered along the ground (coral, kelp, rocks), hanging from overhangs (icicles) or set
+// into the terrain's edge at any angle (rock, coral and ice clusters that break up the smooth
+// contour). Placed once per run from the map config; only sprites near the view are visible.
+// Animated decor (kelp, seaweed, anemones, vents) loops its frames; variant sheets show one
+// randomly picked look.
 import Phaser from 'phaser';
+import { VARIANT_SHEETS, type TextureKey } from '../config/assets';
 import { Depths } from '../config/depths';
+import { WORLD } from '../config/zones';
 import type { DecorPlacement, ScatterRule } from '../config/maps';
 import { textureScale } from '../services/Viewport';
 import { loopFrames } from '../entities/sheetAnim';
@@ -16,6 +20,8 @@ const SINK = 8;
 /** Ground steeper than this (normal y > -cos) gets no scattered decor. */
 const MAX_SLOPE_NORMAL_Y = -0.75;
 const CULL_MARGIN = 400;
+/** Edge props: this much open water must lie in front of a spot (keeps passages readable). */
+const EDGE_CLEAR = 90;
 
 interface Item {
   sprite: Phaser.GameObjects.Sprite;
@@ -39,7 +45,10 @@ export class Decor {
     const rng = createRng(map.def.terrain.seed * 7 + 3);
     const t = map.terrain;
     for (const d of map.def.decor) this.place(d, t);
-    for (const rule of map.def.scatter) this.scatter(rule, t, rng);
+    for (const rule of map.def.scatter) {
+      if (rule.edge) this.scatterEdge(rule, t, rng);
+      else this.scatter(rule, t, rng);
+    }
   }
 
   /** Number of decor sprites (debug / soak). */
@@ -78,7 +87,83 @@ export class Decor {
       const g = terrain.groundBelow(d.x, d.y, 1200);
       if (g !== null) y = g + SINK;
     }
-    this.add(d.key, d.x, y, d.scale ?? 1, d.flip ?? false, d.hang ?? false, d.front ?? false, 0);
+    const it = this.add(d.key, d.x, y, d.scale ?? 1, d.flip ?? false, d.hang ?? false, d.front ?? false, 0);
+    if (it && d.frame !== undefined) it.sprite.setFrame(d.frame);
+  }
+
+  /**
+   * Edge props along the contour: a jittered grid over the band, each sample snapped onto the
+   * surface along the distance-field normal, kept apart from its neighbours, turned so its
+   * base faces into the rock, and skipped where the water in front is too narrow.
+   */
+  private scatterEdge(rule: ScatterRule, terrain: TerrainField, rng: Rng): void {
+    const n = { x: 0, y: 0 };
+    const step = rule.spacing;
+    const gap2 = (step * 0.7) ** 2;
+    const taken = new Map<number, Array<[number, number]>>();
+    const [s0, s1] = rule.scale ?? [0.85, 1.15];
+    const x0 = Math.max(0, rule.minX ?? 0);
+    const x1 = Math.min(terrain.width, rule.maxX ?? Infinity);
+    const sink = rule.sink ?? 0.4;
+    const crowded = (sx: number, sy: number): boolean => {
+      const cx = Math.floor(sx / step);
+      const cy = Math.floor(sy / step);
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          for (const [px, py] of taken.get((cx + i) * 4096 + cy + j) ?? []) {
+            if ((px - sx) ** 2 + (py - sy) ** 2 < gap2) return true;
+          }
+        }
+      }
+      return false;
+    };
+    for (let gx = x0; gx < x1; gx += step) {
+      for (let gy = rule.minY; gy < rule.maxY; gy += step) {
+        const x = gx + rng() * step;
+        const y = gy + rng() * step;
+        if (Math.abs(terrain.distance(x, y)) > step * 0.75) continue;
+        // The field is only roughly Euclidean: step onto the surface a few times, then check.
+        let sx = x;
+        let sy = y;
+        for (let k = 0; k < 4; k++) {
+          const d = terrain.distance(sx, sy);
+          terrain.normal(sx, sy, n);
+          sx -= n.x * d;
+          sy -= n.y * d;
+        }
+        if (Math.abs(terrain.distance(sx, sy)) > 4) continue;
+        terrain.normal(sx, sy, n);
+        if (rule.facing === 'up' && n.y > -0.5) continue;
+        if (sx < x0 || sx > x1 || sy < rule.minY || sy > rule.maxY) continue;
+        if (terrain.distance(sx + n.x * EDGE_CLEAR, sy + n.y * EDGE_CLEAR) < EDGE_CLEAR * 0.55) continue;
+        if (crowded(sx, sy)) continue;
+        const cell = Math.floor(sx / step) * 4096 + Math.floor(sy / step);
+        const list = taken.get(cell) ?? [];
+        list.push([sx, sy]);
+        taken.set(cell, list);
+        const key = rule.keys[Math.floor(rng() * rule.keys.length)];
+        const it = this.add(key, sx, sy, s0 + rng() * (s1 - s0), rng() < 0.5, false, false, 0, rng);
+        if (!it) continue;
+        const s = it.sprite;
+        s.setOrigin(0.5, 1 - sink).setRotation(Math.atan2(n.x, -n.y)).setDepth(Depths.TerrainEdge);
+        if (rule.tint) {
+          const k = Phaser.Math.Clamp((sy - WORLD.surfaceY) / (WORLD.height - WORLD.surfaceY), 0, 1);
+          const c = Phaser.Display.Color.Interpolate.ColorWithColor(
+            Phaser.Display.Color.IntegerToColor(rule.tint[0]),
+            Phaser.Display.Color.IntegerToColor(rule.tint[1]),
+            100,
+            Math.round(k * 100),
+          );
+          s.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
+        }
+        // Rotated: cull by a box around the anchor.
+        const r = Math.max(s.displayWidth, s.displayHeight);
+        it.x0 = sx - r;
+        it.x1 = sx + r;
+        it.y0 = sy - r;
+        it.y1 = sy + r;
+      }
+    }
   }
 
   private scatter(rule: ScatterRule, terrain: TerrainField, rng: Rng): void {
@@ -96,7 +181,7 @@ export class Decor {
         const front = rng() < (rule.front ?? 0);
         const scale = s0 + rng() * (s1 - s0);
         const yy = rule.hang ? y - SINK : y + SINK;
-        this.add(key, x, yy, scale, rng() < 0.5, rule.hang ?? false, front, rng() * 10);
+        this.add(key, x, yy, scale, rng() < 0.5, rule.hang ?? false, front, rng() * 10, rng);
       }
     }
   }
@@ -110,8 +195,9 @@ export class Decor {
     hang: boolean,
     front: boolean,
     phase: number,
-  ): void {
-    if (!this.scene.textures.exists(key)) return;
+    rng: Rng = Math.random,
+  ): Item | null {
+    if (!this.scene.textures.exists(key)) return null;
     const s = scale * textureScale(this.scene, key);
     const sprite = this.scene.add
       .sprite(x, y, key)
@@ -119,17 +205,21 @@ export class Decor {
       .setScale(s)
       .setFlipX(flip)
       .setDepth(front ? Depths.DecorFront : Depths.DecorBack);
+    const variants = VARIANT_SHEETS.has(key as TextureKey);
+    if (variants) sprite.setFrame(Math.floor(rng() * (sprite.texture.frameTotal - 1)));
     const w = sprite.displayWidth;
     const h = sprite.displayHeight;
-    this.items.push({
+    const item: Item = {
       sprite,
-      animated: sprite.texture.frameTotal > 2,
+      animated: !variants && sprite.texture.frameTotal > 2,
       phase,
       x0: x - w / 2,
       x1: x + w / 2,
       y0: hang ? y : y - h,
       y1: hang ? y + h : y,
-    });
+    };
+    this.items.push(item);
+    return item;
   }
 }
 

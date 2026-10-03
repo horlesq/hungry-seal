@@ -317,6 +317,13 @@ export const BAY: MapDef = {
     { key: T.DecorVent, x: 32600, y: 4500 },
     { key: T.DecorVent, x: 35000, y: 3200, scale: 0.8 },
     { key: T.DecorClam, x: coralGrotto.chamber.x, y: coralGrotto.chamber.y + 60 },
+    // Beach life.
+    { key: T.DecorLifeguard, x: 1040, y: S - 340 },
+    { key: T.DecorUmbrella, x: 1250, y: S - 340 },
+    { key: T.DecorSandcastle, x: 1410, y: S - 340 },
+    { key: T.DecorHut, x: 39020, y: S - 340, frame: 0, flip: true },
+    { key: T.DecorUmbrella, x: 38720, y: S - 340, flip: true },
+    { key: T.DecorSandcastle, x: 38580, y: S - 340 },
   ],
   scatter: [
     {
@@ -359,6 +366,29 @@ export const BAY: MapDef = {
       minX: 19500,
       maxX: 37400,
       spacing: 260,
+    },
+    // Rock clusters all along the contour; coral clusters on the reef.
+    {
+      keys: [T.DecorEdgeRock],
+      minY: S + 120,
+      maxY: 6600,
+      minX: 1500,
+      maxX: 38500,
+      spacing: 170,
+      scale: [0.8, 1.3],
+      edge: true,
+      tint: [0xd2b48c, 0x5a4f6e],
+    },
+    {
+      keys: [T.DecorEdgeCoral],
+      minY: S + 300,
+      maxY: 2100,
+      minX: 2600,
+      maxX: 8000,
+      spacing: 150,
+      edge: true,
+      facing: 'up',
+      sink: 0.3,
     },
   ],
   treasure: [

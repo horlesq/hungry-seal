@@ -46,6 +46,8 @@ export interface DecorPlacement {
   front?: boolean;
   /** Keep exactly at y (don't snap to the ground), e.g. a pier over the water. */
   free?: boolean;
+  /** Which look of a variant sheet (VARIANT_SHEETS); random when unset. */
+  frame?: number;
 }
 
 /** Scatters decor along upward-facing ground in a depth range (optionally an x range). */
@@ -61,6 +63,17 @@ export interface ScatterRule {
   hang?: boolean;
   /** Chance to draw in front. */
   front?: number;
+  /**
+   * Edge props: placed along the terrain contour at any angle (walls and ceilings too),
+   * turned to face out of the rock and sunk partly into it, over the terrain.
+   */
+  edge?: boolean;
+  /** Edge props: 'up' keeps them on upward-facing surfaces only (default 'any'). */
+  facing?: 'up' | 'any';
+  /** Edge props: tint at the water line and at the seabed (blended by depth). */
+  tint?: readonly [number, number];
+  /** Edge props: fraction of the prop's height sunk into the rock (default 0.4). */
+  sink?: number;
 }
 
 /** A named stretch of the map with its own danger and creature mix. */

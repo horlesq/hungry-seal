@@ -1,6 +1,7 @@
-# Builds the map decorations (coral, kelp, wrecks, landmarks...) and pickups (chest, mine,
-# coin, magnet orb) in Blender and renders a sheet for each. Swaying plants get 4 frames;
-# everything else is a single frame.
+# Builds the map decorations (coral, kelp, wrecks, landmarks, beach props, edge clusters...)
+# and pickups (chest, mine, coin, magnet orb) in Blender and renders a sheet for each. Swaying
+# plants get 4 frames; edge clusters and huts are variant sheets (one look per frame); everything
+# else is a single frame.
 #
 # Run from the repo root: node tools/blender/bridge.mjs exec tools/blender/decor.py [ONLY=kelp,chest]
 # Output: public/assets/<texture key>-sheet.png. Ground decor stands on the bottom edge of its
@@ -692,6 +693,350 @@ def crate(w, h):
     return None, 1
 
 
+# ---------------------------------------------------------------------------------------
+# Edge props: clusters set into the terrain's contour (any angle) to break its smooth
+# outline. Variant sheets: each frame is a different arrangement, not an animation.
+# Rocks and ice are light and neutral so the game can tint them to the map.
+# ---------------------------------------------------------------------------------------
+
+def stripes(obj, mats, n, axis=(0, 1)):
+    """Alternating materials around the object's local Z axis (umbrella canopy, beach ball)."""
+    for m in mats[1:]:
+        obj.data.materials.append(m)
+    for poly in obj.data.polygons:
+        c = poly.center
+        a = math.atan2(c[axis[1]], c[axis[0]])
+        poly.material_index = int((a + math.pi) / (2 * math.pi) * n) % len(mats)
+
+
+ROCK_SETS = [
+    [(-0.70, 0.0, 1.00, 0.85), (0.75, 0.0, 0.75, 0.62), (0.05, -0.35, 0.45, 0.36)],
+    [(-1.20, 0.0, 0.62, 0.55), (0.00, 0.0, 0.85, 0.78), (1.20, 0.0, 0.60, 0.50)],
+    [(-0.25, 0.0, 1.60, 0.58), (1.25, -0.25, 0.52, 0.42)],
+    [(0.00, 0.0, 0.70, 1.15), (-0.95, -0.2, 0.55, 0.50), (0.92, 0.1, 0.46, 0.42)],
+]
+
+
+def edge_rocks(w, h, v):
+    H2 = h / 2
+    m = toon_material("EdgeRock", H("#e2dbcf"), H("#b9af9f"), split=-H2 + 0.55, soft=0.3,
+                      spots=dict(color=H("#a49a8b"), scale=3.2, size=0.18))
+    rng = np.random.default_rng(40 + v)
+    for i, (x, y, rx, rz) in enumerate(ROCK_SETS[v]):
+        # Faceted stone: a jittered low-poly ball, flat shaded so each face catches the light.
+        z = -H2 + rz * 0.8
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0, location=(x, y, z))
+        b = bpy.context.active_object
+        b.name = f"Rock{i}"
+        for vert in b.data.vertices:
+            vert.co *= 1.0 + rng.uniform(-0.16, 0.12)
+            if vert.co.z > 0.55:
+                vert.co.z = 0.55 + (vert.co.z - 0.55) * 0.4
+        b.scale = (rx, 0.75 * rx, rz)
+        b.rotation_euler = (0, rng.uniform(-0.25, 0.25), rng.uniform(0, math.pi))
+        b.data.materials.append(m)
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        bpy.ops.object.shade_flat()
+        add_outline(b, OUTLINE, INK)
+    return None, 1
+
+
+def coral_dome(name, x, r, color, groove):
+    H2 = CORAL_H2
+    m = toon_material(name, H(color), spots=dict(color=H(groove), scale=7, size=0.2))
+    b = blob(name, [((x, 0, -H2 + r * 0.55), (r, r * 0.8, r * 0.75))], m, voxel=0.025, outline=None)
+    add_outline(b, OUTLINE, INK)
+
+
+def coral_twig(name, x, height, color, tip):
+    H2 = CORAL_H2
+    m = toon_material(name, H(color))
+    tm = toon_material(name + "Tip", H(tip))
+    z0 = -H2
+    arms = [[(x, z0), (x + 0.02, z0 + height * 0.45), (x - 0.3, z0 + height * 0.75), (x - 0.42, z0 + height)],
+            [(x + 0.02, z0 + height * 0.45), (x + 0.3, z0 + height * 0.7), (x + 0.4, z0 + height * 0.92)],
+            [(x - 0.05, z0 + height * 0.6), (x + 0.02, z0 + height * 0.85), (x + 0.0, z0 + height * 1.05)]]
+    for i, a in enumerate(arms):
+        tube(f"{name}{i}", [(px, 0, pz) for px, pz in a], m, 0.09 - 0.012 * i, outline=0.045)
+        ellipsoid(f"{name}T{i}", (a[-1][0], 0, a[-1][1]), (0.1, 0.1, 0.1), tm, outline=0.035)
+
+
+def coral_tubes(name, x, n, color, inner):
+    H2 = CORAL_H2
+    m = toon_material(name, H(color))
+    dark = flat_material(name + "Hole", H(inner))
+    heights = (1.15, 0.7, 0.95, 0.6)
+    for i in range(n):
+        lean = (i - (n - 1) / 2) * 0.22
+        hh = heights[i % 4]
+        hx = x + (i - (n - 1) / 2) * 0.26
+        top = (hx + math.sin(lean) * hh, -0.06 * i, -H2 + math.cos(lean) * hh)
+        tube(f"{name}{i}", [(hx, -0.06 * i, -H2), ((hx + top[0]) / 2, -0.06 * i, (top[2] - H2) / 2), top], m, 0.15,
+             outline=0.045)
+        torus(f"{name}L{i}", top, 0.14, 0.05, m, rot=(0, lean, 0), outline=0.03)
+        ellipsoid(f"{name}H{i}", (top[0], top[1], top[2] + 0.02), (0.1, 0.1, 0.03), dark)
+
+
+def coral_fan_small(name, x, size, color, vein):
+    H2 = CORAL_H2
+    m = toon_material(name, H(color), spots=dict(color=H(vein), scale=12, size=0.2))
+    s = size
+    pts = [(x, -H2 + 0.05)]
+    for k in range(11):
+        a = math.radians(160 - k * 14)
+        r = (1.55 if k % 2 == 0 else 1.38) * s
+        pts.append((x + math.cos(a) * r * 0.62, -H2 + 0.15 + math.sin(a) * r))
+    plate(name, pts, m, thickness=0.05, y=0.15, outline=0.045, round_=False)
+    ink = flat_material(name + "Vein", H(vein))
+    for k, a in enumerate((140, 112, 90, 68, 40)):
+        r = math.radians(a)
+        tube(f"{name}V{k}", [(x, 0.08, -H2 + 0.1), (x + math.cos(r) * 0.85 * s * 0.62, 0.08,
+                                                   -H2 + 0.15 + math.sin(r) * 1.3 * s)], ink, 0.02)
+
+
+CORAL_H2 = 80 / DU_PER_BU / 2
+CORAL_SETS = [
+    [("dome", -0.85, 0.62, "#f4a63a", "#c9761f"), ("twig", 0.35, 1.5, "#ff6f91", "#ffd0dc"),
+     ("tubes", 1.35, 3, "#9b5de5", "#3b1a63")],
+    [("fan", -0.55, 1.0, "#9b5de5", "#c9a7ff"), ("dome", 0.75, 0.55, "#ffd34d", "#d9a52a"),
+     ("twig", -1.45, 1.1, "#ff8a5b", "#ffd6c2")],
+    [("tubes", -1.0, 3, "#ffd34d", "#6a4a10"), ("twig", 0.15, 1.7, "#4fc3f7", "#d6f3ff"),
+     ("dome", 1.2, 0.5, "#ff6f91", "#c94a6a")],
+    [("twig", -0.45, 1.8, "#ff8a5b", "#ffe0d0"), ("fan", 0.95, 0.85, "#ff6f91", "#ffc2d1"),
+     ("dome", -1.45, 0.48, "#7cc35a", "#4e8f36")],
+]
+
+
+def edge_coral(w, h, v):
+    for i, (kind, x, a, color, b) in enumerate(CORAL_SETS[v]):
+        name = f"C{i}"
+        x *= 0.75
+        if kind == "dome":
+            coral_dome(name, x, a, color, b)
+        elif kind == "twig":
+            coral_twig(name, x, a, color, b)
+        elif kind == "tubes":
+            coral_tubes(name, x, int(a), color, b)
+        else:
+            coral_fan_small(name, x, a, color, b)
+    return None, 1
+
+
+ICE_SETS = [
+    [(-0.6, 1.7, -0.25), (0.15, 2.3, 0.05), (0.85, 1.4, 0.35), (-1.25, 0.9, -0.5)],
+    [(-0.9, 1.2, -0.4), (0.0, 1.6, 0.15), (0.9, 1.9, 0.3)],
+    [(0.0, 2.5, 0.0), (-0.75, 1.3, -0.45), (0.8, 1.1, 0.5), (1.35, 0.7, 0.7)],
+    [(-1.1, 1.5, -0.3), (-0.3, 1.0, -0.1), (0.5, 1.8, 0.2), (1.2, 1.2, 0.45)],
+]
+
+
+def edge_ice(w, h, v):
+    H2 = h / 2
+    m = toon_material("Ice", H("#f2fbff"), H("#a9daf2"), split=-H2 + 0.6, soft=0.35)
+    hi = flat_material("IceShine", H("#ffffff"), 1.25)
+    for i, (x, length, lean) in enumerate(ICE_SETS[v]):
+        r = 0.22 + 0.09 * length
+        base = (x, 0.1 * i - 0.2, -H2 + 0.05)
+        d = (math.sin(lean), 0, math.cos(lean))
+        obj = cone(f"Shard{i}", (base[0] + d[0] * length / 2, base[1], base[2] + d[2] * length / 2), r, length, m,
+                   rot=(0, lean, 0), verts=6)
+        bpy.ops.object.shade_flat()
+        add_outline(obj, 0.05, INK)
+        tube(f"Glint{i}", [(base[0] - r * 0.4 + d[0] * length * 0.15, base[1] - r - 0.02, base[2] + length * 0.2),
+                           (base[0] - r * 0.15 + d[0] * length * 0.6, base[1] - r * 0.5 - 0.02,
+                            base[2] + d[2] * length * 0.6)], hi, 0.025)
+    return None, 1
+
+
+# ---------------------------------------------------------------------------------------
+# Beach props (ground decor, bottom-centre anchored)
+# ---------------------------------------------------------------------------------------
+
+def umbrella(w, h):
+    """Striped beach umbrella over a towel, with a beach ball."""
+    H2 = h / 2
+    pole_m = toon_material("Pole", H("#f5f5f0"))
+    red = toon_material("CanopyRed", H("#ef4b3f"))
+    white = toon_material("CanopyWhite", H("#fbf6ec"))
+    tilt = math.radians(-8)
+    foot = 0.1
+    top = (foot + 4.2 * math.sin(-tilt), -H2 + 4.2 * math.cos(tilt))
+    tube("Pole", [(foot, 0, -H2 - 0.1), ((foot + top[0]) / 2, 0, (top[1] - H2) / 2), (top[0], 0, top[1])], pole_m,
+         0.07, outline=0.04)
+    # Canopy: the top of a squashed sphere, striped in wedges.
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=1.0, location=(0, 0, 0))
+    can = bpy.context.active_object
+    can.name = "Canopy"
+    bm_verts = can.data.vertices
+    for vert in bm_verts:
+        if vert.co.z < 0.15:
+            vert.co.z = 0.15
+    can.data.materials.append(red)
+    stripes(can, [red, white], 8)
+    can.scale = (2.0, 2.0, 1.0)
+    can.location = (top[0] + 0.0, 0, top[1] - 0.6)
+    can.rotation_euler = (0, tilt, 0)
+    bpy.ops.object.shade_smooth()
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    add_outline(can, 0.06, INK)
+    ellipsoid("Knob", (top[0] + 0.12, 0, top[1] + 0.42), (0.12, 0.12, 0.12), red, outline=0.03)
+    towel = toon_material("Towel", H("#3b9be0"))
+    box_mesh("Towel", (-1.1, -0.2, -H2 + 0.06), (2.0, 1.2, 0.07), towel, outline=0.035, bevel=0.02)
+    ink = flat_material("TowelStripe", H("#fbf6ec"))
+    for i, x in enumerate((-1.7, -0.5)):
+        box_mesh(f"TowelStripe{i}", (x, -0.81, -H2 + 0.05), (0.2, 0.02, 0.06), ink, outline=None, bevel=0.0)
+    ball_m = [toon_material("BallR", H("#ef4b3f")), toon_material("BallW", H("#fbf6ec")),
+              toon_material("BallB", H("#3b9be0")), toon_material("BallY", H("#ffd34d"))]
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=0.38, location=(1.55, -0.4, -H2 + 0.37))
+    ball = bpy.context.active_object
+    ball.name = "Ball"
+    ball.data.materials.append(ball_m[0])
+    stripes(ball, ball_m, 6, axis=(0, 2))
+    bpy.ops.object.shade_smooth()
+    add_outline(ball, 0.035, INK)
+    return None, 1
+
+
+def sandcastle(w, h):
+    H2 = h / 2
+    sand = toon_material("Castle", H("#f0d595"), H("#d9b56e"), split=-H2 + 0.3, soft=0.25,
+                         spots=dict(color=H("#c9a25a"), scale=14, size=0.12))
+    mound = blob("Mound", [((0, 0, -H2 + 0.1), (1.55, 0.95, 0.32))], sand, voxel=0.025, outline=None)
+    add_outline(mound, OUTLINE, INK)
+    box_mesh("Keep", (0, 0, -H2 + 0.75), (1.1, 0.85, 0.85), sand, bevel=0.06)
+    for i, x in enumerate((-0.42, 0.0, 0.42)):
+        box_mesh(f"Merlon{i}", (x, -0.2, -H2 + 1.27), (0.22, 0.4, 0.2), sand, outline=0.035, bevel=0.03)
+    for i, x in enumerate((-0.92, 0.92)):
+        cylinder(f"Tower{i}", (x, 0, -H2 + 0.75), 0.32, 1.25, sand, outline=OUTLINE, verts=24)
+        cone(f"Spire{i}", (x, 0, -H2 + 1.62), 0.36, 0.5, sand, outline=0.045)
+    door = flat_material("Door", H("#8a6a3a"))
+    ellipsoid("Door", (0, -0.45, -H2 + 0.42), (0.18, 0.04, 0.24), door)
+    tube("Stick", [(0, 0, -H2 + 1.2), (0, 0, -H2 + 1.75), (0.0, 0, -H2 + 2.25)],
+         toon_material("Stick", H("#a0652e")), 0.03, outline=0.025)
+    plate("Flag", [(0.02, -H2 + 2.25), (0.55, -H2 + 2.08), (0.02, -H2 + 1.9)], toon_material("Flag", H("#ef4b3f")),
+          thickness=0.03, outline=0.03, round_=False)
+    return None, 1
+
+
+def lifeguard(w, h):
+    """Lifeguard tower on stilts: yellow hut, red roof, ladder, flag."""
+    H2 = h / 2
+    wood = toon_material("Stilt", H("#f5f5f0"))
+    hut = toon_material("Hut", H("#ffd34d"), H("#e8b52a"), split=-H2 + 4.6, soft=0.3)
+    roof = toon_material("Roof", H("#e8483d"))
+    deck = -H2 + 4.0
+    for i, (x, y) in enumerate(((-1.25, -0.8), (1.25, -0.8), (-1.25, 0.8), (1.25, 0.8))):
+        tube(f"Leg{i}", [(x * 1.25, y, -H2 - 0.05), (x * 1.12, y, -H2 + 2.0), (x, y, deck)], wood, 0.11,
+             outline=0.04)
+    tube("Brace0", [(-1.5, -0.85, -H2 + 0.9), (0.0, -0.85, -H2 + 2.4), (1.4, -0.85, deck - 0.2)], wood, 0.06,
+         outline=0.035)
+    box_mesh("Deck", (0, 0, deck), (3.4, 2.2, 0.22), wood, bevel=0.04)
+    box_mesh("Hut", (0, 0.1, deck + 1.0), (2.6, 1.9, 1.8), hut, bevel=0.06)
+    glass = flat_material("Glass", H("#7fd6f2"), 1.1)
+    box_mesh("Window", (0.2, -0.86, deck + 1.2), (1.5, 0.06, 0.8), glass, outline=0.03, bevel=0.03)
+    roof_obj = profile_solid("Roof", [(-1.75, deck + 1.85), (1.75, deck + 1.85), (0.0, deck + 2.75)], 1.2, roof,
+                             bevel=0.08)
+    add_outline(roof_obj, OUTLINE, INK)
+    rail = toon_material("Rail", H("#f5f5f0"))
+    box_mesh("Rail", (0, -1.05, deck + 0.45), (3.4, 0.08, 0.1), rail, outline=0.03, bevel=0.02)
+    for i, x in enumerate((-1.6, -0.55, 0.55, 1.6)):
+        box_mesh(f"Post{i}", (x, -1.05, deck + 0.22), (0.08, 0.08, 0.5), rail, outline=0.03, bevel=0.01)
+    # Ladder down the front.
+    for i, x in enumerate((0.85, 1.35)):
+        tube(f"LadderRail{i}", [(x, -1.2, deck + 0.1), (x + 0.55, -1.2, -H2 + 0.1)], wood, 0.05, outline=0.03)
+    for i in range(6):
+        u = (i + 0.5) / 6
+        z = deck + 0.1 + u * (-H2 + 0.1 - deck - 0.1)
+        tube(f"Rung{i}", [(0.85 + 0.55 * u, -1.22, z), (1.35 + 0.55 * u, -1.22, z)], wood, 0.035, outline=0.025)
+    tube("FlagPole", [(-1.2, 0.2, deck + 2.3), (-1.2, 0.2, deck + 3.2), (-1.2, 0.2, deck + 3.9)], wood, 0.04,
+         outline=0.03)
+    plate("Flag", [(-1.18, deck + 3.9), (-0.25, deck + 3.65), (-1.18, deck + 3.35)], roof, thickness=0.03,
+          y=0.2, outline=0.03, round_=False)
+    torus("Lifebuoy", (-0.95, -0.98, deck + 1.0), 0.32, 0.1, toon_material("Buoy", H("#ff7a2e")),
+          rot=(math.pi / 2, 0, 0))
+    return None, 1
+
+
+def hut(w, h, v):
+    """Wooden beach hut on short stilts. Variant 0: straw roof; 1: snow on the roof."""
+    H2 = h / 2
+    wood = toon_material("Planks", H("#b07a3e"), H("#8a5a28"), split=-H2 + 1.6, soft=0.4)
+    post = toon_material("Post", H("#7a4b2a"))
+    floor = -H2 + 0.9
+    for i, x in enumerate((-2.4, -0.8, 0.8, 2.4)):
+        cylinder(f"Stilt{i}", (x, -0.9, -H2 + 0.4), 0.13, 1.0, post, outline=0.04, verts=16)
+    box_mesh("Floor", (0, 0, floor), (5.8, 2.6, 0.25), post, bevel=0.04)
+    box_mesh("Walls", (0.0, 0.1, floor + 1.45), (4.4, 2.2, 2.7), wood, bevel=0.06)
+    ink = flat_material("Seam", H("#5a3410"))
+    for i in range(5):
+        z = floor + 0.45 + i * 0.5
+        box_mesh(f"Seam{i}", (0.0, -1.02, z), (4.3, 0.02, 0.035), ink, outline=None, bevel=0.0)
+    door = toon_material("Door", H("#3b6fa8"))
+    box_mesh("Door", (-1.0, -1.03, floor + 1.05), (0.95, 0.06, 1.85), door, outline=0.035, bevel=0.03)
+    glass = flat_material("Glass", H("#7fd6f2"), 1.1)
+    box_mesh("Window", (1.05, -1.03, floor + 1.7), (1.0, 0.06, 0.8), glass, outline=0.035, bevel=0.03)
+    for i, x in enumerate((0.38, 1.72)):
+        box_mesh(f"Shutter{i}", (x, -1.05, floor + 1.7), (0.3, 0.05, 0.9), door, outline=0.03, bevel=0.02)
+    roof_m = (toon_material("Straw", H("#e0b85a"), H("#c4973a"), split=floor + 3.0, soft=0.3,
+                            spots=dict(color=H("#b5862e"), scale=6, size=0.2))
+              if v == 0 else toon_material("Snow", H("#ffffff"), H("#d6ecf8"), split=floor + 3.0, soft=0.3))
+    roof = profile_solid("Roof", [(-3.05, floor + 2.6), (3.05, floor + 2.6), (0.0, floor + 4.4)], 1.45, roof_m,
+                         bevel=0.12)
+    add_outline(roof, OUTLINE, INK)
+    if v == 1:
+        ice = toon_material("Icicle", H("#e6f6ff"))
+        for i, x in enumerate((-2.6, -1.9, -0.9, 0.4, 1.3, 2.2)):
+            obj = cone(f"Icicle{i}", (x, -1.4, floor + 2.35), 0.09, 0.45 + 0.12 * (i % 3), ice, rot=(math.pi, 0, 0))
+            add_outline(obj, 0.025, INK)
+    box_mesh("Step", (-1.0, -1.5, -H2 + 0.3), (1.1, 0.5, 0.18), post, outline=0.035, bevel=0.03)
+    return None, 1
+
+
+def render_variants(key, builder, size, px, count):
+    """Builds and renders `count` variants of a prop into one sheet (2 columns)."""
+    tmp = os.path.join(bpy.app.tempdir or os.getcwd(), "variant_frames")
+    os.makedirs(tmp, exist_ok=True)
+    w, h = size[0] / DU_PER_BU, size[1] / DU_PER_BU
+    paths = []
+    for i in range(count):
+        clear_scene()
+        builder(w, h, i)
+        setup_render(*size, px=px)
+        scene = bpy.context.scene
+        path = os.path.join(tmp, f"{key}-{i}.png")
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+        paths.append(path)
+    fw, fh = int(size[0] * px), int(size[1] * px)
+    cols = 2 if count > 1 else 1
+    rows = math.ceil(count / cols)
+    sheet = np.zeros((rows * fh, cols * fw, 4), dtype=np.float32)
+    for i, path in enumerate(paths):
+        img = bpy.data.images.load(path)
+        pxs = np.empty(fw * fh * 4, dtype=np.float32)
+        img.pixels.foreach_get(pxs)
+        bpy.data.images.remove(img)
+        r, c = divmod(i, cols)
+        top = (rows - 1 - r) * fh
+        sheet[top:top + fh, c * fw:(c + 1) * fw] = pxs.reshape(fh, fw, 4)
+    out = bpy.data.images.new("Sheet", cols * fw, rows * fh, alpha=True)
+    out.pixels.foreach_set(sheet.ravel())
+    out.filepath_raw = os.path.join(OUT_DIR, f"{key}-sheet.png")
+    out.file_format = "PNG"
+    out.save()
+    bpy.data.images.remove(out)
+    return [fw, fh]
+
+
+# key -> (builder(w, h, variant), design size, px per du, variant count)
+VARIANTS = {
+    "decor-edge-rock": (edge_rocks, (120, 80), 3, 4),
+    "decor-edge-coral": (edge_coral, (110, 80), 3, 4),
+    "decor-edge-ice": (edge_ice, (110, 90), 3, 4),
+    "decor-hut": (hut, (220, 200), 2, 2),
+}
+
+
 # key -> (builder, design size, px per du)
 DECOR = {
     "decor-kelp": (kelp, (60, 260), 3),
@@ -726,6 +1071,9 @@ DECOR = {
     "hazard-net": (net, (120, 120), 3),
     "hazard-harpoon": (harpoon, (90, 16), 3),
     "item-crate": (crate, (46, 40), 3),
+    "decor-umbrella": (umbrella, (150, 150), 3),
+    "decor-sandcastle": (sandcastle, (90, 70), 3),
+    "decor-lifeguard": (lifeguard, (140, 240), 2),
 }
 
 
@@ -752,3 +1100,6 @@ def render_decor(key):
 only = [s for s in globals().get("ONLY", "").split(",") if s]
 keys = [k for k in DECOR if not only or any(o in k for o in only)]
 result = {k: render_decor(k)["frame"] for k in keys}
+for k, (builder, size, px, count) in VARIANTS.items():
+    if not only or any(o in k for o in only):
+        result[k] = render_variants(k, builder, size, px, count)

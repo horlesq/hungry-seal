@@ -326,6 +326,8 @@ export const ARCTIC: MapDef = {
     { key: T.DecorAnchor, x: 22700, y: 3500 },
     { key: T.DecorBarrel, x: 22900, y: 3500 },
     { key: T.DecorBarrel, x: 19300, y: 3500, flip: true },
+    { key: T.DecorHut, x: 1000, y: S - 340, frame: 1 },
+    { key: T.DecorHut, x: 39000, y: S - 340, frame: 1, flip: true },
   ],
   scatter: [
     { keys: [T.DecorIcicle], minY: S, maxY: 3400, spacing: 70, hang: true },
@@ -341,6 +343,26 @@ export const ARCTIC: MapDef = {
       minY: 3000,
       maxY: 6500,
       spacing: 220,
+    },
+    // Ice shards along the shallow contour, frosted rock below.
+    {
+      keys: [T.DecorEdgeIce],
+      minY: S + 60,
+      maxY: 3600,
+      minX: 1500,
+      maxX: 38500,
+      spacing: 190,
+      scale: [0.8, 1.25],
+      edge: true,
+    },
+    {
+      keys: [T.DecorEdgeRock],
+      minY: 3200,
+      maxY: 6600,
+      spacing: 190,
+      scale: [0.8, 1.3],
+      edge: true,
+      tint: [0xb9cfe0, 0x46557a],
     },
   ],
   treasure: [

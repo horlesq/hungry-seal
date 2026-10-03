@@ -87,6 +87,13 @@ export const TextureKeys = {
   DecorSkeleton: 'decor-skeleton',
   DecorVent: 'decor-vent',
   DecorClam: 'decor-clam',
+  DecorEdgeRock: 'decor-edge-rock',
+  DecorEdgeCoral: 'decor-edge-coral',
+  DecorEdgeIce: 'decor-edge-ice',
+  DecorHut: 'decor-hut',
+  DecorUmbrella: 'decor-umbrella',
+  DecorSandcastle: 'decor-sandcastle',
+  DecorLifeguard: 'decor-lifeguard',
 } as const;
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
@@ -247,4 +254,19 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   sheet(TextureKeys.DecorSkeleton, 140, 60),
   sheet(TextureKeys.DecorVent, 80, 120),
   sheet(TextureKeys.DecorClam, 90, 60),
+  sheet(TextureKeys.DecorEdgeRock, 120, 80),
+  sheet(TextureKeys.DecorEdgeCoral, 110, 80),
+  sheet(TextureKeys.DecorEdgeIce, 110, 90),
+  sheet(TextureKeys.DecorHut, 220, 200, undefined, 2),
+  sheet(TextureKeys.DecorUmbrella, 150, 150),
+  sheet(TextureKeys.DecorSandcastle, 90, 70),
+  sheet(TextureKeys.DecorLifeguard, 140, 240, undefined, 2),
 ];
+
+/** Sheets whose frames are alternative looks (one picked per placement), not an animation. */
+export const VARIANT_SHEETS: ReadonlySet<TextureKey> = new Set([
+  TextureKeys.DecorEdgeRock,
+  TextureKeys.DecorEdgeCoral,
+  TextureKeys.DecorEdgeIce,
+  TextureKeys.DecorHut,
+]);

@@ -4,6 +4,8 @@ export const Depths = {
   DecorBack: 4,
   /** The map's rock: behind everything that moves, so a seal pressed to a wall stays visible. */
   Terrain: 7,
+  /** Rock, coral and ice clusters set into the terrain's edge (over the rock, under creatures). */
+  TerrainEdge: 7.5,
   /** Rock around the water line, redrawn over the front water line so it doesn't cross islands. */
   TerrainOverWater: 21,
   /** Foreground decorations (kelp in front of the seal). */
