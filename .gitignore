@@ -7,3 +7,6 @@ dist
 # Claude Code: skill folders are machine-specific junctions into .agents/skills
 .claude/skills/
 .claude/settings.local.json
+
+# Local MCP servers (Blender connector)
+.mcp.json
