@@ -69,8 +69,29 @@ export type AssetEntry =
       frameHeight: number;
     };
 
+/**
+ * Frame layout of an animated seal sheet (rendered by tools/blender/seal.py). Skins drawn as a
+ * single image fall back to the squash-and-wiggle effects.
+ */
+export const SEAL_SHEET = {
+  /** One full swim undulation. */
+  swim: [0, 1, 2, 3, 4, 5, 6, 7],
+  /** Mouth opening, from slightly to fully open. */
+  bite: [8, 9, 10],
+  /** Turning toward the camera: 22.5, 45 and 67.5 degrees (mirrored for the second half). */
+  turn: [11, 12, 13],
+  frameCount: 14,
+} as const;
+
 export const ASSET_MANIFEST: readonly AssetEntry[] = [
-  { type: 'image', key: TextureKeys.Seal, url: 'assets/seal.png', resolution: 4 },
+  {
+    type: 'spritesheet',
+    key: TextureKeys.Seal,
+    url: 'assets/seal-sheet.png',
+    resolution: 3,
+    frameWidth: 528,
+    frameHeight: 264,
+  },
   { type: 'image', key: TextureKeys.SealArctic },
   { type: 'image', key: TextureKeys.SealSeaLion },
   { type: 'image', key: TextureKeys.SealTropical },

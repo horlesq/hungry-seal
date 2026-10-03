@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const SERVER =
   'git+https://projects.blender.org/lab/blender_mcp.git@dbbf836ad4b1025f14a2b3b504c43903f39e0b04#subdirectory=mcp';
-const TIMEOUT_MS = 300_000;
+const TIMEOUT_MS = 600_000;
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const [tool = 'get_objects_summary', arg = '{}'] = process.argv.slice(2);

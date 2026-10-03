@@ -1,4 +1,5 @@
-# Builds the cartoon harbor seal in Blender and renders the side-view sprite.
+# Builds the cartoon harbor seal in Blender, animates it, and renders the sprite sheet
+# (swim cycle, bite, turn) the game plays as frames.
 # Run from the repo root: node tools/blender/bridge.mjs exec tools/blender/seal.py
 # (needs Blender open with the Blender Lab MCP add-on serving localhost:9876), or headless:
 # blender -b -P tools/blender/seal.py
@@ -9,13 +10,30 @@ import math
 import os
 
 import bpy
-from mathutils import Vector
+import numpy as np
+from mathutils import Matrix, Vector
 
 # The bridge defines REPO (the repo root); a headless run uses the working directory.
 OUT_DIR = os.path.join(globals().get("REPO", os.getcwd()), "public", "assets")
-# Sprite box: 176x88 design units, rendered at 4x (resolution: 4 in the manifest) so it stays
+# Each frame: 176x88 design units rendered at 3x (resolution: 3 in the manifest) so it stays
 # sharp when the seal grows and the camera zooms in.
-RENDER_W, RENDER_H = 704, 352
+RENDER_W, RENDER_H = 528, 264
+
+# Sprite sheet layout; must match SEAL_SHEET in src/config/assets.ts.
+SWIM_FRAMES = 8  # one full undulation
+BITE_OPEN = (0.35, 0.7, 1.0)  # mouth openness per bite frame
+# Degrees, head swinging toward the camera. The game mirrors these for the second half of
+# a turn (a yaw of 180 - a looks like a flipped), so 90 isn't needed.
+TURN_YAWS = (22.5, 45.0, 67.5)
+SHEET_COLS = 3
+SHEET_NAME = "seal-sheet.png"
+
+# Swim pose tuning (world units / radians).
+TAIL_AMP = 0.42  # vertical tail sweep at the hind flippers
+WAVE_K = 0.9  # phase lag per unit along the body (wave travels head -> tail)
+HEAD_BOB = 0.05
+FLIPPER_SWING = 0.40
+JAW_DROP = 0.48
 ORTHO_W = 6.3  # world units across the frame (2:1 frame -> 3.0 tall)
 CENTER = (-0.05, 0.12)  # frame centre (x, z): the sprite's origin
 
@@ -296,6 +314,7 @@ def build():
     # Big dark eye with highlights.
     ex, ez = 1.80, 0.64
     ey = surface_y(body, ex, ez)
+    EYE_CENTER[:] = (ex, ey, ez)
     ellipsoid("Eye", (ex, ey, ez), (0.21, 0.08, 0.24), m_eye)
     ellipsoid("EyeShine", (ex + 0.06, ey - 0.08, ez + 0.09), (0.075, 0.02, 0.075), m_white,
               segments=16, rings=8)
@@ -316,7 +335,54 @@ def build():
         skin_curve(f"Whisker{i}", [(2.34, z0), (2.64, (z0 + z1) / 2 + 0.03), (2.94, z1)],
                    m_line, 0.013, smile_lift + 0.03)
 
+    # Open mouth (bite frames only): dark inside, tongue and two little teeth, sized per frame.
+    my = surface_y(body, 2.28, 0.0) - 0.19
+    m_mouth = flat_material("MouthInside", (0.30, 0.05, 0.08))
+    m_tongue = flat_material("Tongue", (0.92, 0.45, 0.50))
+    m_tooth = flat_material("Tooth", (1, 1, 1), 1.1)
+    for name, loc, size, mat in (
+        ("MouthOpen", (2.27, my, 0.0), (0.24, 0.02, 1.0), m_mouth),
+        ("Tongue", (2.24, my - 0.02, 0.0), (0.13, 0.015, 0.45), m_tongue),
+        ("ToothA", (2.38, my - 0.03, 0.0), (0.03, 0.01, 0.05), m_tooth),
+        ("ToothB", (2.16, my - 0.03, 0.0), (0.03, 0.01, 0.05), m_tooth),
+    ):
+        ellipsoid(name, loc, (1, 1, 1), mat, segments=24, rings=12).scale = size
+
+    # Curves -> meshes so the pose code can bend everything the same way.
+    curves = [o for o in bpy.data.objects if o.type == "CURVE"]
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in curves:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = curves[0]
+    bpy.ops.object.convert(target="MESH")
+
+    # The model only had details on the near side; mirror them so turning shows a full face.
+    for name in [o.name for o in bpy.data.objects]:
+        if name.startswith(NEAR_DETAILS):
+            mirror_to_far_side(bpy.data.objects[name])
+
     setup_render()
+
+
+EYE_CENTER = [0.0, 0.0, 0.0]  # set by build(); eye highlights orbit it to face the camera
+MOUTH_PARTS = ("MouthOpen", "Tongue", "ToothA", "ToothB")
+NEAR_DETAILS = ("Eye", "Brow", "Nose", "Mouth", "Dot", "Whisker", "Muzzle", "FrontFlipper",
+                "Claw")
+
+
+def mirror_to_far_side(obj):
+    if obj.name in MOUTH_PARTS:
+        return
+    dup = obj.copy()
+    dup.data = obj.data.copy()
+    dup.name = obj.name + "Far"
+    link(dup)
+    dup.matrix_world = Matrix.Scale(-1, 4, (0, 1, 0)) @ obj.matrix_world
+    # Bake the mirror into the mesh so the normals (and the outline shell) stay correct.
+    bpy.ops.object.select_all(action="DESELECT")
+    dup.select_set(True)
+    bpy.context.view_layer.objects.active = dup
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
 
 def setup_render():
@@ -354,14 +420,149 @@ def setup_render():
         bg.inputs["Strength"].default_value = 0.6
 
 
-def render(name="seal.png"):
-    os.makedirs(OUT_DIR, exist_ok=True)
-    path = os.path.join(OUT_DIR, name)
+# ---------------------------------------------------------------------------------------
+# Posing: vertices are bent from their rest positions each frame (no armature needed).
+# ---------------------------------------------------------------------------------------
+
+def smooth01(u):
+    u = np.clip(u, 0.0, 1.0)
+    return u * u * (3 - 2 * u)
+
+
+class Poser:
+    def __init__(self):
+        cx, cz = CENTER
+        self.rig = link(bpy.data.objects.new("Rig", None))
+        self.rig.location = (cx, 0, cz)
+        bpy.context.view_layer.update()
+        self.rest = {}
+        for obj in bpy.data.objects:
+            if obj.type != "MESH":
+                continue
+            # Parent everything to the rig (keeping placement) so turns pivot on the sprite origin.
+            obj.parent = self.rig
+            obj.matrix_parent_inverse = self.rig.matrix_world.inverted()
+            if obj.name in MOUTH_PARTS:
+                obj.hide_render = True
+                continue
+            if obj.name.startswith("EyeShine") and obj.name.endswith("Far"):
+                obj.hide_render = True  # the far eye is behind the head in every frame
+            n = len(obj.data.vertices)
+            local = np.empty(n * 3)
+            obj.data.vertices.foreach_get("co", local)
+            local = local.reshape(n, 3)
+            loc = np.array(obj.location)  # transforms are applied, so world = local + location
+            self.rest[obj.name] = (local + loc, loc)
+        self.mouth_rest = {n: (Vector(bpy.data.objects[n].location),
+                               Vector(bpy.data.objects[n].scale)) for n in MOUTH_PARTS}
+
+    def wave(self, x, phase):
+        """Vertical bend of the body: grows toward the tail, travels head -> tail."""
+        tail = smooth01((0.6 - x) / 3.6) ** 1.4
+        head = smooth01((x - 0.6) / 1.5)
+        return (TAIL_AMP * tail * np.sin(phase - WAVE_K * (0.6 - x))
+                + HEAD_BOB * head * np.sin(phase + math.pi))
+
+    def jaw_weight(self, x, z):
+        return smooth01((x - 1.86) / 0.25) * smooth01((0.10 - z) / 0.12)
+
+    def pose(self, phase=0.0, bite=0.0, yaw=0.0):
+        sweep = FLIPPER_SWING * math.sin(phase + 0.6)
+        for name, (world, loc) in self.rest.items():
+            p = world.copy()
+            if name.startswith(("FrontFlipper", "Claw")):
+                # Paddle around the shoulder.
+                px, pz = 0.71, -0.42
+                c, s = math.cos(sweep), math.sin(sweep)
+                dx, dz = p[:, 0] - px, p[:, 2] - pz
+                p[:, 0] = px + c * dx - s * dz
+                p[:, 2] = pz + s * dx + c * dz
+            if bite > 0:
+                w = self.jaw_weight(p[:, 0], p[:, 2])
+                p[:, 2] -= JAW_DROP * bite * w * (0.6 + (p[:, 0] - 1.86))
+                p[:, 0] -= 0.05 * bite * w
+            if name.startswith("EyeShine") and yaw:
+                # Highlights sit in front of the eye; keep them facing the camera as it turns.
+                eye = np.array(EYE_CENTER)
+                a = math.radians(yaw)
+                c, s = math.cos(a), math.sin(a)
+                d = p - eye
+                p[:, 0] = eye[0] + c * d[:, 0] - s * d[:, 1]
+                p[:, 1] = eye[1] + s * d[:, 0] + c * d[:, 1]
+            p[:, 2] += self.wave(p[:, 0], phase)
+            obj = bpy.data.objects[name]
+            obj.data.vertices.foreach_set("co", (p - loc).ravel())
+            obj.data.update()
+        self.pose_mouth(phase, bite)
+        self.rig.rotation_euler = (0, 0, -math.radians(yaw))
+        bpy.context.view_layer.update()
+
+    def pose_mouth(self, phase, bite):
+        lift = float(self.wave(np.array([2.27]), phase)[0])
+        drop = JAW_DROP * bite * (0.6 + 0.41)  # jaw drop at the mouth's centre
+        for name in MOUTH_PARTS:
+            obj = bpy.data.objects[name]
+            obj.hide_render = bite <= 0
+            loc, size = self.mouth_rest[name]
+            obj.location = loc.copy()
+            obj.scale = size.copy()
+            if name == "MouthOpen":
+                obj.scale.z = 0.03 + drop * 0.5
+                obj.location.z = 0.06 - drop * 0.5 + lift
+            elif name == "Tongue":
+                obj.scale.z = 0.02 + drop * 0.2
+                obj.location.z = 0.06 - drop * 0.75 + lift
+            else:  # teeth hang from the upper lip
+                obj.location.z = 0.03 + lift
+
+
+def render_frame(path):
     bpy.context.scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
+
+
+def build_sheet(paths):
+    """Packs the frame PNGs into one sheet, row-major from the top-left."""
+    rows = math.ceil(len(paths) / SHEET_COLS)
+    w, h = RENDER_W, RENDER_H
+    sheet = np.zeros((rows * h, SHEET_COLS * w, 4), dtype=np.float32)
+    for i, path in enumerate(paths):
+        img = bpy.data.images.load(path)
+        px = np.empty(w * h * 4, dtype=np.float32)
+        img.pixels.foreach_get(px)
+        bpy.data.images.remove(img)
+        r, c = divmod(i, SHEET_COLS)
+        # Blender images are stored bottom-up.
+        top = (rows - 1 - r) * h
+        sheet[top:top + h, c * w:(c + 1) * w] = px.reshape(h, w, 4)
+    out = bpy.data.images.new("SealSheet", SHEET_COLS * w, rows * h, alpha=True)
+    out.pixels.foreach_set(sheet.ravel())
+    path = os.path.join(OUT_DIR, SHEET_NAME)
+    out.filepath_raw = path
+    out.file_format = "PNG"
+    out.save()
+    bpy.data.images.remove(out)
     return path
 
 
+def render_all():
+    poser = Poser()
+    tmp = os.path.join(bpy.app.tempdir or os.getcwd(), "seal_frames")
+    os.makedirs(tmp, exist_ok=True)
+    os.makedirs(OUT_DIR, exist_ok=True)
+    poses = [dict(phase=2 * math.pi * i / SWIM_FRAMES) for i in range(SWIM_FRAMES)]
+    poses += [dict(bite=b) for b in BITE_OPEN]
+    poses += [dict(yaw=y) for y in TURN_YAWS]
+    paths = []
+    for i, kw in enumerate(poses):
+        poser.pose(**kw)
+        path = os.path.join(tmp, f"frame{i:02d}.png")
+        render_frame(path)
+        paths.append(path)
+    poser.pose()
+    return build_sheet(paths), len(paths)
+
+
 build()
-path = render()
-result = {"rendered": path, "objects": len(bpy.data.objects)}
+sheet, frames = render_all()
+result = {"rendered": sheet, "frames": frames, "objects": len(bpy.data.objects)}

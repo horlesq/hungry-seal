@@ -20,7 +20,9 @@ Interface art (wordmark, icons, upgrade symbols, gem, trophy/star/lock/check bad
 ## Blender pipeline
 3D-modeled sprites are built by Python scripts in `tools/blender/` (one per character) and rendered side-on with an orthographic camera, toon shading (two soft tones, no cast shadows) and an inverted-hull outline, so they match the chunky outlined style.
 - Open Blender (5.x) with the Blender Lab MCP add-on running (localhost:9876), and have `uv` installed.
-- `node tools/blender/bridge.mjs exec tools/blender/seal.py` rebuilds the scene and writes `public/assets/seal.png` (704x352 = 176x88 design units at `resolution: 4`). Headless alternative: `blender -b -P tools/blender/seal.py` from the repo root.
+- `node tools/blender/bridge.mjs exec tools/blender/seal.py` rebuilds the scene, poses it frame by frame and writes the sprite sheet `public/assets/seal-sheet.png` (528x264 frames = 176x88 design units at `resolution: 3`, 3 columns). Headless alternative: `blender -b -P tools/blender/seal.py` from the repo root.
+- Sheet layout (`SEAL_SHEET` in `src/config/assets.ts`, must match the script): frames 0-7 swim cycle, 8-10 bite (mouth opening), 11-13 turn (yaw 22.5/45/67.5 degrees toward the camera; the game mirrors them for the second half of a turn). `Seal.ts` picks frames from speed, bites and facing; single-image skins keep the squash/wiggle effects.
+- Posing bends vertices from their rest positions in Python (tail wave, flipper paddle, jaw drop), no armature, so the script stays one file.
 - Face details (eye, nose, whiskers) are placed by ray-casting onto the body, so body proportions can change without re-placing them.
 - Outline and line widths are sized for the in-game display (~130 px wide); judge the sprite in a playtest screenshot, not at full render size.
 - The add-on runs whatever code it gets without guards, so only run scripts from this repo.
@@ -41,4 +43,4 @@ Interface art (wordmark, icons, upgrade symbols, gem, trophy/star/lock/check bad
 - **P8:** final pass on everything, animation sets, VFX, full audio.
 
 ## Seal skins
-Each skin is its own texture key (`seal` = harbor, `seal-arctic`, `seal-sealion`, `seal-tropical`, `seal-leopard`, `seal-walrus`, `seal-elephant`, and the gem skins `seal-pirate`, `seal-golden`), 176x88 design units facing right, painted at 2x by `systems/sealArt.ts` until real art exists. The harbor seal (`seal`) is now the Blender render (see Blender pipeline). Real art must keep the muzzle at the right end (x ~150-165) so the mouth hit circle lines up. Distinct looks per growth stage are still open (art pass).
+Each skin is its own texture key (`seal` = harbor, `seal-arctic`, `seal-sealion`, `seal-tropical`, `seal-leopard`, `seal-walrus`, `seal-elephant`, and the gem skins `seal-pirate`, `seal-golden`), 176x88 design units facing right, painted at 2x by `systems/sealArt.ts` until real art exists. The harbor seal (`seal`) is now an animated Blender-rendered sprite sheet (see Blender pipeline). Real art must keep the muzzle at the right end (x ~150-165) so the mouth hit circle lines up. Distinct looks per growth stage are still open (art pass).

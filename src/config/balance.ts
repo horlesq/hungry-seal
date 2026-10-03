@@ -45,6 +45,9 @@ export const SEAL_VISUAL = {
   wiggleFreq: 3.2,
   /** Stretch along the body at full speed. */
   stretch: 0.08,
+  /** Animated seals: swim cycles per second at full speed, and bite length (seconds). */
+  swimCycleHz: 1.5,
+  biteTime: 0.26,
 } as const;
 
 export const CAMERA = {

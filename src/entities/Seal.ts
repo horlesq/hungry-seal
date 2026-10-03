@@ -1,8 +1,9 @@
 // The player seal. Movement comes from the pure sealMotion model; this class owns the
-// sprite, growth-stage scaling, the mouth hit circle, and the purely visual feel:
-// belly-roll when changing direction, swim wiggle, stretch at speed, gulp pop.
+// sprite, growth-stage scaling, the mouth hit circle, and the purely visual feel. Animated
+// skins (a SEAL_SHEET sprite sheet) play swim, bite and turn frames; single-image skins get a
+// belly-roll when changing direction and a swim wiggle. Both stretch at speed and pop on gulps.
 import Phaser from 'phaser';
-import { TextureKeys, type TextureKey } from '../config/assets';
+import { SEAL_SHEET, TextureKeys, type TextureKey } from '../config/assets';
 import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
 import { textureScale } from '../services/Viewport';
@@ -31,6 +32,11 @@ export class Seal extends Phaser.GameObjects.Sprite {
   /** -1 = facing left, 1 = facing right; animated through 0 for the roll effect. */
   private facing = 1;
   private wigglePhase = 0;
+  /** The texture is a SEAL_SHEET (swim/bite/turn frames) rather than a single image. */
+  private readonly animated: boolean;
+  /** Swim cycle position (radians) and seconds of bite animation left (animated skins). */
+  private swimPhase = 0;
+  private biteLeft = 0;
   /** Extra scale that decays back to 0 (gulps, growing). */
   private pop = 0;
   /** Seconds of post-hit invulnerability left (seal flashes). */
@@ -57,6 +63,8 @@ export class Seal extends Phaser.GameObjects.Sprite {
   ) {
     super(scene, x, y, texture);
     this.texScale = textureScale(scene, texture);
+    // frameTotal counts the whole-texture __BASE frame too.
+    this.animated = scene.textures.get(texture).frameTotal - 1 >= SEAL_SHEET.frameCount;
     this.mods = mods;
     this.motion = createSealMotionState(x, y);
     scene.add.existing(this);
@@ -172,6 +180,7 @@ export class Seal extends Phaser.GameObjects.Sprite {
   /** Quick gulp squash when eating. */
   chomp(): void {
     this.pop = Math.max(this.pop, 0.16);
+    this.biteLeft = SEAL_VISUAL.biteTime;
   }
 
   /** Bumped into something too big to eat: lose most of the speed. */
@@ -205,15 +214,19 @@ export class Seal extends Phaser.GameObjects.Sprite {
     this.pop = damp(this.pop, 0, 9, dt);
 
     const speedFrac = Math.min(1, this.speedFraction);
-    this.wigglePhase += dt * Math.PI * 2 * SEAL_VISUAL.wiggleFreq * (0.35 + speedFrac);
-    const wiggle = m.inWater ? Math.sin(this.wigglePhase) * SEAL_VISUAL.wiggleAmp * speedFrac : 0;
-
-    // Rotation follows the heading; a negative Y scale keeps the seal belly-down when facing
-    // left. Passing the scale through 0 reads as a quick barrel roll.
-    this.setRotation(m.heading + wiggle * this.facing);
     const stretch = 1 + SEAL_VISUAL.stretch * speedFrac;
     const base = this.baseScale * this.texScale * (1 + this.pop);
-    this.setScale(base * stretch, base * (2 - stretch) * this.facing);
+    if (this.animated) this.updateFrames(dt, speedFrac, stretch, base);
+    else {
+      this.wigglePhase += dt * Math.PI * 2 * SEAL_VISUAL.wiggleFreq * (0.35 + speedFrac);
+      const wiggle = m.inWater
+        ? Math.sin(this.wigglePhase) * SEAL_VISUAL.wiggleAmp * speedFrac
+        : 0;
+      // Rotation follows the heading; a negative Y scale keeps the seal belly-down when facing
+      // left. Passing the scale through 0 reads as a quick barrel roll.
+      this.setRotation(m.heading + wiggle * this.facing);
+      this.setScale(base * stretch, base * (2 - stretch) * this.facing);
+    }
 
     // Hit feedback: white flash, electric tint while stunned, blinking while invulnerable.
     if (this.flash > 0) this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
@@ -232,5 +245,41 @@ export class Seal extends Phaser.GameObjects.Sprite {
       this.setTintMode(Phaser.TintModes.MULTIPLY);
     } else this.clearTint();
     this.setAlpha(this.invuln > 0 && Math.floor(this.invuln * 14) % 2 === 0 ? 0.35 : 1);
+  }
+
+  /**
+   * Sprite-sheet seal: the turn plays the rendered yaw frames (mirrored past half way), the
+   * body tilts with the climb/dive angle, and the swim cycle speeds up with speed.
+   */
+  private updateFrames(dt: number, speedFrac: number, stretch: number, base: number): void {
+    const m = this.motion;
+    if (m.inWater) {
+      this.swimPhase += dt * Math.PI * 2 * SEAL_VISUAL.swimCycleHz * (0.35 + speedFrac);
+      this.swimPhase %= Math.PI * 2;
+    }
+    this.biteLeft = Math.max(0, this.biteLeft - dt);
+
+    // Turn progress 0 (facing right) -> 1 (facing left). A yaw of 180 - a looks like the
+    // yaw-a frame mirrored, so the second half reuses the frames flipped.
+    const turn = (1 - this.facing) / 2;
+    const flipped = turn > 0.5;
+    const step = Math.round(Math.min(turn, 1 - turn) * 8); // 22.5 degree steps, 0..4
+    let frame: number;
+    if (step > 0) frame = SEAL_SHEET.turn[Math.min(step, SEAL_SHEET.turn.length) - 1];
+    else if (this.biteLeft > 0) {
+      const open = Math.sin(Math.PI * (1 - this.biteLeft / SEAL_VISUAL.biteTime));
+      const n = SEAL_SHEET.bite.length;
+      frame = SEAL_SHEET.bite[Math.min(n - 1, Math.floor(open * n))];
+    } else {
+      const n = SEAL_SHEET.swim.length;
+      frame = SEAL_SHEET.swim[Math.floor((this.swimPhase / (Math.PI * 2)) * n) % n];
+    }
+    if (this.frame.name !== String(frame)) this.setFrame(frame);
+
+    // Tilt by the climb/dive angle only; the facing comes from the frames and the flip.
+    const pitch = Math.atan2(Math.sin(m.heading), Math.abs(Math.cos(m.heading)));
+    this.setFlipX(flipped);
+    this.setRotation(flipped ? -pitch : pitch);
+    this.setScale(base * stretch, base * (2 - stretch));
   }
 }
