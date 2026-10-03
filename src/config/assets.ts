@@ -83,42 +83,66 @@ export const SEAL_SHEET = {
   frameCount: 14,
 } as const;
 
-export const ASSET_MANIFEST: readonly AssetEntry[] = [
-  {
+/** Pixels per design unit of the Blender-rendered sheets (tools/blender). */
+const SHEET_RES = 3;
+
+/** A Blender-rendered animation sheet: `<key>-sheet.png`, frames of w x h design units. */
+function sheet(key: TextureKey, w: number, h: number, file = `${key}-sheet.png`): AssetEntry {
+  return {
     type: 'spritesheet',
-    key: TextureKeys.Seal,
-    url: 'assets/seal-sheet.png',
-    resolution: 3,
-    frameWidth: 528,
-    frameHeight: 264,
-  },
-  { type: 'image', key: TextureKeys.SealArctic },
-  { type: 'image', key: TextureKeys.SealSeaLion },
-  { type: 'image', key: TextureKeys.SealTropical },
-  { type: 'image', key: TextureKeys.SealLeopard },
-  { type: 'image', key: TextureKeys.SealWalrus },
-  { type: 'image', key: TextureKeys.SealElephant },
-  { type: 'image', key: TextureKeys.SealPirate },
-  { type: 'image', key: TextureKeys.SealGolden },
-  { type: 'image', key: TextureKeys.Minnow },
-  { type: 'image', key: TextureKeys.Shrimp },
-  { type: 'image', key: TextureKeys.Sardine },
-  { type: 'image', key: TextureKeys.Squid },
-  { type: 'image', key: TextureKeys.Penguin },
-  { type: 'image', key: TextureKeys.Turtle },
-  { type: 'image', key: TextureKeys.Seabird },
-  { type: 'image', key: TextureKeys.Pufferfish },
-  { type: 'image', key: TextureKeys.PufferfishPuffed },
-  { type: 'image', key: TextureKeys.Crab },
-  { type: 'image', key: TextureKeys.Lanternfish },
+    key,
+    url: `assets/${file}`,
+    resolution: SHEET_RES,
+    frameWidth: w * SHEET_RES,
+    frameHeight: h * SHEET_RES,
+  };
+}
+
+/** Seal skins share one frame size and the SEAL_SHEET layout. */
+const sealSheet = (key: TextureKey, file?: string) => sheet(key, 176, 88, file);
+
+/**
+ * Looping animation speed (frames per second) of creature sheets; anything not listed plays
+ * at DEFAULT_ANIM_FPS. A texture with a single frame doesn't animate.
+ */
+export const ANIM_FPS: Partial<Record<TextureKey, number>> = {
+  [TextureKeys.Seabird]: 9,
+  [TextureKeys.Turtle]: 5,
+  [TextureKeys.Jellyfish]: 4,
+  [TextureKeys.PufferfishPuffed]: 5,
+  [TextureKeys.Orca]: 7,
+};
+export const DEFAULT_ANIM_FPS = 8;
+
+export const ASSET_MANIFEST: readonly AssetEntry[] = [
+  sealSheet(TextureKeys.Seal, 'seal-sheet.png'),
+  sealSheet(TextureKeys.SealArctic),
+  sealSheet(TextureKeys.SealSeaLion),
+  sealSheet(TextureKeys.SealTropical),
+  sealSheet(TextureKeys.SealLeopard),
+  sealSheet(TextureKeys.SealWalrus),
+  sealSheet(TextureKeys.SealElephant),
+  sealSheet(TextureKeys.SealPirate),
+  sealSheet(TextureKeys.SealGolden),
+  sheet(TextureKeys.Minnow, 48, 26),
+  sheet(TextureKeys.Shrimp, 44, 32),
+  sheet(TextureKeys.Sardine, 60, 26),
+  sheet(TextureKeys.Squid, 70, 36),
+  sheet(TextureKeys.Penguin, 60, 34),
+  sheet(TextureKeys.Turtle, 86, 58),
+  sheet(TextureKeys.Seabird, 72, 44),
+  sheet(TextureKeys.Pufferfish, 40, 32),
+  sheet(TextureKeys.PufferfishPuffed, 40, 40),
+  sheet(TextureKeys.Crab, 52, 36),
+  sheet(TextureKeys.Lanternfish, 38, 20),
   { type: 'image', key: TextureKeys.Darkness },
   { type: 'image', key: TextureKeys.Chest },
   { type: 'image', key: TextureKeys.ChestOpen },
   { type: 'image', key: TextureKeys.MagnetOrb },
-  { type: 'image', key: TextureKeys.Shark },
-  { type: 'image', key: TextureKeys.Orca },
-  { type: 'image', key: TextureKeys.Anglerfish },
-  { type: 'image', key: TextureKeys.Jellyfish },
+  sheet(TextureKeys.Shark, 220, 104),
+  sheet(TextureKeys.Orca, 250, 120),
+  sheet(TextureKeys.Anglerfish, 130, 96),
+  sheet(TextureKeys.Jellyfish, 60, 80),
   { type: 'image', key: TextureKeys.Mine },
   { type: 'image', key: TextureKeys.Coin },
   { type: 'image', key: TextureKeys.Spark },

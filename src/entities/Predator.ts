@@ -9,6 +9,7 @@ import type { PredatorDef } from '../config/predators';
 import { zoneBand } from '../config/zones';
 import { textureScale, uiTextResolution } from '../services/Viewport';
 import { createPredatorMotion, type PredatorMotion } from './predatorAI';
+import { loopFrames } from './sheetAnim';
 
 export class Predator extends Phaser.GameObjects.Sprite {
   def!: PredatorDef;
@@ -17,6 +18,8 @@ export class Predator extends Phaser.GameObjects.Sprite {
   private readonly alert: Phaser.GameObjects.Text;
   private glow: Phaser.GameObjects.Image | null = null;
   private facing = 1;
+  /** Seconds into the swim animation loop. */
+  private animTime = 0;
 
   // Signature matches what Phaser.GameObjects.Group passes when creating pool members.
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
@@ -42,6 +45,7 @@ export class Predator extends Phaser.GameObjects.Sprite {
     this.motion.speed = def.patrolSpeed;
     this.band = zoneBand(def.zones);
     this.facing = Math.cos(heading) >= 0 ? 1 : -1;
+    this.animTime = Math.random() * 10;
     this.setTexture(def.texture)
       .clearTint()
       .setAlpha(1)
@@ -88,6 +92,8 @@ export class Predator extends Phaser.GameObjects.Sprite {
     const target = cos > 0.1 ? 1 : cos < -0.1 ? -1 : this.facing >= 0 ? 1 : -1;
     this.facing += (target - this.facing) * Math.min(1, dt * 8);
     this.setRotation(m.heading);
+    this.animTime += dt;
+    loopFrames(this, this.animTime);
     const s = this.def.scale * textureScale(this.scene, this.def.texture);
     this.setScale(s, s * this.facing);
 

@@ -126,9 +126,10 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 ## Phase 8 — Art, audio, and polish
 - [~] Final consistent art style pass (Hungry Shark-like chunky cartoon): seal, creatures, backgrounds, UI, icons
   - [x] Blender pipeline: `tools/blender/bridge.mjs` drives Blender over MCP; toon shader + inverted-hull outline
-  - [x] Harbor seal modeled in Blender (`tools/blender/seal.py`), rendered as an animated sprite sheet (swim, bite, turn)
-  - [ ] Other skins, creatures and predators in the same style
-- [~] Animations: swim cycle, bite, hurt, death, creature idles (seal swim/bite/turn done)
+  - [x] All 9 seal skins modeled in Blender (`tools/blender/seal.py`), animated sheets (swim, bite, turn)
+  - [x] All creatures, predators and the jellyfish modeled (`tools/blender/creatures.py`) with looping animations
+  - [ ] Chest, mine, coin, pickups, backgrounds in the same style
+- [~] Animations: swim cycle, bite, hurt, death, creature idles (seal swim/bite/turn and creature swim/flap/walk/pulse loops done)
 - [ ] Lighting/effects: light rays, caustics, depth fog, splash, bubble trails
 - [ ] Full SFX set and 2-3 music tracks per zone/menu, volume settings
 - [~] Menu/shop/game-over UI polish, transitions (done in the UI/UX refresh); tutorial refinement

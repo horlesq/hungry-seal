@@ -12,6 +12,7 @@ import {
   type CreatureMotionParams,
 } from './creatureAI';
 import { Depths } from '../config/depths';
+import { loopFrames } from './sheetAnim';
 
 /** A group of creatures that follow the first living member. */
 export class School {
@@ -40,6 +41,8 @@ export class Creature extends Phaser.GameObjects.Sprite {
   /** Seconds until this creature can bump the seal again. */
   bumpCooldown = 0;
   private facing = 1;
+  /** Seconds into the swim/flap animation loop. */
+  private animTime = 0;
   /** def.scale adjusted for the texture's pixel density. */
   private displayScale = 1;
   /** Soft light for glowing species, drawn above the deep-water darkness. */
@@ -65,6 +68,8 @@ export class Creature extends Phaser.GameObjects.Sprite {
     this.facing = Math.cos(heading) >= 0 ? 1 : -1;
     this.displayScale = def.scale * textureScale(this.scene, def.texture);
     this.shownPuffed = false;
+    // Random start so schools don't flap in lockstep.
+    this.animTime = Math.random() * 10;
     this.setTexture(def.texture)
       .setActive(true)
       .setVisible(true)
@@ -119,6 +124,7 @@ export class Creature extends Phaser.GameObjects.Sprite {
     const m = this.motion;
     this.setPosition(m.x, m.y);
     this.bumpCooldown = Math.max(0, this.bumpCooldown - dt);
+    this.animTime += dt;
     const cos = Math.cos(m.heading);
     const target = cos > 0.1 ? 1 : cos < -0.1 ? -1 : this.facing >= 0 ? 1 : -1;
 
@@ -139,6 +145,7 @@ export class Creature extends Phaser.GameObjects.Sprite {
       this.setRotation(m.heading);
       this.setScale(s, s * this.facing);
     }
+    loopFrames(this, this.animTime);
     this.glow?.setPosition(m.x, m.y);
   }
 }

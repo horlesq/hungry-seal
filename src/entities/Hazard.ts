@@ -6,6 +6,7 @@ import type { HazardDef } from '../config/hazards';
 import { textureScale } from '../services/Viewport';
 import { TAU } from '../utils/math';
 import { Depths } from '../config/depths';
+import { loopFrames } from './sheetAnim';
 
 export class Hazard extends Phaser.GameObjects.Sprite {
   def!: HazardDef;
@@ -65,6 +66,9 @@ export class Hazard extends Phaser.GameObjects.Sprite {
       this.setRotation(Math.sin(phase) * 0.12);
       if (blinkOn) this.setTint(0xffc0b0);
       else this.clearTint();
+    } else if (this.texture.frameTotal > 2) {
+      // Animated sheet: the pulse is in the frames.
+      loopFrames(this, this.age);
     } else {
       // Jellyfish pulse: squash on the upstroke.
       const pulse = Math.sin(phase * 2);

@@ -3,6 +3,8 @@
 // serving localhost:9876, and `uv` installed (the server is fetched with uvx, pinned below).
 //
 //   node tools/blender/bridge.mjs exec tools/blender/seal.py   run a Python file in Blender
+//   node tools/blender/bridge.mjs exec tools/blender/seal.py ONLY=walrus   ...with NAME="value"
+//                                                                 globals set first
 //   node tools/blender/bridge.mjs get_objects_summary '{}'     call any MCP tool with JSON args
 //
 // Scripts get `REPO` (this repo's root) defined, and must set `result` to a dict.
@@ -17,7 +19,7 @@ const SERVER =
 const TIMEOUT_MS = 600_000;
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const [tool = 'get_objects_summary', arg = '{}'] = process.argv.slice(2);
+const [tool = 'get_objects_summary', arg = '{}', ...vars] = process.argv.slice(2);
 const server = spawn(process.env.UVX ?? 'uvx', ['--from', SERVER, 'blender-mcp'], {
   stdio: ['pipe', 'pipe', 'inherit'],
 });
@@ -70,7 +72,16 @@ const call =
   tool === 'exec'
     ? {
         name: 'execute_blender_code',
-        arguments: { code: `REPO = ${JSON.stringify(REPO)}\n${readFileSync(arg, 'utf8')}` },
+        arguments: {
+          code: [
+            `REPO = ${JSON.stringify(REPO)}`,
+            ...vars.map((v) => {
+              const i = v.indexOf('=');
+              return `${v.slice(0, i)} = ${JSON.stringify(v.slice(i + 1))}`;
+            }),
+            readFileSync(arg, 'utf8'),
+          ].join('\n'),
+        },
       }
     : { name: tool, arguments: JSON.parse(arg) };
 const reply = await request('tools/call', call);
