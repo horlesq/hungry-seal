@@ -4,7 +4,7 @@
 import { TextureKeys, type TextureKey } from './assets';
 import type { ZoneId } from './zones';
 
-export type PredatorId = 'shark' | 'orca' | 'anglerfish';
+export type PredatorId = 'shark' | 'orca' | 'anglerfish' | 'barracuda' | 'hammerhead';
 
 export type PredatorSpawn =
   /** Max alive grows with run time. */
@@ -52,6 +52,12 @@ export interface PredatorDef {
   spawn: PredatorSpawn;
   /** Glowing spot (world px from the centre when facing right), visible in dark water. */
   glow?: { x: number; y: number; color: number; size: number };
+  /** Spawns several together (barracuda packs, hammerhead pairs). */
+  pack?: { min: number; max: number; spread: number };
+  /** Only spawns while the camera is in one of these map regions (region ids, any map). */
+  regions?: readonly string[];
+  /** Tint over the texture (stand-in colouring until a predator has its own art). */
+  tint?: number;
 }
 
 export const PREDATORS: Record<PredatorId, PredatorDef> = {
@@ -160,6 +166,74 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     zones: ['deep', 'abyss'],
     spawn: { kind: 'zone', zones: ['deep', 'abyss'], after: 20, max: 3 },
     glow: { x: 58, y: -44, color: 0x9ffcff, size: 0.55 },
+  },
+  // Fast, toothy, in packs: small bites but they come from several sides.
+  barracuda: {
+    id: 'barracuda',
+    name: 'Barracuda',
+    texture: TextureKeys.Sardine,
+    tint: 0xb9d6c4,
+    tier: 4,
+    radius: 16,
+    mouthOffset: 36,
+    mouthRadius: 14,
+    scale: 1.7,
+    patrolSpeed: 140,
+    chaseSpeed: 470,
+    fleeSpeed: 480,
+    turnRate: 3.2,
+    chaseTurnRate: 3.0,
+    accel: 900,
+    noticeRadius: 380,
+    loseRadius: 760,
+    telegraphTime: 0.5,
+    maxChaseTime: 3.5,
+    recoverTime: 1.4,
+    cooldown: 3,
+    damage: 10,
+    knockback: 300,
+    nutrition: 22,
+    score: 110,
+    growth: 18,
+    coins: 2,
+    zones: ['reef', 'ocean'],
+    spawn: { kind: 'zone', zones: ['reef', 'ocean'], after: 35, max: 4 },
+    pack: { min: 3, max: 4, spread: 90 },
+    regions: ['kelp', 'wrecks', 'shark-shelf', 'floes', 'tanker', 'city', 'hammerheads', 'pirate-cove'],
+  },
+  // The big danger of open water: charges in pairs.
+  hammerhead: {
+    id: 'hammerhead',
+    name: 'Hammerhead',
+    texture: TextureKeys.Shark,
+    tint: 0xc9b39a,
+    tier: 6,
+    radius: 38,
+    mouthOffset: 80,
+    mouthRadius: 26,
+    scale: 1.15,
+    patrolSpeed: 130,
+    chaseSpeed: 410,
+    fleeSpeed: 440,
+    turnRate: 2.6,
+    chaseTurnRate: 2.3,
+    accel: 560,
+    noticeRadius: 520,
+    loseRadius: 980,
+    telegraphTime: 0.7,
+    maxChaseTime: 6,
+    recoverTime: 1.8,
+    cooldown: 4,
+    damage: 32,
+    knockback: 560,
+    nutrition: 55,
+    score: 400,
+    growth: 55,
+    coins: 8,
+    zones: ['ocean', 'deep'],
+    spawn: { kind: 'zone', zones: ['ocean', 'deep'], after: 40, max: 2 },
+    pack: { min: 1, max: 2, spread: 220 },
+    regions: ['shark-shelf', 'hammerheads', 'icebergs'],
   },
 };
 

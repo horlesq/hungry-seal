@@ -48,6 +48,8 @@ export interface SealMotionEnv {
   surfaceY: number;
   floorY: number;
   terrain?: TerrainQuery;
+  /** Water currents: sets `out` to the flow velocity (px/s) at (x, y); false = none. */
+  flow?: (x: number, y: number, out: { x: number; y: number }) => boolean;
 }
 
 export interface SealMotionInput {
@@ -127,6 +129,10 @@ export function stepSealMotion(
 
   s.x += (s.vx + s.kx) * dt;
   s.y += (s.vy + s.ky) * dt;
+  if (env.flow && s.inWater && env.flow(s.x, s.y, flowOut)) {
+    s.x += flowOut.x * dt;
+    s.y += flowOut.y * dt;
+  }
   const decay = Math.exp(-p.knockDecay * dt);
   s.kx *= decay;
   s.ky *= decay;
@@ -140,6 +146,7 @@ export function stepSealMotion(
 }
 
 const normal = { x: 0, y: 0 };
+const flowOut = { x: 0, y: 0 };
 
 /**
  * Keeps the seal out of the rock: pushes it back out and drops the part of its velocity

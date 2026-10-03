@@ -33,6 +33,7 @@ import {
 import { Button } from '../ui/Button';
 import { COLORS, CSS, drawPanel, EDGE, formatNumber, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
+import { PEARL_KEY } from '../systems/Pearls';
 import { drawBar, drawSegments } from '../ui/widgets';
 
 /** Status panel geometry (relative to its top-left corner). */
@@ -58,11 +59,18 @@ export class HudScene extends Phaser.Scene {
   private bannerRoot!: Phaser.GameObjects.Container;
   private bannerTitle!: Phaser.GameObjects.Text;
   private bannerBlurb!: Phaser.GameObjects.Text;
+  /** Five pips under the banner: how dangerous the region is. */
+  private bannerDanger!: Phaser.GameObjects.Graphics;
   private bannerY = 0;
   private scoreRoot!: Phaser.GameObjects.Container;
   private scoreText!: Phaser.GameObjects.Text;
   private coinText!: Phaser.GameObjects.Text;
   private coinIcon!: Phaser.GameObjects.Image;
+  private pearlText!: Phaser.GameObjects.Text;
+  private pearlIcon!: Phaser.GameObjects.Image;
+  private bossRoot: Phaser.GameObjects.Container | null = null;
+  private bossBar!: Phaser.GameObjects.Graphics;
+  private bossName!: Phaser.GameObjects.Text;
   private coins = 0;
   private magnetRoot!: Phaser.GameObjects.Container;
   private magnetText!: Phaser.GameObjects.Text;
@@ -147,6 +155,8 @@ export class HudScene extends Phaser.Scene {
       EventBus.on('run:growth', this.onGrowth, this),
       EventBus.on('run:score', (score) => (this.targetScore = score)),
       EventBus.on('run:coins', this.onCoins, this),
+      EventBus.on('run:pearls', this.onPearls, this),
+      EventBus.on('boss:hp', this.onBossHp, this),
       EventBus.on('run:magnet', this.onMagnet, this),
       EventBus.on('run:combo', this.onCombo, this),
       EventBus.on('run:frenzy', (state) => (this.frenzy = state)),
@@ -295,6 +305,14 @@ export class HudScene extends Phaser.Scene {
     this.coinIcon = this.add
       .image(0, 0, TextureKeys.Coin)
       .setScale(0.95 * textureScale(this, TextureKeys.Coin));
+    // Pearls found on this map.
+    this.pearlText = uiText(this, 0, 100, '', 'heading', {
+      size: 24,
+      color: '#ffd6f5',
+      outline: 6,
+    }).setOrigin(1, 0);
+    this.pearlIcon = this.add.image(0, 0, PEARL_KEY);
+    this.pearlIcon.setScale(26 / this.pearlIcon.width);
 
     // Coin-magnet timer chip (hidden until a magnet orb is grabbed).
     this.magnetBg = this.add.graphics();
@@ -305,12 +323,14 @@ export class HudScene extends Phaser.Scene {
       0.5,
     );
     this.magnetRoot = this.add
-      .container(0, 124, [this.magnetBg, magnet, this.magnetText])
+      .container(0, 160, [this.magnetBg, magnet, this.magnetText])
       .setVisible(false);
     this.scoreRoot = this.add.container(0, 0, [
       this.scoreText,
       this.coinIcon,
       this.coinText,
+      this.pearlIcon,
+      this.pearlText,
       this.magnetRoot,
     ]);
     this.root.add(this.scoreRoot);
@@ -322,6 +342,30 @@ export class HudScene extends Phaser.Scene {
     this.coinText.setText(formatNumber(coins));
     // Keep the icon just left of the right-aligned number as it grows.
     this.coinIcon.setPosition(-this.coinText.width - 18, 62 + this.coinText.height / 2);
+  }
+
+  /** Boss health bar, top centre, while the seal is in the lair. */
+  private onBossHp(b: { name: string; hp: number; max: number; show: boolean }): void {
+    if (!this.bossRoot) {
+      this.bossBar = this.add.graphics();
+      this.bossName = uiText(this, 0, 0, '', 'heading', { size: 26, outline: 6 }).setOrigin(0.5, 1);
+      this.bossRoot = this.add.container(0, 0, [this.bossBar, this.bossName]);
+    }
+    const v = getViewport();
+    this.bossRoot.setPosition(v.viewWidth / 2, getSafeInsets().top + 168).setVisible(b.show);
+    if (!b.show) return;
+    this.bossName.setText(b.name);
+    const w = 360;
+    const g = this.bossBar.clear();
+    drawBar(g, -w / 2, 6, w, 18, b.hp / b.max, COLORS.coral);
+    // Heart notches.
+    g.lineStyle(2, COLORS.trench, 0.9);
+    for (let i = 1; i < b.max; i++) g.lineBetween(-w / 2 + (w * i) / b.max, 6, -w / 2 + (w * i) / b.max, 24);
+  }
+
+  private onPearls(p: { found: number; total: number }): void {
+    this.pearlText.setText(`${p.found}/${p.total}`);
+    this.pearlIcon.setPosition(-this.pearlText.width - 18, 100 + this.pearlText.height / 2);
   }
 
   private onMagnet(seconds: number): void {
@@ -351,7 +395,10 @@ export class HudScene extends Phaser.Scene {
       color: CSS.foam,
       outline: 5,
     }).setOrigin(0.5, 0);
-    this.bannerRoot = this.add.container(0, 0, [this.bannerTitle, this.bannerBlurb]).setAlpha(0);
+    this.bannerDanger = this.add.graphics();
+    this.bannerRoot = this.add
+      .container(0, 0, [this.bannerTitle, this.bannerBlurb, this.bannerDanger])
+      .setAlpha(0);
   }
 
   private onHint(text: string | null): void {
@@ -380,9 +427,10 @@ export class HudScene extends Phaser.Scene {
     });
   }
 
-  private onZone(zone: { name: string; blurb: string }): void {
+  private onZone(zone: { name: string; blurb: string; danger?: number }): void {
     this.bannerTitle.setText(zone.name);
     this.bannerBlurb.setText(zone.blurb);
+    this.drawDanger(zone.danger ?? 0);
     this.tweens.killTweensOf(this.bannerRoot);
     const y = this.bannerY;
     this.bannerRoot.setAlpha(0).setY(y - 20);
@@ -393,6 +441,21 @@ export class HudScene extends Phaser.Scene {
         { alpha: 0, y: y - 10, delay: 2200, duration: 500 },
       ],
     });
+  }
+
+  /** Danger rating as 5 pips (calm green, gold, coral red), under the blurb. */
+  private drawDanger(danger: number): void {
+    const g = this.bannerDanger.clear();
+    if (danger <= 0) return;
+    const color = danger <= 2 ? COLORS.kelp : danger === 3 ? COLORS.gold : COLORS.coral;
+    const y = this.bannerBlurb.y + this.bannerBlurb.height + 18;
+    const gap = 26;
+    for (let i = 0; i < 5; i++) {
+      const x = (i - 2) * gap;
+      g.fillStyle(COLORS.trench, 0.75).fillCircle(x, y, 10);
+      if (i < danger) g.fillStyle(color, 1).fillCircle(x, y, 7);
+      else g.lineStyle(2, COLORS.mist, 0.5).strokeCircle(x, y, 6);
+    }
   }
 
   /** Top-centre combo readout: multiplier, meal count and a shrinking timer bar. */

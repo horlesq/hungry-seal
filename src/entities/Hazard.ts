@@ -69,6 +69,8 @@ export class Hazard extends Phaser.GameObjects.Sprite {
       else if (saves.data.settings.highContrast) {
         this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       } else this.setTint(0xffc0b0).setTintMode(Phaser.TintModes.MULTIPLY);
+    } else if (d.still) {
+      // Urchins: no pulse.
     } else if (this.texture.frameTotal > 2) {
       // Animated sheet: the pulse is in the frames.
       loopFrames(this, this.age);

@@ -2,7 +2,7 @@
 import { TextureKeys, type TextureKey } from './assets';
 import type { ZoneId } from './zones';
 
-export type HazardId = 'jellyfish' | 'mine';
+export type HazardId = 'jellyfish' | 'mine' | 'urchin';
 
 export interface HazardDef {
   id: HazardId;
@@ -27,6 +27,8 @@ export interface HazardDef {
   weight: number;
   /** Glow drawn above the deep-water darkness so hazards stay visible. */
   glow: { color: number; size: number; blink: boolean };
+  /** No squash/pulse animation (urchins just sit there). */
+  still?: boolean;
 }
 
 export const HAZARDS: Record<HazardId, HazardDef> = {
@@ -63,6 +65,25 @@ export const HAZARDS: Record<HazardId, HazardDef> = {
     zones: ['ocean', 'deep', 'abyss'],
     weight: 2,
     glow: { color: 0xff3b30, size: 0.28, blink: true },
+  },
+  // Placed by the map on urchin beds (never spawned at random: no zones).
+  urchin: {
+    id: 'urchin',
+    name: 'Sea urchin',
+    texture: TextureKeys.DecorUrchin,
+    radius: 17,
+    scale: 1,
+    damage: 8,
+    knockback: 420,
+    stun: 0.4,
+    explodes: false,
+    driftSpeed: 0,
+    bobAmp: 0,
+    bobFreq: 0,
+    zones: [],
+    weight: 0,
+    glow: { color: 0xb07cff, size: 0.14, blink: false },
+    still: true,
   },
 };
 

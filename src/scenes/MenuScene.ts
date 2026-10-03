@@ -2,6 +2,8 @@
 // fullscreen toggles, and the seal floating on the right, watching the pointer.
 // Keys: arrows / Tab + Enter, S = upgrades, M = mute, F = fullscreen.
 import Phaser from 'phaser';
+import { MAP_ORDER } from '../config/maps';
+import { GameMap } from '../world/GameMap';
 import { SoundKeys } from '../audio/sounds';
 import { skinDef } from '../config/skins';
 import { SceneKeys } from '../config/keys';
@@ -59,6 +61,10 @@ export class MenuScene extends Phaser.Scene {
     this.lookAt = null;
     this.sealRotation = 0;
     audio.startMusic();
+    // Bake the maps' terrain in the background so starting a run doesn't hitch.
+    void GameMap.prefetch(saves.data.maps.selected).then(() => {
+      for (const id of MAP_ORDER) void GameMap.prefetch(id);
+    });
     const v = fitUiCamera(this);
     const safe = getSafeInsets();
     const save = saves.data;

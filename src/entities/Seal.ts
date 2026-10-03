@@ -22,6 +22,8 @@ import {
 } from './sealMotion';
 
 const STAGE1_SCALE = GROWTH.stages[0].scale;
+/** Top speed multiplier while tangled in a net. */
+const NET_SLOW = 0.3;
 
 export class Seal extends Phaser.GameObjects.Sprite {
   readonly motion: SealMotionState;
@@ -52,10 +54,13 @@ export class Seal extends Phaser.GameObjects.Sprite {
   private readonly mods: RunModifiers;
   /** Temporary speed multiplier (frenzy). */
   private speedBonus = 1;
+  /** Seconds left tangled in a fishing net (slowed). */
+  private trapLeft = 0;
   private frenzy = false;
   private frenzyHue = 0;
   /** World limits and the map's rock. */
   private readonly env: SealMotionEnv = { ...WORLD, terrain: currentMap().terrain };
+
 
   /** `texture`: the equipped skin (cosmetic only). */
   constructor(
@@ -76,9 +81,24 @@ export class Seal extends Phaser.GameObjects.Sprite {
     this.setStage(1, false);
   }
 
+  /** Water currents (size gates) that push the seal around. */
+  setFlow(flow: SealMotionEnv['flow']): void {
+    this.env.flow = flow;
+  }
+
   /** Frenzy glow on/off (visual only; the rules live in GameScene). */
   setFrenzy(on: boolean): void {
     this.frenzy = on;
+  }
+
+  /** Tangled in a net: much slower for a few seconds. */
+  trap(seconds: number): void {
+    this.trapLeft = Math.max(this.trapLeft, seconds);
+    this.updateParams();
+  }
+
+  get isTrapped(): boolean {
+    return this.trapLeft > 0;
   }
 
   /** Temporary speed multiplier on top of stage and upgrades (1 = none). */
@@ -93,6 +113,10 @@ export class Seal extends Phaser.GameObjects.Sprite {
     this.invuln = Math.max(0, this.invuln - dt);
     this.stun = Math.max(0, this.stun - dt);
     this.flash = Math.max(0, this.flash - dt);
+    if (this.trapLeft > 0) {
+      this.trapLeft = Math.max(0, this.trapLeft - dt);
+      if (this.trapLeft === 0) this.updateParams();
+    }
     const events = stepSealMotion(this.motion, input, this.params, this.env, dt);
     this.setPosition(this.motion.x, this.motion.y);
     this.updateVisuals(dt);
@@ -115,7 +139,12 @@ export class Seal extends Phaser.GameObjects.Sprite {
     const b = SEAL_MOTION.boost;
     this.params = {
       ...SEAL_MOTION,
-      maxSpeed: SEAL_MOTION.maxSpeed * cfg.speedMult * this.mods.speedMult * this.speedBonus,
+      maxSpeed:
+        SEAL_MOTION.maxSpeed *
+        cfg.speedMult *
+        this.mods.speedMult *
+        this.speedBonus *
+        (this.trapLeft > 0 ? NET_SLOW : 1),
       radius: SEAL_MOTION.radius * (cfg.scale / STAGE1_SCALE),
       boost: {
         ...b,

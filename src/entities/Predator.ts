@@ -110,7 +110,8 @@ export class Predator extends Phaser.GameObjects.Sprite {
       // High contrast: a white blink (brightness, not hue) instead of a red tint.
       if (saves.data.settings.highContrast) this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       else this.setTint(0xff8080).setTintMode(Phaser.TintModes.MULTIPLY);
-    } else this.clearTint();
+    } else if (this.def.tint !== undefined) this.setTint(this.def.tint).setTintMode(Phaser.TintModes.MULTIPLY);
+    else this.clearTint();
     this.alert
       .setVisible(warning || (m.state === 'chase' && m.stateTime < 0.4))
       .setPosition(m.x, m.y - 50);

@@ -42,6 +42,22 @@ const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   },
   [TextureKeys.Crab]: { width: 52, height: 36, draw: drawCrab, res: HI },
   [TextureKeys.Lanternfish]: { width: 38, height: 20, draw: drawLanternfish, res: HI },
+  [TextureKeys.Boat]: { width: 360, height: 200, draw: drawBoat, res: HI },
+  [TextureKeys.Net]: { width: 120, height: 120, draw: drawNet, res: HI },
+  [TextureKeys.Harpoon]: { width: 90, height: 16, draw: drawHarpoon, res: HI },
+  [TextureKeys.Crate]: { width: 46, height: 40, draw: drawCrate, res: HI },
+  [TextureKeys.MorayEel]: {
+    width: 170,
+    height: 44,
+    draw: (c, w, h) => drawEel(c, w, h, '#6f8a3a', '#c9d98a', '#2c3a14', '#3e5220'),
+    res: HI,
+  },
+  [TextureKeys.ElectricEel]: {
+    width: 180,
+    height: 44,
+    draw: (c, w, h) => drawEel(c, w, h, '#24345c', '#5c78b8', '#0c1430', '#ffe14d'),
+    res: HI,
+  },
   [TextureKeys.Darkness]: { width: 256, height: 256, draw: drawDarkness },
   [TextureKeys.Chest]: {
     width: 64,
@@ -662,6 +678,185 @@ function drawCrab(ctx: Ctx, w: number, h: number): void {
     ctx.arc(cx + dx + 0.6, cy - 15, 1.3, 0, TAU);
     ctx.fill();
   }
+}
+
+/** A little fishing boat facing right, waterline at ~78% of the height, with a fisherman. */
+function drawBoat(ctx: Ctx, w: number, h: number): void {
+  const line = '#2a1a10';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = line;
+  // Hull.
+  ctx.fillStyle = '#c94a3a';
+  ctx.beginPath();
+  ctx.moveTo(10, h * 0.55);
+  ctx.lineTo(w - 6, h * 0.5);
+  ctx.quadraticCurveTo(w - 40, h * 0.92, w * 0.62, h * 0.94);
+  ctx.lineTo(w * 0.2, h * 0.94);
+  ctx.quadraticCurveTo(26, h * 0.9, 10, h * 0.55);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#f2e6d0';
+  ctx.fillRect(14, h * 0.6, w - 30, h * 0.06);
+  // Cabin.
+  ctx.fillStyle = '#f2e6d0';
+  ctx.fillRect(w * 0.28, h * 0.22, w * 0.26, h * 0.32);
+  ctx.strokeRect(w * 0.28, h * 0.22, w * 0.26, h * 0.32);
+  ctx.fillStyle = '#7fd6f2';
+  ctx.fillRect(w * 0.31, h * 0.27, w * 0.08, h * 0.1);
+  ctx.fillRect(w * 0.43, h * 0.27, w * 0.08, h * 0.1);
+  ctx.fillStyle = '#3b6fa8';
+  ctx.fillRect(w * 0.26, h * 0.18, w * 0.3, h * 0.06);
+  // Mast with a boom and net.
+  ctx.beginPath();
+  ctx.moveTo(w * 0.72, h * 0.52);
+  ctx.lineTo(w * 0.72, h * 0.04);
+  ctx.lineTo(w * 0.96, h * 0.3);
+  ctx.stroke();
+  // Fisherman with a harpoon.
+  ctx.fillStyle = '#f2c94c';
+  ctx.beginPath();
+  ctx.arc(w * 0.16, h * 0.38, 13, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#3b6fa8';
+  ctx.fillRect(w * 0.12, h * 0.42, 26, 22);
+  ctx.strokeRect(w * 0.12, h * 0.42, 26, 22);
+  ctx.beginPath();
+  ctx.moveTo(w * 0.2, h * 0.46);
+  ctx.lineTo(w * 0.04, h * 0.2);
+  ctx.stroke();
+}
+
+/** A square fishing net (sinking). */
+function drawNet(ctx: Ctx, w: number, h: number): void {
+  ctx.strokeStyle = 'rgba(232,214,176,0.95)';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i <= 6; i++) {
+    const t = 8 + (i / 6) * (w - 16);
+    ctx.beginPath();
+    ctx.moveTo(t, 8);
+    ctx.quadraticCurveTo(t + 6, h / 2, t, h - 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(8, t);
+    ctx.quadraticCurveTo(w / 2, t + 6, w - 8, t);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#e8a33c';
+  for (const [x, y] of [
+    [8, 8],
+    [w - 8, 8],
+    [8, h - 8],
+    [w - 8, h - 8],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/** A harpoon pointing right. */
+function drawHarpoon(ctx: Ctx, w: number, h: number): void {
+  ctx.strokeStyle = '#2a1a10';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(4, h / 2);
+  ctx.lineTo(w - 18, h / 2);
+  ctx.stroke();
+  ctx.fillStyle = '#c8d0d8';
+  ctx.beginPath();
+  ctx.moveTo(w - 2, h / 2);
+  ctx.lineTo(w - 22, 2);
+  ctx.lineTo(w - 16, h / 2);
+  ctx.lineTo(w - 22, h - 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+/** A wooden fish crate. */
+function drawCrate(ctx: Ctx, w: number, h: number): void {
+  ctx.fillStyle = '#b07a3e';
+  ctx.strokeStyle = '#4a2c10';
+  ctx.lineWidth = 3;
+  ctx.fillRect(3, 6, w - 6, h - 9);
+  ctx.strokeRect(3, 6, w - 6, h - 9);
+  ctx.beginPath();
+  ctx.moveTo(3, h / 2 + 2);
+  ctx.lineTo(w - 3, h / 2 + 2);
+  ctx.stroke();
+  ctx.fillStyle = '#9fd0e8';
+  ctx.beginPath();
+  ctx.ellipse(w / 2 - 6, 8, 9, 5, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(w / 2 + 8, 6, 9, 5, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** A long eel facing right: wavy body, open mouth, spots (moray) or glowing bands (electric). */
+function drawEel(
+  ctx: Ctx,
+  w: number,
+  h: number,
+  body: string,
+  belly: string,
+  outline: string,
+  marks: string,
+): void {
+  const cy = h / 2;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = outline;
+  // Body: a wavy band thinning to the tail.
+  const top: Array<[number, number]> = [];
+  const bottom: Array<[number, number]> = [];
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const x = 4 + t * (w - 30);
+    const thick = (h * 0.42) * (0.25 + 0.75 * Math.pow(t, 0.6));
+    const wave = Math.sin(t * Math.PI * 2.2) * h * 0.08 * (1 - t);
+    top.push([x, cy + wave - thick / 2]);
+    bottom.push([x, cy + wave + thick / 2]);
+  }
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(top[0][0], top[0][1]);
+  for (const [x, y] of top) ctx.lineTo(x, y);
+  ctx.quadraticCurveTo(w - 2, cy - h * 0.18, w - 4, cy);
+  ctx.quadraticCurveTo(w - 2, cy + h * 0.2, bottom[bottom.length - 1][0], bottom[bottom.length - 1][1]);
+  for (let i = bottom.length - 1; i >= 0; i--) ctx.lineTo(bottom[i][0], bottom[i][1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Pale belly stripe.
+  ctx.strokeStyle = belly;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 4; i <= 20; i++) ctx.lineTo(bottom[i][0], bottom[i][1] - 3);
+  ctx.stroke();
+  // Marks.
+  ctx.fillStyle = marks;
+  for (let i = 3; i < 19; i += 2) {
+    const [x, y] = top[i];
+    ctx.beginPath();
+    ctx.ellipse(x, y + 5, 3, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Eye and open jaw.
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(w - 22, cy - 5, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.arc(w - 21, cy - 5, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(w - 4, cy + 1);
+  ctx.lineTo(w - 26, cy + 3);
+  ctx.stroke();
 }
 
 /** Small dark fish with glowing dots along its side. */

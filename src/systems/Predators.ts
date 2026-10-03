@@ -112,8 +112,9 @@ export class Predators {
       if (timer > 0) continue;
       this.timers.set(def.id, DANGER.predatorSpawnInterval);
       const alive = this.alive.filter((p) => p.def.id === def.id).length;
+      if (def.regions && !def.regions.includes(currentMap().regionAt(cx, cy).id)) continue;
       // The map's mix: fewer (skip some spawns) or more (a higher cap) of this kind.
-      const mult = currentMap().def.predatorMult?.[def.id] ?? 1;
+      const mult = currentMap().predatorMult(def.id, cx, cy);
       const allowed = predatorsAllowed(def.spawn, elapsed, viewZone);
       const cap = mult > 1 ? Math.ceil(allowed * mult) : allowed;
       if (alive < cap && (mult >= 1 || this.random() < mult)) this.spawn(def, camera, seal);
@@ -142,8 +143,19 @@ export class Predators {
       accept: (x, y) => openSpot(currentMap().terrain, x, y, def.radius * 2 + 40),
     });
     if (!p) return null;
-    const predator = this.group.get() as Predator | null;
-    return predator?.spawn(def, p.x, p.y, p.x < camera.midPoint.x ? 0 : Math.PI) ?? null;
+    const heading = p.x < camera.midPoint.x ? 0 : Math.PI;
+    const pack = def.pack;
+    const count = pack ? pack.min + Math.floor(this.random() * (pack.max - pack.min + 1)) : 1;
+    let first: Predator | null = null;
+    for (let i = 0; i < count; i++) {
+      const ox = i === 0 || !pack ? 0 : (this.random() - 0.5) * pack.spread * 2;
+      const oy = i === 0 || !pack ? 0 : (this.random() - 0.5) * pack.spread;
+      if (!openSpot(currentMap().terrain, p.x + ox, p.y + oy, def.radius + 20)) continue;
+      const predator = this.group.get() as Predator | null;
+      const spawned = predator?.spawn(def, p.x + ox, p.y + oy, heading) ?? null;
+      first ??= spawned;
+    }
+    return first;
   }
 
   /** Red arrows at the screen edge pointing at hunting predators that are off-screen. */

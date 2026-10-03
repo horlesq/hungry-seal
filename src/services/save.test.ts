@@ -7,6 +7,9 @@ import {
   equipSkin,
   isMapUnlocked,
   migrateSave,
+  collectPearl,
+  defeatBoss,
+  isMapMastered,
   purchase,
   SAVE_VERSION,
   selectMap,
@@ -188,7 +191,7 @@ describe('save data', () => {
 
   it('migrates v4 saves to v5: map selection, volumes and toggles', () => {
     const s = migrateSave({ version: 4, bestScore: 100, settings: { muted: true } });
-    expect(s.maps).toEqual({ selected: 'bay', best: {} });
+    expect(s.maps).toEqual({ selected: 'bay', best: {}, pearls: {}, bosses: [] });
     expect(s.settings).toMatchObject({ muted: true, music: 0.6, sfx: 0.8, shake: true });
     // A locked selection (or junk) falls back to the home map; volumes are clamped.
     const t = migrateSave({
@@ -196,8 +199,41 @@ describe('save data', () => {
       maps: { selected: 'tropical', best: { bay: 50, nowhere: 9 } },
       settings: { music: 3, sfx: -1, shake: false, highContrast: true },
     });
-    expect(t.maps).toEqual({ selected: 'bay', best: { bay: 50 } });
+    expect(t.maps).toEqual({ selected: 'bay', best: { bay: 50 }, pearls: {}, bosses: [] });
     expect(t.settings).toMatchObject({ music: 1, sfx: 0, shake: false, highContrast: true });
+  });
+
+  it('pearls: saved once each, three on the previous map open the next', () => {
+    let data = defaultSave();
+    expect(isMapUnlocked(data, 'arctic')).toBe(false);
+    for (const i of [0, 1]) {
+      const r = collectPearl(data, 'bay', i)!;
+      expect(r.unlocked).toEqual([]);
+      data = r.data;
+    }
+    expect(collectPearl(data, 'bay', 1)).toBeNull(); // already found
+    expect(collectPearl(data, 'bay', 99)).toBeNull(); // no such pearl
+    const third = collectPearl(data, 'bay', 4)!;
+    expect(third.unlocked).toEqual(['arctic']);
+    expect(third.data.maps.pearls.bay).toEqual([0, 1, 4]);
+    expect(isMapUnlocked(third.data, 'arctic')).toBe(true);
+  });
+
+  it('a map is mastered with every pearl and its boss', () => {
+    let data = defaultSave();
+    for (let i = 0; i < 6; i++) data = collectPearl(data, 'bay', i)!.data;
+    expect(isMapMastered(data, 'bay')).toBe(false);
+    data = defeatBoss(data, 'bay')!;
+    expect(defeatBoss(data, 'bay')).toBeNull();
+    expect(isMapMastered(data, 'bay')).toBe(true);
+  });
+
+  it('migrates pearls and bosses (v6), dropping junk', () => {
+    const s = migrateSave({
+      maps: { selected: 'bay', pearls: { bay: [0, 2, 2, 9, 'x'], nowhere: [1] }, bosses: ['bay', 'moon'] },
+    });
+    expect(s.maps.pearls).toEqual({ bay: [0, 2] });
+    expect(s.maps.bosses).toEqual(['bay']);
   });
 });
 

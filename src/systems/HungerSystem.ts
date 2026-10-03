@@ -39,8 +39,9 @@ export class HungerSystem {
     return p.baseDrainPerSec * (1 + elapsed / p.rampSeconds) * p.zoneMultiplier[zone];
   }
 
-  update(dt: number, elapsed: number, zone: ZoneId): void {
-    this.value = Math.max(0, this.value - this.drainRate(elapsed, zone) * dt);
+  /** `extra` multiplies the drain (toxic water, hot vents). */
+  update(dt: number, elapsed: number, zone: ZoneId, extra = 1): void {
+    this.value = Math.max(0, this.value - this.drainRate(elapsed, zone) * extra * dt);
   }
 
   /** Restores hunger (clamped to max). Returns the amount actually gained. */

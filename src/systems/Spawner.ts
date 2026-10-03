@@ -33,12 +33,10 @@ const SPAWN_CLEARANCE = 70;
 /** ...and stay this far from the map's left/right edges. */
 const EDGE_MARGIN = 160;
 
-/** The current map's creature mix: weights scaled, absent species dropped. */
-function forMap(list: readonly CreatureDef[]): CreatureDef[] {
-  const mult = currentMap().def.creatureMult ?? {};
-  return list
-    .map((d) => ({ ...d, weight: d.weight * (mult[d.id] ?? 1) }))
-    .filter((d) => d.weight > 0);
+/** Spawn weight of a creature at (x, y): its base weight x the map's and the region's mix. */
+function weightAt(x: number, y: number) {
+  const map = currentMap();
+  return (d: CreatureDef) => d.weight * map.creatureMult(d.id, x, y);
 }
 
 /** Open water (or sky) with room for a group, inside the map. */
@@ -73,8 +71,8 @@ export class Spawner {
   ) {
     this.group = scene.add.group({ classType: Creature, maxSize: POOL_SIZE });
     this.terrain = currentMap().terrain;
-    this.swimmers = forMap(SWIMMERS);
-    this.flyers = forMap(FLYERS);
+    this.swimmers = [...SWIMMERS];
+    this.flyers = [...FLYERS];
     this.starters = this.swimmers.filter((d) => d.tier === 1);
     this.accept = (x, y) => openSpot(this.terrain, x, y);
     this.ctx = {
@@ -114,7 +112,7 @@ export class Spawner {
       if (Math.hypot(x - seal.x, y - seal.y) < SPAWN.initialMinDistance) continue;
       if (!this.accept(x, y)) continue;
       // Friendly opening: only prey a brand-new seal can eat. Bigger creatures swim in later.
-      const def = pickForZone(this.starters, y, this.random);
+      const def = pickForZone(this.starters, y, this.random, weightAt(x, y));
       if (!def) continue;
       this.spawnGroup(def, x, y, this.random() < 0.5 ? 0 : Math.PI);
       placed++;
@@ -205,7 +203,13 @@ export class Spawner {
         accept: this.accept,
       });
       if (!p) return;
-      const def = pickSpawn(this.swimmers, p.y, this.random, foodOnly ? seal.stage : null);
+      const def = pickSpawn(
+        this.swimmers,
+        p.y,
+        this.random,
+        foodOnly ? seal.stage : null,
+        weightAt(p.x, p.y),
+      );
       if (!def) continue;
       // Swim into the view so the player gets to see it.
       const heading = p.x < camera.midPoint.x ? 0 : Math.PI;
@@ -215,7 +219,9 @@ export class Spawner {
   }
 
   private spawnInSky(camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): void {
-    const def = this.flyers[Math.floor(this.random() * this.flyers.length)];
+    const mid = camera.midPoint;
+    const flyers = this.flyers.filter((d) => weightAt(mid.x, mid.y)(d) > 0);
+    const def = flyers[Math.floor(this.random() * flyers.length)];
     if (!def?.band) return;
     const p = pickOffscreenPoint(camera, seal, this.random, {
       marginMin: SPAWN.marginMin,

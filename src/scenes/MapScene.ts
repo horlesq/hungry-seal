@@ -12,6 +12,8 @@ import { fitUiCamera, getSafeInsets, onResize, sharpenTexts } from '../services/
 import { Button } from '../ui/Button';
 import { FocusNav } from '../ui/FocusNav';
 import { mapThumbnail } from '../ui/mapThumb';
+import { WORLD } from '../config/zones';
+import { GameMap } from '../world/GameMap';
 import { COLORS, CSS, EDGE, formatNumber, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
 import { addBackdrop, BACKDROPS, drawBar } from '../ui/widgets';
@@ -101,10 +103,8 @@ export class MapScene extends Phaser.Scene {
     const w = 364;
     const h = 420;
     const button = this.cardButton(def, x, y, w, h);
-    const thumb = this.add
-      .image(x, y - h / 2 + 20, mapThumbnail(this, def.id, w - 40))
-      .setOrigin(0.5, 0);
-    fitThumb(thumb, w - 40, THUMB_H.wide);
+    const thumb = this.add.image(x, y - h / 2 + 20, '__DEFAULT').setOrigin(0.5, 0);
+    this.fillThumb(thumb, def, w - 40, THUMB_H.wide);
     const textY = y - h / 2 + 20 + THUMB_H.wide + 18;
     uiText(this, x, textY, def.name, 'heading', { size: 32 }).setOrigin(0.5, 0);
     uiText(this, x, textY + 44, def.blurb, 'body', {
@@ -125,8 +125,8 @@ export class MapScene extends Phaser.Scene {
     const w = 640;
     const h = 260;
     const button = this.cardButton(def, x, y, w, h);
-    const thumb = this.add.image(x - w / 2 + 20, y, mapThumbnail(this, def.id, 300)).setOrigin(0, 0.5);
-    fitThumb(thumb, 300, THUMB_H.tall);
+    const thumb = this.add.image(x - w / 2 + 20, y, '__DEFAULT').setOrigin(0, 0.5);
+    this.fillThumb(thumb, def, 300, THUMB_H.tall);
     const tx = thumb.x + 300 + 20;
     uiText(this, tx, y - h / 2 + 26, def.name, 'heading', { size: 30 });
     uiText(this, tx, y - h / 2 + 68, def.blurb, 'body', {
@@ -140,6 +140,24 @@ export class MapScene extends Phaser.Scene {
     );
     const rect = new Phaser.Geom.Rectangle(x - w / 2, y - h / 2, w, h);
     return { def, button, thumb, status, lock: this.lockIcon(def, thumb), rect };
+  }
+
+  /** Shows the map's picture once its terrain is baked (in a worker, no hitch). */
+  private fillThumb(thumb: Phaser.GameObjects.Image, def: MapDef, w: number, h: number): void {
+    const stretch = h / ((w / def.terrain.width) * WORLD.height);
+    const show = () => {
+      if (!thumb.scene) return;
+      thumb.setTexture(mapThumbnail(this, def.id, w, Math.round(stretch * 10) / 10));
+      fitThumb(thumb, w, h);
+      const lock = this.cards.find((c) => c.def.id === def.id)?.lock;
+      if (lock) {
+        const b = thumb.getBounds();
+        lock.setPosition(b.centerX, b.centerY);
+      }
+    };
+    thumb.setDisplaySize(w, h).setAlpha(0.3);
+    if (GameMap.ready(def.id)) show();
+    else void GameMap.prefetch(def.id).then(() => this.time.delayedCall(0, show));
   }
 
   private cardButton(def: MapDef, x: number, y: number, w: number, h: number): Button {

@@ -5,15 +5,19 @@ import type { MapId } from '../config/maps';
 import { WORLD } from '../config/zones';
 import { GameMap } from '../world/GameMap';
 
-/** Texture key of the map's thumbnail, `width` px wide (made on first use). */
-export function mapThumbnail(scene: Phaser.Scene, id: MapId, width: number): string {
-  const key = `map-thumb-${id}-${width}`;
+/**
+ * Texture key of the map's thumbnail, `width` px wide (made on first use). `stretch` makes it
+ * taller than true scale (maps are very wide and flat).
+ */
+export function mapThumbnail(scene: Phaser.Scene, id: MapId, width: number, stretch = 1): string {
+  const key = `map-thumb-${id}-${width}-${stretch}`;
   if (scene.textures.exists(key)) return key;
   const map = GameMap.get(id);
   const t = map.terrain;
   const p = map.def.palette;
   const scale = width / map.width;
-  const height = Math.round(WORLD.height * scale);
+  const height = Math.round(WORLD.height * scale * stretch);
+  const scaleY = scale * stretch;
   const tex = scene.textures.createCanvas(key, width, height);
   if (!tex) return key;
   const ctx = tex.context;
@@ -37,13 +41,13 @@ export function mapThumbnail(scene: Phaser.Scene, id: MapId, width: number): str
   const land = hex(p.land);
   const edge = hex(p.outline);
   for (let py = 0; py < height; py++) {
-    const y = (py + 0.5) / scale;
+    const y = (py + 0.5) / scaleY;
     for (let px = 0; px < width; px++) {
       const d = t.distance((px + 0.5) / scale, y);
       if (d > 0) continue;
       const i = (py * width + px) * 4;
       let c: number[];
-      if (d > -1.2 / scale) c = edge;
+      if (d > -1.2 / scaleY) c = edge;
       else if (y < WORLD.surfaceY) c = land;
       else {
         const k = Math.min(1, (y - WORLD.surfaceY) / (WORLD.height - WORLD.surfaceY));

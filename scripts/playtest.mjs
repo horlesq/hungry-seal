@@ -18,12 +18,12 @@ const GAME_W = 1280;
 const GAME_H = 720;
 // Spots on Seal Bay (the default map) for flows that need open water at a given depth.
 const BAY = {
-  /** Open water from the surface down to the trench floor. */
-  diveColumn: { x: 9300, y: 900 },
-  /** Open ocean just below the shallows. */
-  ocean: { x: 7000, y: 2300 },
-  /** Abyss water above the trench floor, under the cave rock. */
-  abyss: { x: 10600, y: 6150 },
+  /** Open water from the surface down to the Shark Shelf floor. */
+  diveColumn: { x: 20500, y: 900 },
+  /** The Kelp Forest region (open water). */
+  kelp: { x: 10000, y: 2300 },
+  /** Abyss water on the trench floor (below the size-5 current). */
+  abyss: { x: 26000, y: 6150 },
 };
 
 const errors = [];
@@ -700,7 +700,7 @@ async function danger(browser) {
   check('mine is used up', !boom.mine);
 
   // Shark: telegraph, chase, bite (in open water, clear of the reef).
-  await teleport(page, BAY.ocean.x, BAY.ocean.y);
+  await teleport(page, BAY.diveColumn.x, 2600);
   await page.waitForTimeout(500);
   await waitVulnerable(page);
   await setHunger(80);
@@ -963,16 +963,16 @@ async function phase4(browser) {
   );
   await page.screenshot({ path: `${OUT}/17-frenzy.png` });
 
-  // Zone banner on entering the open ocean.
-  await teleport(page, BAY.ocean.x, BAY.ocean.y);
+  // Region banner on entering the Kelp Forest.
+  await teleport(page, BAY.kelp.x, BAY.kelp.y);
   await page.waitForTimeout(700);
   const banner = await page.evaluate(() => {
     const hud = window.__PHASER_GAME__.scene.getScene('Hud');
     return { alpha: hud.bannerRoot.alpha, title: hud.bannerTitle.text };
   });
   check(
-    'zone banner on entering the open ocean',
-    banner.alpha > 0.5 && banner.title === 'Open Ocean',
+    'region banner on entering the Kelp Forest',
+    banner.alpha > 0.5 && banner.title === 'Kelp Forest',
     banner.title,
   );
   await page.screenshot({ path: `${OUT}/18-zone-banner.png` });

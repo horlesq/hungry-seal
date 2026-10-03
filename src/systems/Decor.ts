@@ -68,7 +68,9 @@ export class Decor {
 
   private place(d: DecorPlacement, terrain: TerrainField): void {
     let y = d.y;
-    if (d.hang) {
+    if (d.free) {
+      // Exactly where it's placed (a pier over the water).
+    } else if (d.hang) {
       const c = terrain.ceilingAbove(d.x, d.y, 800);
       if (c === null) return;
       y = c - SINK;
@@ -82,7 +84,9 @@ export class Decor {
   private scatter(rule: ScatterRule, terrain: TerrainField, rng: Rng): void {
     const n = { x: 0, y: 0 };
     const [s0, s1] = rule.scale ?? [0.85, 1.15];
-    for (let x = 220; x < terrain.width - 220; x += rule.spacing * (0.6 + rng() * 0.8)) {
+    const x0 = Math.max(220, rule.minX ?? 0);
+    const x1 = Math.min(terrain.width - 220, rule.maxX ?? Infinity);
+    for (let x = x0; x < x1; x += rule.spacing * (0.6 + rng() * 0.8)) {
       for (const y of rule.hang
         ? ceilings(terrain, x, rule.minY, rule.maxY)
         : grounds(terrain, x, rule.minY, rule.maxY)) {

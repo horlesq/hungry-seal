@@ -23,6 +23,13 @@ import { skinDef } from '../config/skins';
 import { WORLD, depthMeters, zoneAt, type ZoneId } from '../config/zones';
 import { TerrainRenderer } from '../systems/TerrainRenderer';
 import { Decor } from '../systems/Decor';
+import { Gates } from '../systems/Gates';
+import { Eels } from '../systems/Eels';
+import { Boats, BOATS, type BoatEvent } from '../systems/Boats';
+import { Boss, BOSS, type BossEvent } from '../systems/Boss';
+import type { Hazard } from '../entities/Hazard';
+import { MapHazards } from '../systems/MapHazards';
+import { Pearls } from '../systems/Pearls';
 import { GameMap, setCurrentMap } from '../world/GameMap';
 import { MAPS } from '../config/maps';
 import type { Creature } from '../entities/Creature';
@@ -95,6 +102,15 @@ export class GameScene extends Phaser.Scene {
   map!: GameMap;
   private terrainView!: TerrainRenderer;
   private decor!: Decor;
+  private gates!: Gates;
+  private eels!: Eels;
+  private boats!: Boats;
+  private boss!: Boss;
+  private pearls!: Pearls;
+  private mapHazards!: MapHazards;
+  /** Run time of the last "too strong" / "toxic" warnings. */
+  private lastGateHint = -Infinity;
+  private lastCloudHint = -Infinity;
   private effects!: Effects;
   private spawner!: Spawner;
   private hazards!: HazardField;
@@ -110,7 +126,8 @@ export class GameScene extends Phaser.Scene {
   private hintShown: string | null = null;
   private sharkNoticed = false;
   private currentZone: ZoneId = 'reef';
-  private readonly zoneBannerAt = new Map<ZoneId, number>();
+  private readonly zoneBannerAt = new Map<string, number>();
+  private currentRegion = '';
   private debugGfx!: Phaser.GameObjects.Graphics;
 
   private score = 0;
@@ -201,6 +218,7 @@ export class GameScene extends Phaser.Scene {
     this.hintShown = null;
     this.sharkNoticed = false;
     this.zoneBannerAt.clear();
+    this.currentRegion = '';
 
     // The map: set it first, the spawners and the seal read its terrain.
     this.map = GameMap.get(saves.data.maps.selected);
@@ -230,6 +248,15 @@ export class GameScene extends Phaser.Scene {
     cam.setBounds(0, WORLD.ceilingY, this.map.width, WORLD.height - WORLD.ceilingY);
     this.terrainView = new TerrainRenderer(this, this.map);
     this.decor = new Decor(this, this.map);
+    this.gates = new Gates(this, this.map);
+    this.seal.setFlow(this.gates.flow);
+    this.pearls = new Pearls(this, this.map, this.effects);
+    this.mapHazards = new MapHazards(this, this.map);
+    this.eels = new Eels(this, this.map.def);
+    this.boats = new Boats(this, this.map.def);
+    this.boss = new Boss(this, this.map.def.boss);
+    this.lastGateHint = -Infinity;
+    this.lastCloudHint = -Infinity;
     cam.centerOn(this.seal.x, this.seal.y);
     cam.startFollow(this.seal, false, CAMERA.lerpX, CAMERA.lerpY);
     cam.fadeIn(400, 4, 20, 37);
@@ -247,6 +274,13 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.terrainView.destroy();
       this.decor.destroy();
+      this.gates.destroy();
+      this.pearls.destroy();
+      this.mapHazards.destroy();
+      this.eels.destroy();
+      this.boats.destroy();
+      this.boss.destroy();
+      EventBus.emit('boss:hp', { name: '', hp: 0, max: 1, show: false });
       this.scene.stop(SceneKeys.Hud);
       this.scene.stop(SceneKeys.GameOver);
       this.scene.stop(SceneKeys.Pause);
@@ -308,7 +342,13 @@ export class GameScene extends Phaser.Scene {
         dt,
       );
       for (const e of events) this.handleSealEvent(e);
-      this.hunger.update(dt, this.elapsed, zoneAt(this.seal.y).id);
+      this.hunger.update(
+        dt,
+        this.elapsed,
+        zoneAt(this.seal.y).id,
+        this.mapHazards.drainAt(this.seal.x, this.seal.y),
+      );
+      this.updateMapWarnings();
       this.trackDistance(dt);
       const ended = this.combo.update(dt);
       if (ended >= COMBO_CALLOUT_MIN) {
@@ -365,6 +405,20 @@ export class GameScene extends Phaser.Scene {
       radius: this.seal.radius,
     };
     for (const e of this.pickups.update(dt, cam, sealBody, !this.dead)) this.onPickup(e);
+    if (this.pearls.update(dt, sealBody, !this.dead)) this.hudDirty = true;
+    this.gates.update(dt, this.seal.stage, cam);
+    const vulnerable = !this.dead && !this.seal.isInvulnerable && !this.frenzy.active;
+    for (const e of this.eels.update(dt, sealBody, this.biteStage, vulnerable, cam.worldView)) {
+      if (e.type === 'zap') this.effects.zap(e.x, e.y);
+      if (e.type === 'bite') this.effects.bite(this.seal.x, this.seal.y);
+      if (e.type === 'bite' || e.hit) this.hurt(e.source, e.x, e.y, e.damage, e.knockback, e.stun);
+    }
+    const boatSeal = { ...sealBody, inWater: this.seal.motion.inWater };
+    for (const e of this.boats.update(dt, time, boatSeal, this.seal.stage, vulnerable)) {
+      this.onBoatEvent(e);
+    }
+    for (const e of this.boss.update(dt, sealBody, vulnerable)) this.onBossEvent(e);
+    this.mapHazards.update(dt, cam);
     this.magnetLeft = Math.max(0, this.magnetLeft - dt);
     this.darkness.update(dt, this.seal.x, this.seal.y);
 
@@ -441,17 +495,25 @@ export class GameScene extends Phaser.Scene {
     return this.frenzy.active ? FRENZY_STAGE : this.seal.stage;
   }
 
-  /** Banner when swimming into a new depth zone (not the sky), rate-limited per zone. */
+  /**
+   * Depth zones drive the music; regions drive the banner (name, blurb, danger), shown when
+   * swimming into a new region, rate-limited per region.
+   */
   private updateZone(): void {
-    const zone = this.map.zone(zoneAt(this.seal.y));
-    if (zone.id === this.currentZone || zone.id === 'surface') return;
-    this.currentZone = zone.id;
-    this.updateMusic();
-    const last = this.zoneBannerAt.get(zone.id) ?? -Infinity;
+    const zone = zoneAt(this.seal.y);
+    if (zone.id !== this.currentZone && zone.id !== 'surface') {
+      this.currentZone = zone.id;
+      this.updateMusic();
+    }
+    const region = this.map.regionAt(this.seal.x, this.seal.y);
+    if (region.id === this.currentRegion) return;
+    const first = this.currentRegion === '';
+    this.currentRegion = region.id;
+    const last = this.zoneBannerAt.get(region.id) ?? -Infinity;
     if (this.elapsed - last < ZONE_BANNER_COOLDOWN) return;
-    this.zoneBannerAt.set(zone.id, this.elapsed);
-    EventBus.emit('zone:enter', { name: zone.name, blurb: zone.blurb });
-    audio.play(SoundKeys.Zone);
+    this.zoneBannerAt.set(region.id, this.elapsed);
+    EventBus.emit('zone:enter', { name: region.name, blurb: region.blurb, danger: region.danger });
+    if (!first) audio.play(SoundKeys.Zone);
   }
 
   private updateTutorial(dt: number): void {
@@ -492,6 +554,18 @@ export class GameScene extends Phaser.Scene {
     for (const p of this.predators.alive) {
       if (!p.active || !canEat(stage, p.def.tier)) continue;
       if (circlesOverlap(mouth.x, mouth.y, r, p.x, p.y, p.radius)) this.eatPredator(p);
+    }
+    // The boss can't be eaten: biting it while it's exposed takes a heart.
+    const b = this.boss.body;
+    if (b.exposed && circlesOverlap(mouth.x, mouth.y, r, b.x, b.y, b.r)) {
+      this.boss.hit();
+      for (const e of this.boss.drainEvents()) this.onBossEvent(e);
+    }
+    for (const h of this.eels.heads()) {
+      if (!canEat(stage, h.tier) || !circlesOverlap(mouth.x, mouth.y, r, h.x, h.y, h.r)) continue;
+      this.feed(h.x, h.y, this.eels.eat(h.eel));
+      this.effects.chomp(h.x, h.y, true);
+      audio.play(SoundKeys.ChompBig);
     }
   }
 
@@ -631,10 +705,16 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------------------
 
   private checkHazards(): void {
+    if (this.checkHazardList(this.hazards.alive)) return;
+    this.checkHazardList(this.mapHazards.alive);
+  }
+
+  /** Contact with any hazard in the list. Returns true if one hit the seal. */
+  private checkHazardList(list: readonly Hazard[]): boolean {
     const s = this.seal;
     const frenzied = this.frenzy.active;
-    if (s.isInvulnerable && !frenzied) return;
-    for (const h of this.hazards.alive) {
+    if (s.isInvulnerable && !frenzied) return false;
+    for (const h of list) {
       if (!h.active || !circlesOverlap(s.x, s.y, s.radius, h.x, h.y, h.radius)) continue;
       const def = h.def;
       if (frenzied) {
@@ -659,7 +739,90 @@ export class GameScene extends Phaser.Scene {
         this.effects.zap(s.x, s.y);
         audio.play(SoundKeys.Zap);
       }
-      return;
+      return true;
+    }
+    return false;
+  }
+
+  private onBossEvent(e: BossEvent): void {
+    switch (e.type) {
+      case 'hp':
+        EventBus.emit('boss:hp', { name: e.name, hp: e.hp, max: e.max, show: e.show });
+        break;
+      case 'hit-seal':
+        this.hurt('boss', e.x, e.y, BOSS.damage, BOSS.knockback, 0.4);
+        break;
+      case 'hurt':
+        this.seal.chomp();
+        this.effects.chomp(e.x, e.y, true);
+        this.effects.bubbleBurst(e.x, e.y, 18);
+        this.effects.floatText(e.x, e.y - 120, e.hp > 0 ? 'OUCH!' : 'GOT IT!', '#ff9ad5', 40);
+        audio.play(SoundKeys.ChompBig);
+        this.shake(200, 0.008);
+        this.hitStop = Math.max(this.hitStop, 0.08);
+        break;
+      case 'defeated': {
+        const first = saves.defeatBoss(this.map.id);
+        this.score += BOSS.reward.score;
+        this.coins.drop(e.x, e.y, BOSS.reward.coins / 4);
+        if (first) this.runGems += BOSS.reward.gems;
+        this.effects.growBurst(e.x, e.y);
+        this.effects.floatText(
+          e.x,
+          e.y - 160,
+          first ? `BOSS DEFEATED! +${BOSS.reward.gems} gems` : 'BOSS DEFEATED!',
+          '#ffe08a',
+          46,
+        );
+        audio.play(SoundKeys.Unlock);
+        this.cameras.main.flash(300, 255, 240, 200);
+        this.shake(400, 0.016);
+        this.hudDirty = true;
+        break;
+      }
+    }
+  }
+
+  private onBoatEvent(e: BoatEvent): void {
+    switch (e.type) {
+      case 'net':
+        this.seal.trap(BOATS.netTrap);
+        this.hurt('net', e.x, e.y, BOATS.netDamage, 120, 0.2);
+        this.effects.floatText(this.seal.x, this.seal.y - 60, 'Tangled!', '#e8d6b0', 30);
+        break;
+      case 'harpoon':
+        this.hurt('harpoon', e.x, e.y, BOATS.harpoonDamage, BOATS.harpoonKnockback, 0.3);
+        break;
+      case 'rammed':
+        this.effects.splash(e.x, -600);
+        this.shake(220, 0.01);
+        this.effects.floatText(e.x, e.y - 90, 'CATCH OVERBOARD!', '#ffe08a', 34);
+        break;
+      case 'crate': {
+        const c = BOATS.crate;
+        this.feed(e.x, e.y, c);
+        this.runCoins += c.coins;
+        this.effects.coinPickup(e.x, e.y);
+        audio.play(SoundKeys.ChompBig);
+        break;
+      }
+    }
+  }
+
+  /** "Too strong!" when a gate holds the seal back; "Toxic water!" in a cloud. */
+  private updateMapWarnings(): void {
+    const s = this.seal;
+    const gate = this.gates.blocking(s.x, s.y);
+    if (gate && this.elapsed - this.lastGateHint > 4) {
+      this.lastGateHint = this.elapsed;
+      this.effects.floatText(s.x, s.y - 70, `Too strong! Grow to size ${gate.minStage}`, '#ffe08a', 30);
+      audio.play(SoundKeys.Bump);
+    }
+    const cloud = this.mapHazards.cloudAt(s.x, s.y);
+    if (cloud && this.elapsed - this.lastCloudHint > 5) {
+      this.lastCloudHint = this.elapsed;
+      const text = cloud === 'toxic' ? 'Toxic water! Hunger drains fast' : 'Hot water! Hunger drains fast';
+      this.effects.floatText(s.x, s.y - 70, text, cloud === 'toxic' ? '#9dff6a' : '#ffae6a', 28);
     }
   }
 
@@ -830,6 +993,7 @@ export class GameScene extends Phaser.Scene {
       this.hudDirty = false;
       EventBus.emit('run:score', this.score);
       EventBus.emit('run:coins', this.runCoins);
+      EventBus.emit('run:pearls', { found: this.pearls.found, total: this.pearls.total });
       EventBus.emit('run:growth', {
         stage: this.growth.stage,
         maxStage: this.growth.maxStage,

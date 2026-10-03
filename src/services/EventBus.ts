@@ -33,7 +33,15 @@ export interface GrowthState {
   progress: number;
 }
 
-export type DamageSource = HazardId | PredatorId | 'pufferfish';
+export type DamageSource =
+  | HazardId
+  | PredatorId
+  | 'pufferfish'
+  | 'moray'
+  | 'eel'
+  | 'boss'
+  | 'net'
+  | 'harpoon';
 export type DeathCause = 'starved' | DamageSource;
 
 export interface ComboState {
@@ -114,6 +122,10 @@ export interface GameEvents {
   'run:growth': [state: GrowthState];
   'run:score': [score: number];
   'run:coins': [coins: number];
+  /** Boss health while the seal is in its lair (show = false hides the bar). */
+  'boss:hp': [boss: { name: string; hp: number; max: number; show: boolean }];
+  /** Pearls found on this map (all runs) out of its total. */
+  'run:pearls': [pearls: { found: number; total: number }];
   'run:combo': [state: ComboState];
   'run:frenzy': [state: FrenzyState];
   /** Whole seconds of coin-magnet power left (0 = none). */
@@ -122,7 +134,8 @@ export interface GameEvents {
   'seal:hurt': [info: { source: DamageSource; damage: number }];
   /** First-run hint text to show at the bottom of the screen (null = hide). */
   hint: [text: string | null];
-  'zone:enter': [zone: { name: string; blurb: string }];
+  /** Swam into a new map region (or depth zone): banner text and a 1-5 danger rating. */
+  'zone:enter': [zone: { name: string; blurb: string; danger?: number }];
   /** An active mission was just completed mid-run (paid when the run ends). */
   'mission:complete': [mission: { text: string; coins: number; gems: number }];
   /** The HUD's pause button was pressed. */

@@ -9,14 +9,15 @@ export function pickForZone<T extends { zones: readonly ZoneId[]; weight: number
   list: readonly T[],
   y: number,
   random: () => number,
+  weightOf: (d: T) => number = (d) => d.weight,
 ): T | null {
   const zone = zoneAt(y).id;
-  const candidates = list.filter((d) => d.zones.includes(zone));
-  const total = candidates.reduce((sum, d) => sum + d.weight, 0);
+  const candidates = list.filter((d) => d.zones.includes(zone) && weightOf(d) > 0);
+  const total = candidates.reduce((sum, d) => sum + weightOf(d), 0);
   if (total <= 0) return null;
   let roll = random() * total;
   for (const d of candidates) {
-    roll -= d.weight;
+    roll -= weightOf(d);
     if (roll <= 0) return d;
   }
   return candidates[candidates.length - 1];
@@ -82,14 +83,16 @@ export function pickSpawn<T extends { zones: readonly ZoneId[]; weight: number; 
   y: number,
   random: () => number,
   foodForStage: number | null,
+  weightOf?: (d: T) => number,
 ): T | null {
   if (foodForStage !== null) {
     const food = pickForZone(
       list.filter((d) => canEat(foodForStage, d.tier)),
       y,
       random,
+      weightOf,
     );
     if (food) return food;
   }
-  return pickForZone(list, y, random);
+  return pickForZone(list, y, random, weightOf);
 }

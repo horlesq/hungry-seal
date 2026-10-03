@@ -50,7 +50,8 @@ export class HazardField {
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = DANGER.hazardSpawnInterval;
-    if (this.alive.length >= hazardsAllowed(elapsed)) return;
+    const bloom = currentMap().regionAt(cx, cy).jellyBloom ?? 1;
+    if (this.alive.length >= Math.round(hazardsAllowed(elapsed) * bloom)) return;
 
     const p = pickOffscreenPoint(camera, seal, this.random, {
       marginMin: SPAWN.marginMin,

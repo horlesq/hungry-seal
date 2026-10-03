@@ -29,6 +29,14 @@ const TITLES: Record<DeathCause, { title: string; subtitle: string; color: strin
   orca: { title: 'Crunched!', subtitle: 'An orca caught you', color: '#e8eef4' },
   anglerfish: { title: 'Lured!', subtitle: 'Never follow the pretty light', color: '#9ffcff' },
   pufferfish: { title: 'Spiked!', subtitle: 'That pufferfish was puffed up', color: '#ffd23c' },
+  urchin: { title: 'Prickled!', subtitle: 'Sea urchins are not food', color: '#c9a3ff' },
+  barracuda: { title: 'Nibbled!', subtitle: 'A barracuda pack got you', color: '#b9e6cf' },
+  hammerhead: { title: 'Hammered!', subtitle: 'A hammerhead caught you', color: '#ffb38a' },
+  moray: { title: 'Ambushed!', subtitle: 'A moray eel lunged from the rocks', color: '#c9e08a' },
+  eel: { title: 'Shocked!', subtitle: 'An electric eel zapped you', color: '#fff27a' },
+  boss: { title: 'Squashed!', subtitle: 'The lair boss won this time', color: '#ff7ab8' },
+  net: { title: 'Netted!', subtitle: 'Caught in a fishing net', color: '#e8d6b0' },
+  harpoon: { title: 'Harpooned!', subtitle: 'The fishermen got you', color: '#ffb38a' },
 };
 
 type ResultsData = RunResult & { instant?: boolean };
