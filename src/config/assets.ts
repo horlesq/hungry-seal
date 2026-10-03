@@ -70,7 +70,7 @@ export type AssetEntry =
     };
 
 export const ASSET_MANIFEST: readonly AssetEntry[] = [
-  { type: 'image', key: TextureKeys.Seal },
+  { type: 'image', key: TextureKeys.Seal, url: 'assets/seal.png', resolution: 4 },
   { type: 'image', key: TextureKeys.SealArctic },
   { type: 'image', key: TextureKeys.SealSeaLion },
   { type: 'image', key: TextureKeys.SealTropical },

@@ -17,6 +17,14 @@ Close to Hungry Shark Evolution: bright saturated colors, chunky rounded shapes,
 ## UI graphics
 Interface art (wordmark, icons, upgrade symbols, gem, trophy/star/lock/check badges, crumbs) is painted in code in `src/ui/uiTextures.ts` and is part of the UI design, not a placeholder. Icons are white so they can be tinted, except the colored gem (`ui-gem`). Replacing them with drawn art later means adding manifest entries under the same keys and skipping the painter when the texture exists.
 
+## Blender pipeline
+3D-modeled sprites are built by Python scripts in `tools/blender/` (one per character) and rendered side-on with an orthographic camera, toon shading (two soft tones, no cast shadows) and an inverted-hull outline, so they match the chunky outlined style.
+- Open Blender (5.x) with the Blender Lab MCP add-on running (localhost:9876), and have `uv` installed.
+- `node tools/blender/bridge.mjs exec tools/blender/seal.py` rebuilds the scene and writes `public/assets/seal.png` (704x352 = 176x88 design units at `resolution: 4`). Headless alternative: `blender -b -P tools/blender/seal.py` from the repo root.
+- Face details (eye, nose, whiskers) are placed by ray-casting onto the body, so body proportions can change without re-placing them.
+- Outline and line widths are sized for the in-game display (~130 px wide); judge the sprite in a playtest screenshot, not at full render size.
+- The add-on runs whatever code it gets without guards, so only run scripts from this repo.
+
 ## Technical rules
 - Everything loaded via the manifest in `src/config/assets.ts` (key -> path -> type). Code uses keys only.
 - Sprites: PNG, power-of-two atlases preferred, packed with a texture atlas tool (free-tex-packer or similar). Target atlas <= 2048x2048 for mobile.
@@ -33,4 +41,4 @@ Interface art (wordmark, icons, upgrade symbols, gem, trophy/star/lock/check bad
 - **P8:** final pass on everything, animation sets, VFX, full audio.
 
 ## Seal skins
-Each skin is its own texture key (`seal` = harbor, `seal-arctic`, `seal-sealion`, `seal-tropical`, `seal-leopard`, `seal-walrus`, `seal-elephant`, and the gem skins `seal-pirate`, `seal-golden`), 176x88 design units facing right, painted at 2x by `systems/sealArt.ts` until real art exists. Real art must keep the muzzle at the right end (x ~150-165) so the mouth hit circle lines up. Distinct looks per growth stage are still open (art pass).
+Each skin is its own texture key (`seal` = harbor, `seal-arctic`, `seal-sealion`, `seal-tropical`, `seal-leopard`, `seal-walrus`, `seal-elephant`, and the gem skins `seal-pirate`, `seal-golden`), 176x88 design units facing right, painted at 2x by `systems/sealArt.ts` until real art exists. The harbor seal (`seal`) is now the Blender render (see Blender pipeline). Real art must keep the muzzle at the right end (x ~150-165) so the mouth hit circle lines up. Distinct looks per growth stage are still open (art pass).

@@ -16,6 +16,7 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 - `npm run check` — typecheck + lint + unit tests + headless browser playtest. Must pass before a phase/feature is called done.
 - `npm run playtest` — screenshots land in `.playtest/`; look at them, passing checks don't prove it looks right. `PLAYTEST_ONLY=desktop,mobile` runs single sections.
 - `npm run balance -- human 600 [upgradeLevel]` — bot plays a run (optionally with every upgrade at a level); use it after any tuning change in `config/*.ts`. Take several samples (high variance). Run batches of 2-4 per background task (each run can take 10 min).
+- `node tools/blender/bridge.mjs exec tools/blender/<name>.py` — rebuild and render a Blender-modeled sprite (Blender open with the MCP add-on; see ASSETS.md).
 - `npm run soak` — long run + 20 restarts; fails on growing objects, listeners or heap.
 - Release checklist: [docs/REGRESSION.md](docs/REGRESSION.md).
 - URL flags: `?debug` (overlay + hit circles, or press `), `?calm` (no hazards/predators).

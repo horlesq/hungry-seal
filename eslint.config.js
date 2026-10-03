@@ -17,7 +17,7 @@ export default tseslint.config(
   },
   {
     // Node tooling scripts (they also contain page.evaluate() callbacks run in the browser).
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'tools/**/*.mjs'],
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },
