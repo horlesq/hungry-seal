@@ -11,6 +11,7 @@ import { PreloadScene } from './scenes/PreloadScene';
 import { ShopScene } from './scenes/ShopScene';
 import { SkinsScene } from './scenes/SkinsScene';
 import { StatsScene } from './scenes/StatsScene';
+import { EventBus } from './services/EventBus';
 import { applyViewport, measureViewport } from './services/Viewport';
 
 /** Don't hold the game back forever if the font can't load (it falls back to system fonts). */
@@ -66,7 +67,10 @@ function start(): void {
   game.events.once(Phaser.Core.Events.READY, () => applyViewport(game));
 
   if (import.meta.env.DEV) {
-    (window as unknown as { __PHASER_GAME__: Phaser.Game }).__PHASER_GAME__ = game;
+    // Test hooks (playtest, soak, balance bot).
+    const w = window as unknown as { __PHASER_GAME__: Phaser.Game; __EVENT_BUS__: unknown };
+    w.__PHASER_GAME__ = game;
+    w.__EVENT_BUS__ = EventBus;
   }
 }
 

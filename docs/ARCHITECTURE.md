@@ -191,4 +191,4 @@ hungry-seal/
 - Manual play on a real phone over LAN: `npm run dev:host`, open the printed network URL.
 
 ## Scripts
-`npm run dev` | `dev:host` | `build` | `preview` | `typecheck` | `lint` | `format` | `format:check` | `test` | `test:watch` | `playtest` | `balance` | `check`
+`npm run dev` | `dev:host` | `build` | `preview` | `typecheck` | `lint` | `format` | `format:check` | `test` | `test:watch` | `playtest` | `balance` | `soak` | `check`

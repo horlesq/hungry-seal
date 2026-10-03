@@ -143,6 +143,7 @@ First run only (until the first run ends): bottom-centre hints — how to swim (
 - 30-90s: hazards appear, first predator sighting.
 - 2-4 min: predators frequent, hunger drain noticeably higher; player must have grown.
 - Without upgrades a typical first run lasts ~2-3 min; with upgrades 5+ min.
+- Measured (Phase 7, human-like balance bot, which plays better than a first-timer): fresh save 1:49 / 2:15 / 2:54 / 3:42 / 3:54 / 10:00+ (median ~3:20, deaths mostly sharks); all upgrades at level 3: 7:41, 10:00+, and a run still at full health at 4:46 when stopped. Coins per run: ~30-140 fresh, ~430-490 upgraded, plus mission rewards. Maxing every upgrade costs 13,720 coins (roughly 40-60 runs).
 
 ## Juice checklist
 Screen shake, hit-stop on big bites, particles (bubbles, blood-free chomp bits/stars), water splash on breach, parallax backgrounds, light rays, floating text, squash and stretch, low-hunger vignette, satisfying audio per bite.

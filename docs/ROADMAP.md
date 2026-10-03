@@ -117,10 +117,10 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 **Exit:** reasons to come back between runs: missions to finish, gems to save for, records to beat.
 
 ## Phase 7 — Balance and systems hardening
-- [ ] Tune hunger drain, spawn rates, prey values, predator damage, upgrade costs with playtest data
-- [ ] Difficulty curve pass (first run 2-3 min; upgraded 5+ min)
-- [ ] Unit tests for core math; regression checklist
-- [ ] Object pooling audit, memory/GC check on long runs
+- [x] Tune with playtest data: measured fresh and upgraded runs with the balance bot (now takes an upgrade level); the Phase 5 tuning (hunger 2.1/s ramping over 360 s, food guarantee, pufferfish rhythm) meets the targets, no further changes needed
+- [x] Difficulty curve pass: fresh median ~3:20 for a good player (1:49-10:00+), upgraded (level 3) 7:41-10:00+; numbers in GAME_DESIGN.md
+- [x] Unit tests cover the core rules (movement, AI, hunger, growth, combo, frenzy, upgrades, progression, saves, joystick, viewport, spawning: 116 tests); release checklist in docs/REGRESSION.md
+- [x] Pooling audit (creatures, hazards, predators, coins, float texts, rings, glows all pooled; only rare pickups are created/destroyed) and `npm run soak`: 4-minute run through every zone + 20 restarts with flat heap (~76 MB after GC), bounded objects, no listener growth, 165 fps
 **Exit (Feature-complete beta):** everything in v1 scope present and balanced.
 
 ## Phase 8 — Art, audio, and polish

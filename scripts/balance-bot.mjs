@@ -1,7 +1,8 @@
 // Balance probe: a greedy bot plays a run by chasing the nearest edible prey with the mouse,
 // logging hunger/score/stage every 5 s. Use it to sanity-check tuning in config/balance.ts.
 //
-// Usage: npm run balance -- [human|perfect] [seconds]      (default: human 150)
+// Usage: npm run balance -- [human|perfect] [seconds] [upgradeLevel]   (default: human 150 0)
+//   upgradeLevel = every upgrade at this level (0-5), to measure upgraded runs
 //   human   = only on-screen prey, re-aims every 250 ms, no leading (roughly a decent player)
 //   perfect = sees all prey, re-aims every 60 ms, leads targets (upper bound on skill)
 //
@@ -20,7 +21,18 @@ const browser = await chromium.launch({
   headless: true,
   args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
 });
+const upgradeLevel = Number(process.argv[4] ?? 0);
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+if (upgradeLevel > 0) {
+  await page.addInitScript((level) => {
+    const ids = ['speed', 'belly', 'metabolism', 'boost', 'jaws', 'magnet', 'frenzy'];
+    const upgrades = Object.fromEntries(ids.map((id) => [id, level]));
+    localStorage.setItem(
+      'hungry-seal-save',
+      JSON.stringify({ version: 4, runs: 10, tutorialDone: true, upgrades }),
+    );
+  }, upgradeLevel);
+}
 await page.goto('http://localhost:5196/');
 await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Menu'));
 await page.keyboard.press('Enter');
@@ -29,7 +41,7 @@ await page.mouse.move(640, 360);
 
 const human = (process.argv[2] ?? 'human') !== 'perfect';
 const seconds = Number(process.argv[3] ?? 150);
-console.log(`bot mode: ${human ? 'human' : 'perfect'}`);
+console.log(`bot mode: ${human ? 'human' : 'perfect'}, upgrades ${upgradeLevel}`);
 
 const start = Date.now();
 let lastLog = 0;

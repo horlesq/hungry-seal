@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "playtest": "node scripts/playtest.mjs",
     "balance": "node scripts/balance-bot.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run playtest"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run playtest",
+    "soak": "node scripts/soak.mjs"
   },
   "dependencies": {
     "@fontsource-variable/baloo-2": "^5.3.0",
