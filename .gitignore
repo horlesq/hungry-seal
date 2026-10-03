@@ -10,3 +10,6 @@ dist
 
 # Local MCP servers (Blender connector)
 .mcp.json
+
+# Python bytecode (Blender scripts)
+__pycache__/
