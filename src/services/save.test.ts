@@ -168,20 +168,20 @@ describe('save data', () => {
     expect(isMapUnlocked(fresh, 'bay')).toBe(true);
     expect(isMapUnlocked(fresh, 'arctic')).toBe(false);
     expect(selectMap(fresh, 'arctic')).toBeNull();
-    const good = { ...fresh, bestScore: 5000 };
+    const good = { ...fresh, bestScore: 15000 };
     expect(selectMap(good, 'arctic')?.maps.selected).toBe('arctic');
     expect(selectMap(good, 'tropical')).toBeNull();
   });
 
   it('reports maps a run unlocks and keeps a best score per map', () => {
-    const run: RunStats = { ...emptyRunStats(), score: 4200 };
-    const r = settleRun({ ...defaultSave(), bestScore: 3000 }, run, {
+    const run: RunStats = { ...emptyRunStats(), score: 12500 };
+    const r = settleRun({ ...defaultSave(), bestScore: 9000 }, run, {
       random: () => 0.5,
       date: '2026-10-03',
       map: 'bay',
     });
     expect(r.unlockedMaps).toEqual(['arctic']);
-    expect(r.data.maps.best.bay).toBe(4200);
+    expect(r.data.maps.best.bay).toBe(12500);
     const again = settleRun(r.data, run, { random: () => 0.5, date: '2026-10-03', map: 'bay' });
     expect(again.unlockedMaps).toEqual([]);
   });

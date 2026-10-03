@@ -7,8 +7,8 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
 - Side view, camera follows the seal with slight look-ahead.
 - **Maps (done):** each map is a bounded world (~14-16k px wide, ~11-12 screens) with solid terrain like Hungry Shark: islands above the water, reefs and arches, kelp slopes, a shipwreck, a deep trench with a cave system and treasure chambers. You slide along rock (a hard bump thuds); creatures and predators steer around it; crabs walk on the real ground. Creatures still spawn around the camera by depth zone, only in open water.
   - **Seal Bay** (free): lighthouse island, reef arch, kelp slope, wreck ledge, swim-through rock ring, trench caves, pillars, sea-stack island.
-  - **Arctic** (unlocks at 4,000 points in one run): ice floes with icicles along the surface, giant icebergs, an ice cave, a seamount arch. Lots of penguins, no turtles or pufferfish, twice the orcas.
-  - **Tropical Lagoon** (unlocks at 10,000 points): coral lagoon, sunken ruins, a volcano with a lava tube under it, trench vents. Extra turtles and pufferfish, no penguins.
+  - **Arctic** (unlocks at 12,000 points in one run): ice floes with icicles along the surface, giant icebergs, an ice cave, a seamount arch. Lots of penguins, no turtles or pufferfish, twice the orcas.
+  - **Tropical Lagoon** (unlocks at 30,000 points): coral lagoon, sunken ruins, a volcano with a lava tube under it, trench vents. Extra turtles and pufferfish, no penguins.
   - Each map has its own colors, zone names, decor (Blender-rendered coral, kelp, wrecks, landmarks), creature/predator mix and treasure spots (chests respawn 150 s after opening; a random chest can also appear on the abyss floor).
   - Map select after the first run (Play -> map cards with a picture of the map, best score there, unlock progress). The pause screen shows the whole map with where you are and the treasure spots.
 - Vertical range from sky through surface to the abyss; depth zones are the same on every map:
@@ -19,6 +19,7 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
   4. **Deep** — anglerfish, mines, orcas, dim lighting.
   5. **Abyss** — endgame zone, big predators, rich rewards, hardest hunger drain.
 - A run's difficulty scales with elapsed time (and depth).
+- Measured with terrain (balance bot, human mode, no upgrades, 2026-10-03): Seal Bay 3:26 / 4:58, Arctic 6:07, Tropical 2:03 / 8:10; scores 8k-59k. Same spread as before maps; unlock scores set so each map takes a few good runs.
 
 ## Controls
 - **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Speed ramps from 0 at 18 px to full at 110 px from the seal, so pointing straight at nearby prey still chases at full speed. Mouse leaving the canvas = glide.

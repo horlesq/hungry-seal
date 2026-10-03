@@ -278,7 +278,7 @@ const ARCTIC: MapDef = {
   id: 'arctic',
   name: 'Arctic',
   blurb: 'Ice floes, icebergs and penguins. Watch out for orcas.',
-  unlockScore: 4000,
+  unlockScore: 12000,
   start: { x: 2150, y: 1000 },
   palette: {
     sky: '#9fd8f5',
@@ -404,7 +404,7 @@ const TROPICAL: MapDef = {
   id: 'tropical',
   name: 'Tropical Lagoon',
   blurb: 'Coral gardens, sunken ruins and a volcano with a tunnel through it.',
-  unlockScore: 10000,
+  unlockScore: 30000,
   start: { x: 2000, y: 900 },
   palette: {
     sky: '#4cc3f5',
