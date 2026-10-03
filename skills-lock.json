@@ -7,6 +7,12 @@
       "skillPath": "skills/agent-browser/SKILL.md",
       "computedHash": "80161e6836b3b40f4e83730a290deb40ac14d877d38c97ad5f6d71be37ce74c3"
     },
+    "create-game-assets": {
+      "source": "gamedev-skills/awesome-gamedev-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/disciplines/create-game-assets/SKILL.md",
+      "computedHash": "e0a2efd971196dc386b206e23dc2b8acf4a4fd0b22465ff9621f20d5dcd61b24"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
@@ -24,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/disciplines/game-ui-ux/SKILL.md",
       "computedHash": "4aeb677be89029728154d40bb1d98e07d809f019ff8cd0e9188fb4a1f9d51255"
+    },
+    "level-design": {
+      "source": "gamedev-skills/awesome-gamedev-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/disciplines/level-design/SKILL.md",
+      "computedHash": "43a262c4dfa741b40709a16764d7fac38036a9e8295e510edad50a89c9bf8ab8"
     },
     "phaser-coder": {
       "source": "yakoub-ai/phaser4-gamedev",

@@ -347,11 +347,73 @@ export class TerrainField {
 }
 
 /** Evaluates the field at one point (unclamped where shapes are in range). */
-export function evaluate(def: TerrainDef, ops: readonly PreparedOp[], x: number, y: number): number {
-  const fy = floorAt(def.floor, x);
-  // Distance to the seabed, corrected for slope so steep banks aren't too "thick".
-  const slope = (floorAt(def.floor, x + 8) - floorAt(def.floor, x - 8)) / 16;
-  let d = (fy - y) / Math.sqrt(1 + slope * slope);
+/** Seabed heights sampled every FLOOR_STEP px, for exact distances to the profile. */
+const FLOOR_STEP = 8;
+
+export interface FloorSamples {
+  step: number;
+  heights: Float32Array;
+  /** Lowest/highest seabed within reach (TERRAIN_MAX_DIST) of each sample, for early outs. */
+  minNear: Float32Array;
+  maxNear: Float32Array;
+}
+
+export function sampleFloor(def: TerrainDef): FloorSamples {
+  const n = Math.ceil(def.width / FLOOR_STEP) + 1;
+  const heights = new Float32Array(n);
+  for (let i = 0; i < n; i++) heights[i] = floorAt(def.floor, i * FLOOR_STEP);
+  const reach = Math.ceil(TERRAIN_MAX_DIST / FLOOR_STEP);
+  const minNear = new Float32Array(n);
+  const maxNear = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let k = Math.max(0, i - reach); k <= Math.min(n - 1, i + reach); k++) {
+      lo = Math.min(lo, heights[k]);
+      hi = Math.max(hi, heights[k]);
+    }
+    minNear[i] = lo;
+    maxNear[i] = hi;
+  }
+  return { step: FLOOR_STEP, heights, minNear, maxNear };
+}
+
+/**
+ * Signed distance to the seabed: to the nearest point of the sampled profile within reach
+ * (exact enough for sheer cliffs, where a slope-corrected vertical distance badly
+ * underestimates the open water above a drop).
+ */
+function floorDistance(f: FloorSamples, x: number, y: number): number {
+  const { step, heights } = f;
+  const ic0 = Math.min(heights.length - 1, Math.max(0, Math.round(x / step)));
+  // Far above or below every nearby bit of seabed: the distance is clamped anyway.
+  if (y < f.minNear[ic0] - TERRAIN_MAX_DIST) return TERRAIN_MAX_DIST;
+  if (y > f.maxNear[ic0] + TERRAIN_MAX_DIST) return -TERRAIN_MAX_DIST;
+  const i0 = Math.max(0, Math.floor((x - TERRAIN_MAX_DIST) / step));
+  const i1 = Math.min(heights.length - 1, Math.ceil((x + TERRAIN_MAX_DIST) / step));
+  const ic = Math.min(heights.length - 1, Math.max(0, Math.round(x / step)));
+  const below = y < heights[ic];
+  let best = Math.abs(heights[ic] - y);
+  for (let i = i0; i <= i1; i++) {
+    const dx = i * step - x;
+    const dy = heights[i] - y;
+    // Only profile points on the other side of the surface count.
+    if (below ? dy < 0 : dy > 0) continue;
+    const d = Math.hypot(dx, dy);
+    if (d < best) best = d;
+  }
+  // Steps between samples: the vertical distance at x bounds it too.
+  return below ? best : -best;
+}
+
+export function evaluate(
+  def: TerrainDef,
+  ops: readonly PreparedOp[],
+  x: number,
+  y: number,
+  floor: FloorSamples = sampleFloor(def),
+): number {
+  let d = floorDistance(floor, x, y);
   if (def.floorRough) d += def.floorRough * rockNoise(x, y, def.seed);
   // Edge walls (open above the map is still bounded by them).
   d = Math.min(d, x - EDGE_WALL, def.width - EDGE_WALL - x);
@@ -374,12 +436,13 @@ export function prepareOps(def: TerrainDef): PreparedOp[] {
 
 function bake(def: TerrainDef, cols: number, rows: number): Float32Array {
   const ops = prepareOps(def);
+  const floor = sampleFloor(def);
   const data = new Float32Array(cols * rows);
   const m = TERRAIN_MAX_DIST;
   for (let r = 0; r < rows; r++) {
     const y = r * TERRAIN_CELL;
     for (let c = 0; c < cols; c++) {
-      const d = evaluate(def, ops, c * TERRAIN_CELL, y);
+      const d = evaluate(def, ops, c * TERRAIN_CELL, y, floor);
       data[r * cols + c] = d > m ? m : d < -m ? -m : d;
     }
   }

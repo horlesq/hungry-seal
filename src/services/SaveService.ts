@@ -7,6 +7,8 @@ import {
   defaultSave,
   equipSkin,
   migrateSave,
+  collectPearl,
+  defeatBoss,
   selectMap,
   type Settings,
   purchase,
@@ -72,6 +74,20 @@ export class SaveService {
   /** Wears an owned skin. Returns false if it isn't owned. */
   equipSkin(id: SkinId): boolean {
     return this.apply(equipSkin(this.current, id));
+  }
+
+  /** Records a pearl right away (so quitting a run doesn't lose it). Returns maps it unlocked. */
+  collectPearl(map: MapId, index: number): { unlocked: MapId[] } | null {
+    const r = collectPearl(this.current, map, index);
+    if (!r) return null;
+    this.current = r.data;
+    this.persist();
+    return { unlocked: r.unlocked };
+  }
+
+  /** Records a boss win. Returns false if it was already beaten. */
+  defeatBoss(map: MapId): boolean {
+    return this.apply(defeatBoss(this.current, map));
   }
 
   /** Picks the map to play. Returns false if it's still locked. */

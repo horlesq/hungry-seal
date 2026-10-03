@@ -6,7 +6,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from '../config/keys';
 import { MAP_ORDER, MAPS, type MapDef, type MapId } from '../config/maps';
-import { isMapUnlocked } from '../services/saveData';
+import { isMapUnlocked, pearlsFound } from '../services/saveData';
 import { saves } from '../services/SaveService';
 import { fitUiCamera, getSafeInsets, onResize, sharpenTexts } from '../services/Viewport';
 import { Button } from '../ui/Button';
@@ -181,16 +181,21 @@ export class MapScene extends Phaser.Scene {
       card.thumb.setAlpha(open ? 1 : 0.45);
       if (open) {
         const best = data.maps.best[def.id] ?? 0;
+        const pearls = `${pearlsFound(data, def.id)}/${def.pearls.length} pearls`;
+        const boss = data.maps.bosses.includes(def.id) ? ', boss beaten' : '';
         card.status
-          .setText(best > 0 ? `Best here ${formatNumber(best)}` : 'Not played yet')
+          .setText(best > 0 ? `Best ${formatNumber(best)}  ${pearls}${boss}` : 'Not played yet')
           .setColor(def.id === data.maps.selected ? CSS.glacier : CSS.mist);
       } else {
-        const need = def.unlockScore ?? 0;
-        card.status.setText(`Score ${formatNumber(need)} in one run`).setColor(CSS.gold);
+        const u = def.unlock!;
+        const have = pearlsFound(data, u.after);
+        card.status
+          .setText(`Find ${u.pearls} pearls in ${MAPS[u.after].name} (${Math.min(have, u.pearls)}/${u.pearls})`)
+          .setColor(CSS.gold);
         // Progress toward the unlock, under the status line.
         const b = card.status.getBounds();
         const w = Math.max(220, b.width);
-        drawBar(g, b.centerX - w / 2, b.bottom + 8, w, 10, data.bestScore / need, COLORS.gold);
+        drawBar(g, b.centerX - w / 2, b.bottom + 8, w, 10, have / u.pearls, COLORS.gold);
       }
     }
     const open = isMapUnlocked(data, this.selected);

@@ -25,7 +25,7 @@ import {
   type UpgradeLevels,
 } from '../systems/UpgradeSystem';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -50,7 +50,14 @@ export interface SaveData {
   /** First-run hints have been shown. */
   tutorialDone: boolean;
   /** The map to play, and the best score on each map (v5). */
-  maps: { selected: MapId; best: Partial<Record<MapId, number>> };
+  maps: {
+    selected: MapId;
+    best: Partial<Record<MapId, number>>;
+    /** Pearls found on each map (indexes into the map's pearl list) (v6). */
+    pearls: Partial<Record<MapId, number[]>>;
+    /** Maps whose boss has been beaten (v6). */
+    bosses: MapId[];
+  };
   settings: Settings;
 }
 
@@ -70,9 +77,48 @@ export function defaultSettings(): Settings {
 }
 
 /** A map is open once the best score (any map) reaches its unlock score. */
+/** A map opens after enough pearls on the map before it (or, for older saves, a best score). */
 export function isMapUnlocked(data: SaveData, id: MapId): boolean {
-  const need = MAPS[id].unlockScore;
-  return need === null || data.bestScore >= need;
+  const u = MAPS[id].unlock;
+  if (!u) return true;
+  return pearlsFound(data, u.after) >= u.pearls || data.bestScore >= u.score;
+}
+
+export function pearlsFound(data: SaveData, id: MapId): number {
+  return data.maps.pearls[id]?.length ?? 0;
+}
+
+/** Map mastered: every pearl found and the boss beaten. */
+export function isMapMastered(data: SaveData, id: MapId): boolean {
+  return pearlsFound(data, id) >= MAPS[id].pearls.length && data.maps.bosses.includes(id);
+}
+
+/**
+ * Records a pearl. Returns the new data and the maps it unlocked, or null if it was already
+ * found (or doesn't exist).
+ */
+export function collectPearl(
+  data: SaveData,
+  id: MapId,
+  index: number,
+): { data: SaveData; unlocked: MapId[] } | null {
+  const found = data.maps.pearls[id] ?? [];
+  if (found.includes(index) || index < 0 || index >= MAPS[id].pearls.length) return null;
+  const next: SaveData = {
+    ...data,
+    maps: { ...data.maps, pearls: { ...data.maps.pearls, [id]: [...found, index].sort() } },
+  };
+  return { data: next, unlocked: newlyUnlocked(data, next) };
+}
+
+/** Records a boss win. Returns null if it was already beaten on this map. */
+export function defeatBoss(data: SaveData, id: MapId): SaveData | null {
+  if (data.maps.bosses.includes(id)) return null;
+  return { ...data, maps: { ...data.maps, bosses: [...data.maps.bosses, id] } };
+}
+
+function newlyUnlocked(before: SaveData, after: SaveData): MapId[] {
+  return MAP_ORDER.filter((m) => !isMapUnlocked(before, m) && isMapUnlocked(after, m));
 }
 
 /** Selects a map if it's unlocked. Returns null if not possible. */
@@ -96,7 +142,7 @@ export function defaultSave(): SaveData {
     achievements: [],
     topRuns: [],
     tutorialDone: false,
-    maps: { selected: 'bay', best: {} },
+    maps: { selected: 'bay', best: {}, pearls: {}, bosses: [] },
     settings: defaultSettings(),
   };
 }
@@ -222,9 +268,18 @@ export function migrateSave(raw: unknown): SaveData {
   // Maps (v5): per-map bests for known maps; keep the selection only if it's unlocked.
   const maps = record(r.maps);
   const best = record(maps?.best) ?? {};
+  const pearls = record(maps?.pearls) ?? {};
+  const bosses = Array.isArray(maps?.bosses) ? maps.bosses : [];
   for (const id of MAP_ORDER) {
     const n = count(best[id]);
     if (n > 0) data.maps.best[id] = n;
+    // Pearls and bosses (v6): valid, distinct pearl indexes only.
+    const list = Array.isArray(pearls[id]) ? (pearls[id] as unknown[]) : [];
+    const valid = [...new Set(list)].filter(
+      (i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < MAPS[id].pearls.length,
+    );
+    if (valid.length > 0) data.maps.pearls[id] = valid.sort();
+    if (bosses.includes(id)) data.maps.bosses.push(id);
   }
   const selected = maps?.selected as MapId;
   if (MAP_ORDER.includes(selected) && isMapUnlocked(data, selected)) data.maps.selected = selected;
@@ -270,10 +325,7 @@ export function settleRun(
   });
   const rewardGems = missions.gems + achievementGems;
   const bestScore = Math.max(data.bestScore, count(run.score));
-  const unlockedMaps = MAP_ORDER.filter((id) => {
-    const need = MAPS[id].unlockScore;
-    return need !== null && data.bestScore < need && bestScore >= need;
-  });
+  const unlockedMaps = newlyUnlocked(data, { ...data, bestScore });
   return {
     unlockedMaps,
     newBest: run.score > data.bestScore,
