@@ -10,6 +10,7 @@ import { Depths } from '../config/depths';
 import type { MapDef } from '../config/maps';
 import { audio } from '../services/AudioManager';
 import { textureScale } from '../services/Viewport';
+import { loopFrames } from '../entities/sheetAnim';
 import { canEat, circlesOverlap } from './feeding';
 
 export const EELS = {
@@ -54,8 +55,10 @@ interface Eel {
   y: number;
   dx: number;
   dy: number;
-  sprite: Phaser.GameObjects.Image;
+  sprite: Phaser.GameObjects.Sprite;
   glow: Phaser.GameObjects.Image;
+  /** Animation clock (offset per eel so neighbours don't wave in step). */
+  anim: number;
   state: State;
   t: number;
   /** How far out of the den (px) the head is. */
@@ -78,7 +81,7 @@ export class Eels {
       const len = Math.hypot(den.dir[0], den.dir[1]) || 1;
       const def = EELS[den.kind];
       const sprite = scene.add
-        .image(den.x, den.y, def.texture)
+        .sprite(den.x, den.y, def.texture)
         .setOrigin(0.92, 0.5)
         .setScale(textureScale(scene, def.texture))
         .setRotation(Math.atan2(den.dir[1], den.dir[0]))
@@ -101,6 +104,7 @@ export class Eels {
         glow,
         state: 'hidden',
         t: Math.random() * 2,
+        anim: Math.random() * 3,
         out: 30,
         charge: 0,
         eaten: false,
@@ -143,6 +147,8 @@ export class Eels {
       // The head sits at the sprite's origin (0.92): move the whole sprite out of the den.
       e.sprite.setPosition(hx, hy);
       e.glow.setPosition(hx, hy);
+      e.anim += dt;
+      loopFrames(e.sprite, e.anim);
     }
     return this.events;
   }

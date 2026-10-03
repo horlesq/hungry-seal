@@ -344,7 +344,7 @@ export class HudScene extends Phaser.Scene {
     this.coinIcon.setPosition(-this.coinText.width - 18, 62 + this.coinText.height / 2);
   }
 
-  /** Boss health bar, top centre, while the seal is in the lair. */
+  /** Boss health bar, bottom centre (clear of the region banner), while the seal is in the lair. */
   private onBossHp(b: { name: string; hp: number; max: number; show: boolean }): void {
     if (!this.bossRoot) {
       this.bossBar = this.add.graphics();
@@ -352,7 +352,7 @@ export class HudScene extends Phaser.Scene {
       this.bossRoot = this.add.container(0, 0, [this.bossBar, this.bossName]);
     }
     const v = getViewport();
-    this.bossRoot.setPosition(v.viewWidth / 2, getSafeInsets().top + 168).setVisible(b.show);
+    this.bossRoot.setPosition(v.viewWidth / 2, v.viewHeight - getSafeInsets().bottom - 64).setVisible(b.show);
     if (!b.show) return;
     this.bossName.setText(b.name);
     const w = 360;

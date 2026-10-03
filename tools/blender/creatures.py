@@ -2,8 +2,8 @@
 # animation sheet for each: tails sweep, wings flap, legs walk, bells pulse.
 #
 # Run from the repo root: node tools/blender/bridge.mjs exec tools/blender/creatures.py [ONLY=shark,crab]
-# Output: public/assets/<texture key>-sheet.png, frames of the placeholder's design size x3,
-# 2 columns. Everything faces +X (right) and is centred on the frame, like the placeholders.
+# Output: public/assets/<texture key>-sheet.png, frames of the placeholder's design size x3
+# (x2 for the bosses), 2 columns. Everything faces +X (right) and is centred on the frame, like the placeholders.
 import importlib
 import math
 import os
@@ -631,7 +631,290 @@ def anglerfish():
     return pose, 6
 
 
-# key -> (builder, design size of one frame)
+def barracuda():
+    """Long silver hunter: dark bars on the back, underbite full of teeth, forked tail."""
+    ol = H("#1e2a35")
+    m = toon_material("Barracuda", H("#8ea6b8"), H("#eef3f6"), split=-0.06, soft=0.03, tilt=0.02)
+    fin = toon_material("BarracudaFin", H("#5d7488"))
+    body = blob("Body", [((0.15, 0, 0.0), (1.30, 0.23, 0.26)), ((1.10, 0, -0.02), (0.62, 0.19, 0.20)),
+                         ((1.55, 0, -0.05), (0.30, 0.11, 0.11)), ((1.62, 0, -0.11), (0.22, 0.08, 0.06)),
+                         ((-0.95, 0, 0.0), (0.62, 0.15, 0.17)), ((-1.38, 0, 0.0), (0.24, 0.08, 0.09))],
+                m, voxel=0.016, outline=None)
+    add_outline(body, OUTLINE, ol)
+    plate("Tail", [(-1.45, 0.03), (-1.92, 0.44), (-1.74, 0.02), (-1.92, -0.42), (-1.45, -0.04)], fin,
+          thickness=0.035, outline=0.05, round_=False)
+    plate("Dorsal", [(0.05, 0.20), (0.22, 0.50), (0.42, 0.21)], fin, thickness=0.03, outline=0.05,
+          round_=False)
+    plate("Dorsal2", [(-0.95, 0.13), (-0.84, 0.34), (-0.66, 0.14)], fin, thickness=0.03, outline=0.05,
+          round_=False)
+    plate("Anal", [(-0.95, -0.13), (-0.84, -0.31), (-0.66, -0.14)], fin, thickness=0.03, outline=0.05,
+          round_=False)
+    bar = flat_material("Bar", H("#4f6577"))
+    for i in range(6):
+        x = 0.85 - i * 0.32
+        ellipsoid(f"Bar{i}", on_skin(body, x, 0.12), (0.06, 0.01, 0.12), bar,
+                  rot=(0, math.radians(-25), 0), segments=12, rings=6)
+    ink = flat_material("Ink", ol)
+    cartoon_eye(body, "Eye", 1.22, 0.07, 0.085, pupil=0.66, look=(0.3, 0.0))
+    skin_tube(body, "Brow", [(1.09, 0.17), (1.23, 0.16), (1.36, 0.11)], ink, 0.02, lift=0.0)
+    skin_tube(body, "Mouth", [(1.80, -0.10), (1.55, -0.10), (1.30, -0.08)],
+              flat_material("Gape", H("#3a1820")), 0.022, lift=0.0)
+    tooth = flat_material("Tooth", (1, 1, 1), 1.1)
+    for i in range(5):
+        x = 1.36 + i * 0.1
+        y = surface_y(body, x, -0.09) - 0.02
+        obj = cone(f"Tooth{i}", (x, y, -0.12), 0.026, 0.07, tooth, rot=(math.pi, 0, 0))
+        add_outline(obj, 0.015)
+    pect_root = (0.85, -0.08)
+    plate("Pect", [(0.88, -0.06), (0.55, -0.26), (0.62, -0.08)], fin, thickness=0.025,
+          y=surface_y(body, 0.7, -0.1) - 0.03, outline=0.035, round_=False)
+    piv = 0.6
+
+    def pose(name, p, phase):
+        if name.startswith("Pect"):
+            rotate_xz(p, pect_root, 0.3 * math.sin(phase))
+        w = smooth01((piv - p[:, 0]) / 2.5) ** 1.2
+        rotate_xy(p, (piv, 0), 0.5 * math.sin(phase), w)
+        rotate_xz(p, (piv, 0), 0.07 * math.sin(phase + 1.0), w)
+        return p
+
+    return pose, 6
+
+
+def hammerhead():
+    """Shark with a cartoon hammer: the head flattens into a tall T with an eye at each end."""
+    ol = H("#2a261c")
+    m = toon_material("Hammer", H("#7f7a6c"), H("#f2efe6"), split=-0.22, soft=0.04, tilt=-0.03)
+    fin = toon_material("HammerFin", H("#726d60"))
+    body = blob("Body", [((0.2, 0, 0.05), (2.3, 0.70, 0.80)), ((2.0, 0, 0.0), (1.3, 0.60, 0.64)),
+                         ((2.95, 0, -0.02), (0.62, 0.40, 0.42)), ((3.40, 0, 0.04), (0.30, 0.30, 1.02)),
+                         ((-2.0, 0, 0.05), (1.25, 0.37, 0.42)), ((-2.95, 0, 0.08), (0.55, 0.19, 0.21))],
+                m, voxel=0.04, outline=None)
+    add_outline(body, OUTLINE, ol)
+    plate("Tail", [(-2.95, 0.10), (-3.92, 1.45), (-3.68, 0.42), (-3.55, 0.05), (-3.76, -0.72),
+                   (-3.05, -0.10)], fin, thickness=0.07, round_=False)
+    plate("Dorsal", [(-0.35, 0.66), (0.15, 1.30), (0.35, 1.85), (0.60, 1.80), (0.95, 0.72)], fin,
+          thickness=0.07, round_=False)
+    plate("Dorsal2", [(-2.35, 0.38), (-2.15, 0.66), (-1.95, 0.40)], fin, thickness=0.05, round_=False)
+    pect_root = (1.30, -0.45)
+    plate("Pect", [(1.40, -0.42), (0.40, -1.30), (0.65, -1.36), (1.00, -0.58), (1.25, -0.40)], fin,
+          thickness=0.06, y=surface_y(body, 1.0, -0.5) - 0.04, round_=False)
+    ink = flat_material("Ink", ol)
+    for i in range(3):
+        x = 1.45 + i * 0.16
+        skin_tube(body, f"Gill{i}", [(x, 0.26), (x - 0.06, 0.0), (x, -0.26)], ink, 0.02, lift=0.0)
+    cartoon_eye(body, "EyeTop", 3.42, 0.84, 0.15, pupil=0.7, look=(0.25, 0.0))
+    cartoon_eye(body, "EyeLow", 3.42, -0.76, 0.13, pupil=0.7, look=(0.25, 0.0))
+    skin_tube(body, "Brow", [(3.18, 1.06), (3.42, 1.04), (3.64, 0.96)], ink, 0.035, lift=0.0)
+    mouth = flat_material("MouthDark", H("#3a1820"))
+    skin_tube(body, "Mouth", [(3.12, -0.30), (2.85, -0.42), (2.50, -0.42), (2.25, -0.32)], mouth,
+              0.06, lift=0.0)
+    tooth = flat_material("Tooth", (1, 1, 1), 1.1)
+    teeth_row(body, "Tooth", 2.42, 3.02, lambda x: -0.41 + 0.10 * (x - 2.42), 5, tooth,
+              length=0.14, lift=0.03)
+    piv = 0.6
+
+    def pose(name, p, phase):
+        if name.startswith("Pect"):
+            rotate_xz(p, pect_root, 0.12 * math.sin(phase))
+        w = smooth01((piv - p[:, 0]) / 4.4) ** 1.2
+        rotate_xy(p, (piv, 0), 0.42 * math.sin(phase), w)
+        rotate_xz(p, (piv, 0), 0.06 * math.sin(phase + 1.0), w)
+        head = smooth01((p[:, 0] - 1.5) / 2.0)
+        rotate_xy(p, (1.5, 0), -0.06 * math.sin(phase), head)
+        return p
+
+    return pose, 6
+
+
+def eel(kind):
+    """Long eel facing right that waves in the view plane. moray: mottled green, gaping jaw
+    with fangs, fin along the back. electric: dark blue knifefish with glowing yellow bands."""
+    moray = kind == "moray"
+    if moray:
+        ol = H("#22300f")
+        m = toon_material("Eel", H("#7d9a3e"), H("#c9d98a"), split=-0.18, soft=0.05,
+                          spots=dict(color=H("#3e5220"), scale=4.5, size=0.28, max_x=2.2))
+        fin = toon_material("EelFin", H("#6c8836"))
+    else:
+        ol = H("#0c1430")
+        m = toon_material("Eel", H("#2c3d6a"), H("#6c86c4"), split=-0.16, soft=0.05)
+        fin = toon_material("EelFin", H("#3a4f86"))
+    x0, x1 = -2.95 + 0.15, 2.30  # body tube from near the tail tip to the head
+    # Tapers evenly from the head to a thin tail; many overlapping parts keep it smooth.
+    radius = lambda x: 0.05 + 0.27 * smooth01(np.clip((x - x0) / (x1 - x0), 0, 1) ** 0.7)  # noqa: E731
+    parts = []
+    n = 28
+    for i in range(n):
+        x = x0 + i / (n - 1) * (x1 - x0)
+        r = float(radius(x))
+        parts.append(((x, 0, 0.0), (0.32, r * 0.9, r)))
+    if moray:
+        parts += [((2.42, 0, 0.08), (0.58, 0.30, 0.30)),
+                  ((2.30, 0, -0.20), (0.50, 0.24, 0.13), (0, math.radians(10), 0))]
+    else:
+        parts += [((2.40, 0, 0.0), (0.55, 0.28, 0.28)), ((2.80, 0, -0.02), (0.20, 0.18, 0.18))]
+    body = blob("Body", parts, m, voxel=0.022, outline=None)
+    add_outline(body, OUTLINE, ol)
+    if moray:
+        # A long low fin along the back, from behind the head to the tail tip.
+        plate("FinTop", [(1.85, 0.20), (1.40, 0.46), (0.40, 0.50), (-0.80, 0.42), (-2.00, 0.30),
+                         (-2.95, 0.04), (-2.00, 0.10), (-0.80, 0.18), (0.40, 0.20), (1.40, 0.16)],
+              fin, thickness=0.04, y=0.05, outline=0.05)
+        plate("FinLow", [(0.20, -0.22), (-0.80, -0.38), (-2.00, -0.28), (-2.95, -0.03), (-2.00, -0.10),
+                         (-0.80, -0.16)], fin, thickness=0.04, y=0.05, outline=0.05)
+    else:
+        # Knifefish: one long ribbon fin along the belly.
+        plate("FinLow", [(1.70, -0.20), (0.60, -0.48), (-0.80, -0.46), (-2.00, -0.32), (-2.95, -0.03),
+                         (-2.00, -0.10), (-0.80, -0.18), (0.60, -0.18)], fin, thickness=0.04, y=0.05,
+              outline=0.05)
+        band = flat_material("Band", H("#ffe14d"), 2.2)
+        for i in range(6):
+            x = 1.55 - i * 0.62
+            r = float(radius(x))
+            skin_tube(body, f"Band{i}", [(x + 0.05, r * 0.85), (x - 0.03, 0.0), (x + 0.05, -r * 0.85)],
+                      band, 0.035, lift=0.0)
+    ink = flat_material("Ink", ol)
+    if moray:
+        maw = flat_material("Maw", H("#3a1220"))
+        my = surface_y(body, 2.62, -0.10) - 0.02
+        ellipsoid("Maw", (2.62, my, -0.10), (0.36, 0.04, 0.10), maw, rot=(0, math.radians(-8), 0))
+        tooth = flat_material("Fang", H("#f4f1e4"), 1.1)
+        for i in range(4):
+            x = 2.40 + i * 0.14
+            obj = cone(f"FangTop{i}", (x, my - 0.03, -0.04 - 0.012 * i), 0.03, 0.10, tooth,
+                       rot=(math.pi, 0, 0))
+            add_outline(obj, 0.015)
+            obj = cone(f"FangLow{i}", (x + 0.05, my - 0.03, -0.18 + 0.015 * i), 0.026, 0.09, tooth)
+            add_outline(obj, 0.015)
+        cartoon_eye(body, "Eye", 2.52, 0.20, 0.11, pupil=0.55, look=(0.3, 0.0))
+        skin_tube(body, "Brow", [(2.36, 0.33), (2.52, 0.33), (2.68, 0.27)], ink, 0.025, lift=0.0)
+        for i, x in enumerate((2.86, 2.92)):
+            obj = cone(f"Nostril{i}", (x, surface_y(body, x - 0.1, 0.12) - 0.02 + 0.04 * i, 0.16), 0.025,
+                       0.12, fin, rot=(0, math.radians(35), 0))
+            add_outline(obj, 0.015, ol)
+    else:
+        cartoon_eye(body, "Eye", 2.62, 0.10, 0.075, pupil=0.7, look=(0.3, 0.0))
+        skin_tube(body, "Mouth", [(2.98, -0.06), (2.85, -0.11), (2.68, -0.10)], ink, 0.02, lift=0.0)
+    head_x = 1.9
+
+    def pose(name, p, phase):
+        # A wave runs from the head to the tail in the visible plane; the head stays put.
+        x = p[:, 0]
+        w = smooth01((head_x - x) / 4.0)
+        p[:, 2] += 0.17 * np.sin(phase + 2.0 * (x - head_x)) * w
+        if moray and name.startswith(("Maw", "FangLow")):
+            p[:, 2] -= 0.025 * (1 + math.sin(phase * 2))
+        return p
+
+    return pose, 6
+
+
+BOSS_STYLES = {
+    "kraken": dict(body="#d9473f", belly="#ff9b85", spot="#9e2a35", fin="#c53c3a", outline="#3d0f16",
+                   sucker="#ffd2c4"),
+    "colossal": dict(body="#e6ecf6", belly="#ffffff", spot="#a9b8d6", fin="#cdd8ec", outline="#25304a",
+                     sucker="#ffffff", eye_glow="#7fd8ff"),
+    "abyssal": dict(body="#4d2a7a", belly="#7a4fb0", spot="#2e164f", fin="#5b3290", outline="#14061f",
+                    sucker="#e8c9ff", glow="#ff5fd0"),
+}
+
+
+def giant_squid(style):
+    """Boss squid, arms first (facing right): long mantle and fins trailing left, a huge eye,
+    eight writhing arms and two feeding tentacles with clubs."""
+    s = BOSS_STYLES[style]
+    ol = H(s["outline"])
+    m = toon_material("Squid", H(s["body"]), H(s["belly"]), split=-0.5, soft=0.2,
+                      spots=dict(color=H(s["spot"]), scale=1.6, size=0.2))
+    fin = toon_material("SquidFin", H(s["fin"]))
+    mantle = blob("Body", [((-2.5, 0, 0.25), (2.5, 1.15, 1.20)), ((-4.4, 0, 0.30), (1.25, 0.78, 0.82)),
+                           ((-5.3, 0, 0.32), (0.55, 0.40, 0.40)), ((0.2, 0, 0.0), (1.05, 1.05, 1.05)),
+                           ((1.0, 0, -0.05), (0.6, 0.85, 0.80))], m, voxel=0.05, outline=None)
+    add_outline(mantle, OUTLINE * 1.4, ol)
+    # Rhomboid fin around the mantle tip.
+    plate("Fin", [(-3.9, 0.32), (-5.0, 1.75), (-6.25, 0.34), (-5.0, -1.10)], fin, thickness=0.1, y=0.3,
+          outline=OUTLINE * 1.3, round_=False)
+    arm_m = toon_material("Arm", H(s["body"]), H(s["belly"]), split=-0.15, soft=0.06)
+    sucker = flat_material("Sucker", H(s["sucker"]), 1.05)
+    arms = []
+    # (root z, depth y, length, end lift): spread out from the head.
+    specs = [(0.65, 0.5, 3.8, 1.4), (0.45, 0.2, 4.4, 0.9), (0.25, -0.2, 4.8, 0.4), (0.05, -0.5, 4.6, -0.2),
+             (-0.15, 0.4, 4.4, -0.7), (-0.35, -0.1, 4.5, -1.1), (-0.55, -0.45, 4.1, -1.5),
+             (-0.70, 0.3, 3.6, -1.9)]
+    for i, (z0, y, length, lift) in enumerate(specs):
+        # Many overlapping parts so the thin tips stay one smooth piece.
+        parts = []
+        k = 22
+        for j in range(k):
+            u = j / (k - 1)
+            x = 1.2 + u * length
+            z = z0 + lift * u ** 1.4 + 0.25 * math.sin(u * 3.0 + i)
+            r = 0.36 * (1 - u) + 0.07
+            parts.append(((x, y, z), (max(r, length / k * 1.3), r, r)))
+        arms.append(blob(f"Arm{i}", parts, arm_m, voxel=0.045, outline=None))
+        add_outline(arms[-1], OUTLINE, ol)
+    # Two feeding tentacles, thin, ending in clubs.
+    for i, (z0, lift) in enumerate(((0.15, 1.1), (-0.25, -1.3))):
+        parts = []
+        k = 20
+        for j in range(k):
+            u = j / (k - 1)
+            parts.append(((1.2 + u * 4.5, -0.7, z0 + lift * u ** 1.2), (0.3, 0.11, 0.11)))
+        parts.append(((5.55, -0.7, z0 + lift + 0.05), (0.42, 0.22, 0.26)))
+        arms.append(blob(f"ArmClub{i}", parts, arm_m, voxel=0.04, outline=None))
+        add_outline(arms[-1], OUTLINE, ol)
+    # Suckers along the underside of the near arms.
+    for a in (arms[3], arms[5], arms[8], arms[9]):
+        verts = [a.matrix_world @ v.co for v in a.data.vertices]
+        for j in range(6):
+            x = 1.9 + j * 0.55
+            near = [c for c in verts if abs(c.x - x) < 0.08]
+            if not near:
+                continue
+            zc = min(c.z for c in near) + 0.07
+            ysurf = surface_y(a, x, zc, fallback=None)
+            if ysurf is None:
+                continue
+            ellipsoid(f"{a.name}Sucker{j}", (x, ysurf - 0.02, zc), (0.09, 0.03, 0.06), sucker,
+                      segments=12, rings=6)
+    if s.get("glow"):
+        g = flat_material("Photophore", H(s["glow"]), 2.4)
+        rng = np.random.default_rng(7)
+        for j in range(16):
+            x = rng.uniform(-5.0, -0.6)
+            z = rng.uniform(-0.6, 1.1)
+            ysurf = surface_y(mantle, x, z, fallback=None)
+            if ysurf is None:
+                continue
+            ellipsoid(f"Glow{j}", (x, ysurf - 0.02, z), (0.11, 0.02, 0.11), g, segments=12, rings=6)
+    cartoon_eye(mantle, "Eye", 0.35, 0.28, 0.46, pupil=0.5, look=(0.3, -0.05))
+    if s.get("eye_glow"):
+        ring = flat_material("EyeRing", H(s["eye_glow"]), 2.0)
+        ellipsoid("EyeRing", on_skin(mantle, 0.35, 0.28, -0.005), (0.56, 0.02, 0.56), ring)
+    skin_tube(mantle, "Brow", [(-0.10, 0.80), (0.35, 0.86), (0.80, 0.70)], flat_material("BrowInk", ol),
+              0.07, lift=0.0)
+
+    def pose(name, p, phase):
+        if name.startswith("Arm"):
+            i = int(name[3]) if name[3].isdigit() else 8 + int(name[7])
+            x = p[:, 0]
+            w = smooth01((x - 1.1) / 4.5)
+            p[:, 2] += 0.42 * np.sin(phase - 1.3 * (x - 1.1) + i * 0.8) * w
+            p[:, 0] -= 0.12 * (1 + math.sin(phase + i * 0.5)) * w
+        if name.startswith("Fin"):
+            k = smooth01((-p[:, 0] - 3.9) / 2.3)
+            p[:, 2] += 0.25 * math.sin(phase) * k * np.sign(p[:, 2] - 0.3)
+        if name == "Body" or name.startswith(("Eye", "Glow", "Brow")):
+            # The mantle swells and squeezes.
+            w = smooth01((-p[:, 0] - 0.5) / 3.0)
+            p[:, 2] = 0.3 + (p[:, 2] - 0.3) * (1.0 + 0.05 * math.sin(phase) * w)
+        return p
+
+    return pose, 6
+
+
+# key -> (builder, design size of one frame[, px per du])
 CREATURES = {
     "creature-minnow": (minnow, (48, 26)),
     "creature-shrimp": (shrimp, (44, 32)),
@@ -648,14 +931,21 @@ CREATURES = {
     "predator-orca": (orca, (250, 120)),
     "predator-anglerfish": (anglerfish, (130, 96)),
     "hazard-jellyfish": (jellyfish, (60, 80)),
+    "predator-barracuda": (barracuda, (110, 40)),
+    "predator-hammerhead": (hammerhead, (240, 110)),
+    "creature-moray": (lambda: eel("moray"), (170, 44)),
+    "creature-eel-electric": (lambda: eel("electric"), (180, 44)),
+    "boss-kraken": (lambda: giant_squid("kraken"), (380, 200), 2),
+    "boss-colossal": (lambda: giant_squid("colossal"), (380, 200), 2),
+    "boss-abyssal": (lambda: giant_squid("abyssal"), (380, 200), 2),
 }
 
 
 def render_creature(key):
-    builder, size = CREATURES[key]
+    builder, size, *px = CREATURES[key]
     clear_scene()
     pose, frames = builder()
-    setup_render(*size)
+    setup_render(*size, px=px[0] if px else 3)
     poser = Poser((0.0, 0.0))
 
     class Frames:

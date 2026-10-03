@@ -5,25 +5,57 @@
 // drops a treasure; the first win on a map also counts toward mastering it.
 import Phaser from 'phaser';
 import { SoundKeys } from '../audio/sounds';
-import { TextureKeys } from '../config/assets';
+import { type TextureKey, TextureKeys } from '../config/assets';
 import { Depths } from '../config/depths';
 import type { BossId, MapDef } from '../config/maps';
 import { audio } from '../services/AudioManager';
 import { textureScale } from '../services/Viewport';
+import { loopFrames } from '../entities/sheetAnim';
 import { circlesOverlap } from './feeding';
 
 export const BOSSES: Record<
   BossId,
-  { name: string; tint: number; glow: number; hp: number; speed: number; lungeSpeed: number }
+  {
+    name: string;
+    texture: TextureKey;
+    /** Warning flash over the art while it winds up an attack. */
+    flash: number;
+    glow: number;
+    hp: number;
+    speed: number;
+    lungeSpeed: number;
+  }
 > = {
-  kraken: { name: 'The Kraken', tint: 0xff8a7a, glow: 0xff6a6a, hp: 6, speed: 90, lungeSpeed: 720 },
-  colossal: { name: 'Colossal Squid', tint: 0xe8f0ff, glow: 0x9fd8ff, hp: 7, speed: 80, lungeSpeed: 700 },
-  abyssal: { name: 'Abyssal Squid', tint: 0xc88aff, glow: 0xd06bff, hp: 8, speed: 100, lungeSpeed: 760 },
+  kraken: {
+    name: 'The Kraken',
+    texture: TextureKeys.BossKraken,
+    flash: 0xffd27a,
+    glow: 0xff6a6a,
+    hp: 6,
+    speed: 90,
+    lungeSpeed: 720,
+  },
+  colossal: {
+    name: 'Colossal Squid',
+    texture: TextureKeys.BossColossal,
+    flash: 0x7fd8ff,
+    glow: 0x9fd8ff,
+    hp: 7,
+    speed: 80,
+    lungeSpeed: 700,
+  },
+  abyssal: {
+    name: 'Abyssal Squid',
+    texture: TextureKeys.BossAbyssal,
+    flash: 0xff9af0,
+    glow: 0xd06bff,
+    hp: 8,
+    speed: 100,
+    lungeSpeed: 760,
+  },
 };
 
 export const BOSS = {
-  /** Display scale of the stand-in art (the squid texture, 70 du wide). */
-  scale: 5.2,
   bodyRadius: 120,
   telegraph: 0.8,
   lungeTime: 0.65,
@@ -47,7 +79,7 @@ export type BossEvent =
   | { type: 'hp'; name: string; hp: number; max: number; show: boolean };
 
 export class Boss {
-  private readonly sprite: Phaser.GameObjects.Image;
+  private readonly sprite: Phaser.GameObjects.Sprite;
   private readonly glow: Phaser.GameObjects.Image;
   private readonly ring: Phaser.GameObjects.Graphics;
   private readonly def: (typeof BOSSES)[BossId];
@@ -61,6 +93,7 @@ export class Boss {
   private guard = 0;
   private sweepR = 0;
   private wasShown = false;
+  private anim = 0;
   private readonly events: BossEvent[] = [];
 
   constructor(
@@ -72,9 +105,8 @@ export class Boss {
     this.x = lair.x;
     this.y = lair.y;
     this.sprite = scene.add
-      .image(this.x, this.y, TextureKeys.Squid)
-      .setScale(BOSS.scale * textureScale(scene, TextureKeys.Squid))
-      .setTint(this.def.tint)
+      .sprite(this.x, this.y, this.def.texture)
+      .setScale(textureScale(scene, this.def.texture))
       .setDepth(11);
     this.glow = scene.add
       .image(this.x, this.y, TextureKeys.Glow)
@@ -130,9 +162,9 @@ export class Boss {
       case 'telegraph':
         this.vx *= 0.9;
         this.vy *= 0.9;
-        this.sprite.setTint(Math.floor(this.t * 12) % 2 ? 0xffffff : this.def.tint);
+        this.sprite.setTint(Math.floor(this.t * 12) % 2 ? 0xffffff : this.def.flash);
         if (this.t >= BOSS.telegraph) {
-          this.sprite.setTint(this.def.tint);
+          this.sprite.clearTint();
           // Close: sweep the tentacles; farther: lunge.
           const d = Math.hypot(seal.x - this.x, seal.y - this.y);
           if (d < BOSS.sweepRadius) {
@@ -189,6 +221,9 @@ export class Boss {
     }
     this.sprite.setPosition(this.x, this.y);
     this.sprite.setFlipX(this.vx < -5);
+    // Arms writhe faster while it attacks.
+    this.anim += dt * (this.state === 'lunge' || this.state === 'sweep' ? 2 : 1);
+    loopFrames(this.sprite, this.anim);
     this.sprite.setRotation(Math.sin(this.t * 1.4) * 0.06);
     const exposed = this.state === 'exposed';
     this.glow

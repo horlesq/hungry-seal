@@ -541,6 +541,157 @@ def magnet(w, h):
     return None, 1
 
 
+# ---------------------------------------------------------------------------------------
+# Fishing boats and what they throw (centre-anchored, the boat sits on the water line)
+# ---------------------------------------------------------------------------------------
+
+def profile_solid(name, pts, half_width, mat, bevel=0.16):
+    """A solid from a side profile [(x, z), ...] extruded across the view (hulls)."""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "2D"
+    cu.fill_mode = "BOTH"
+    cu.extrude = half_width
+    cu.bevel_depth = bevel
+    cu.bevel_resolution = 3
+    sp = cu.splines.new("POLY")
+    sp.points.add(len(pts) - 1)
+    for pt, (x, z) in zip(sp.points, pts):
+        pt.co = (x, z, 0, 1)
+    sp.use_cyclic_u = True
+    cu.materials.append(mat)
+    obj = link(bpy.data.objects.new(name, cu))
+    obj.rotation_euler = (math.pi / 2, 0, 0)
+    select_only(obj)
+    bpy.ops.object.convert(target="MESH")
+    obj = bpy.context.active_object
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    bpy.ops.object.shade_smooth()
+    return obj
+
+
+def boat(w, h):
+    """Fishing boat facing right with a fisherman at the stern, harpoon raised. The keel sits
+    at 94% of the frame height (the game's origin) and the water line at ~77%."""
+    H2 = h / 2
+    keel = H2 - 0.94 * h
+    deck = keel + 2.15
+    hull_m = toon_material("Hull", H("#d2463a"), H("#9e2d2b"), split=keel + 1.0, soft=0.25)
+    cream = toon_material("Cream", H("#f2e6d0"))
+    blue = toon_material("Roof", H("#3b6fa8"))
+    wood = toon_material("Wood", H("#a0652e"))
+    glass = flat_material("Glass", H("#7fd6f2"), 1.1)
+    # Hull from its side profile: square transom at the stern, a raked bow, sheer rising forward.
+    bottom = []
+    for i in range(13):
+        u = i / 12
+        x = -4.3 + u * 8.7
+        z = keel + 0.55 * max(0.0, (x - 1.8) / 2.6) ** 2 + 0.35 * max(0.0, (-3.2 - x) / 1.1) ** 2
+        bottom.append((x, z))
+    sheer = [(5.75, deck + 0.8), (4.6, deck + 0.42), (3.0, deck + 0.18), (0.5, deck + 0.04), (-2.5, deck + 0.04),
+             (-4.95, deck + 0.18)]
+    hull = profile_solid("Hull", [(-4.75, keel + 0.75)] + bottom + [(5.0, keel + 1.2), (5.45, deck - 0.2)] + sheer,
+                         1.05, hull_m)
+    add_outline(hull, OUTLINE * 1.3, INK)
+    skin_tube(hull, "Stripe", [(-4.85, deck - 0.3), (-2.0, deck - 0.36), (1.0, deck - 0.36), (3.6, deck - 0.18),
+                               (5.45, deck + 0.3)], cream, 0.11, lift=0.0)
+    box_mesh("Deck", (0.0, 0, deck + 0.02), (9.4, 2.1, 0.12), wood, bevel=0.03)
+    # Wheelhouse.
+    box_mesh("Cabin", (-0.6, 0, deck + 1.05), (2.8, 2.0, 1.9), cream, bevel=0.08)
+    box_mesh("CabinRoof", (-0.6, 0, deck + 2.08), (3.3, 2.4, 0.26), blue, bevel=0.08)
+    for i, x in enumerate((-1.3, 0.1)):
+        box_mesh(f"Window{i}", (x, -1.02, deck + 1.35), (0.9, 0.06, 0.65), glass, outline=0.03, bevel=0.03)
+    cylinder("Funnel", (-1.5, 0, deck + 2.6), 0.22, 0.9, blue)
+    ring_m = toon_material("Buoy", H("#ff7a2e"))
+    torus("Lifebuoy", (0.9, -1.08, deck + 0.75), 0.36, 0.11, ring_m, rot=(math.pi / 2, 0, 0))
+    # Mast with a boom out over the bow and a bundled net hanging from it.
+    cylinder("Mast", (2.4, 0, deck + 2.1), 0.13, 4.2, wood)
+    cylinder("Boom", (3.85, 0, deck + 3.2), 0.08, 3.4, wood, rot=(0, math.radians(62), 0))
+    tube("Line", [(5.3, -0.1, deck + 3.95), (5.32, -0.1, deck + 2.5), (5.3, -0.1, deck + 1.05)],
+         flat_material("Rope", H("#5a4630")), 0.025)
+    net_m = toon_material("Bundle", H("#6fa86a"), spots=dict(color=H("#3f6e3c"), scale=9, size=0.25))
+    ellipsoid("NetBundle", (5.3, -0.1, deck + 0.75), (0.45, 0.4, 0.42), net_m, outline=OUTLINE)
+    # The fisherman: yellow oilskins and sou'wester, beard, harpoon up.
+    coat = toon_material("Coat", H("#f2c94c"), H("#d9a92a"), split=deck + 0.6, soft=0.2)
+    skin = toon_material("Skin", H("#f1b68f"))
+    beard = toon_material("Beard", H("#8a5a3a"))
+    fx = -3.55
+    body = blob("Fisher", [((fx, 0, deck + 0.75), (0.55, 0.45, 0.75)), ((fx, 0, deck + 1.35), (0.45, 0.4, 0.35))],
+                coat, voxel=0.03, outline=None)
+    add_outline(body, OUTLINE, INK)
+    head = ellipsoid("Head", (fx + 0.05, 0, deck + 1.98), (0.47, 0.44, 0.46), skin, outline=OUTLINE)
+    ellipsoid("Beard", (fx + 0.2, -0.1, deck + 1.68), (0.27, 0.3, 0.2), beard, outline=0.03)
+    ellipsoid("Hat", (fx, 0, deck + 2.32), (0.6, 0.55, 0.16), coat, outline=OUTLINE)
+    ellipsoid("HatTop", (fx + 0.02, 0, deck + 2.45), (0.38, 0.36, 0.24), coat, outline=OUTLINE)
+    cartoon_eye(head, "Eye", fx + 0.26, deck + 2.08, 0.1, pupil=0.7, look=(0.3, 0.0))
+    ellipsoid("Nose", on_skin(head, fx + 0.42, deck + 1.9, 0.02), (0.11, 0.08, 0.09), skin, outline=0.03)
+    # Arm up holding the harpoon, which points forward and up.
+    tube("Arm", [(fx + 0.25, -0.35, deck + 1.35), (fx + 0.6, -0.4, deck + 1.75), (fx + 0.75, -0.42, deck + 2.25)],
+         coat, 0.13, outline=0.04)
+    ellipsoid("Hand", (fx + 0.78, -0.45, deck + 2.32), (0.15, 0.13, 0.15), skin, outline=0.03)
+    shaft_from = (fx - 0.6, -0.5, deck + 1.55)
+    shaft_to = (fx + 2.0, -0.5, deck + 3.05)
+    tube("Shaft", [shaft_from, ((shaft_from[0] + shaft_to[0]) / 2, -0.5, (shaft_from[2] + shaft_to[2]) / 2),
+                   shaft_to], wood, 0.05, outline=0.03)
+    steel = toon_material("Steel", H("#c8d0d8"), shine=True)
+    ang = math.atan2(shaft_to[2] - shaft_from[2], shaft_to[0] - shaft_from[0])
+    cone("Tip", (shaft_to[0] + 0.18 * math.cos(ang), -0.5, shaft_to[2] + 0.18 * math.sin(ang)), 0.1, 0.42, steel,
+         rot=(0, math.pi / 2 - ang, 0), outline=0.03)
+    return None, 1
+
+
+def net(w, h):
+    """A square fishing net with orange floats along the top, sagging a little."""
+    rope = toon_material("Rope", H("#e8d6b0"))
+    float_m = toon_material("Float", H("#ff8a2e"))
+    s = min(w, h) / 2 - 0.35
+    n = 6
+    for i in range(n + 1):
+        t = -s + 2 * s * i / n
+        sag = 0.12 * math.sin(math.pi * i / n)
+        tube(f"V{i}", [(t, 0, s), (t + 0.08, 0, 0), (t, 0, -s + sag)], rope, 0.035, outline=0.025)
+        tube(f"H{i}", [(-s, 0, t), (0, 0, t - 0.1 - sag), (s, 0, t)], rope, 0.035, outline=0.025)
+    for i, x in enumerate((-s, -s / 3, s / 3, s)):
+        ellipsoid(f"Float{i}", (x, -0.05, s), (0.2, 0.2, 0.2), float_m, outline=0.035)
+    lead = toon_material("Lead", H("#5a6470"))
+    for i, x in enumerate((-s, s)):
+        ellipsoid(f"Weight{i}", (x, -0.05, -s), (0.15, 0.15, 0.15), lead, outline=0.03)
+    return None, 1
+
+
+def harpoon(w, h):
+    """A harpoon pointing right: wooden shaft, barbed steel head, rope loop at the back."""
+    W2 = w / 2
+    wood = toon_material("Shaft", H("#a0652e"))
+    steel = toon_material("Steel", H("#c8d0d8"), shine=True)
+    cylinder("Shaft", (-0.35, 0, 0), 0.06, w - 1.2, wood, rot=(0, math.pi / 2, 0), outline=0.035)
+    cone("Head", (W2 - 0.38, 0, 0), 0.15, 0.55, steel, rot=(0, math.pi / 2, 0), outline=0.035)
+    for sgn in (-1, 1):
+        cone(f"Barb{sgn}", (W2 - 0.72, 0, sgn * 0.13), 0.06, 0.32, steel,
+             rot=(0, -math.pi / 2 + sgn * 0.6, 0), outline=0.025)
+    torus("Loop", (-W2 + 0.3, 0, 0), 0.16, 0.04, toon_material("Rope", H("#5a4630")),
+          rot=(math.pi / 2, 0, 0))
+    return None, 1
+
+
+def crate(w, h):
+    """A wooden fish crate with fish tails sticking out of the top."""
+    H2 = h / 2
+    wood = toon_material("Crate", H("#b07a3e"), H("#8a5a28"), split=-0.3, soft=0.2)
+    box_mesh("Box", (0, 0, -0.12), (w - 0.25, 1.0, h - 0.5), wood, bevel=0.05)
+    ink = flat_material("Slat", H("#4a2c10"))
+    for i, z in enumerate((-0.35, 0.12)):
+        box_mesh(f"Slat{i}", (0, -0.52, z), (w - 0.35, 0.04, 0.05), ink, outline=None, bevel=0.0)
+    fish_m = toon_material("Fish", H("#8fb8d4"), H("#e8f4fa"), split=0.0, soft=0.05)
+    for i, (x, tilt) in enumerate(((-0.28, 0.45), (0.25, -0.35))):
+        # Body standing up out of the crate, head on top, leaning outward.
+        fish = ellipsoid(f"Fish{i}", (x, -0.15, H2 - 0.45), (0.13, 0.12, 0.3), fish_m, rot=(0, tilt, 0),
+                         outline=0.03)
+        ex = x - 0.11 * math.sin(tilt) + 0.04
+        ellipsoid(f"FishEye{i}", on_skin(fish, ex, H2 - 0.3, 0.01), (0.045, 0.02, 0.045),
+                  flat_material(f"FishPupil{i}", H("#10161c")))
+    return None, 1
+
+
 # key -> (builder, design size, px per du)
 DECOR = {
     "decor-kelp": (kelp, (60, 260), 3),
@@ -571,6 +722,10 @@ DECOR = {
     "hazard-mine": (mine, (68, 68), 3),
     "item-coin": (coin, (30, 30), 3),
     "item-magnet": (magnet, (40, 40), 3),
+    "boat-fishing": (boat, (360, 200), 2),
+    "hazard-net": (net, (120, 120), 3),
+    "hazard-harpoon": (harpoon, (90, 16), 3),
+    "item-crate": (crate, (46, 40), 3),
 }
 
 
