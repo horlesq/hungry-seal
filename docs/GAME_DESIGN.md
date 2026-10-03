@@ -1,25 +1,31 @@
 # Game Design
 
 ## Pitch
-You are a hungry seal in an endless ocean. Your belly is always emptying. Eat fish, crabs, squid and seabirds to stay alive, dodge hazards, outgrow predators, grab coins, and spend them on upgrades between runs.
+You are a hungry seal exploring a big ocean map. Your belly is always emptying. Eat fish, crabs, squid and seabirds to stay alive, dodge hazards, outgrow predators, grab coins, and spend them on upgrades between runs.
 
 ## Camera and world
 - Side view, camera follows the seal with slight look-ahead.
-- Endless horizontal scroll (procedurally spawned), vertical range from sky through surface to the abyss.
+- **Maps (done):** each map is a bounded world (~14-16k px wide, ~11-12 screens) with solid terrain like Hungry Shark: islands above the water, reefs and arches, kelp slopes, a shipwreck, a deep trench with a cave system and treasure chambers. You slide along rock (a hard bump thuds); creatures and predators steer around it; crabs walk on the real ground. Creatures still spawn around the camera by depth zone, only in open water.
+  - **Seal Bay** (free): lighthouse island, reef arch, kelp slope, wreck ledge, swim-through rock ring, trench caves, pillars, sea-stack island.
+  - **Arctic** (unlocks at 4,000 points in one run): ice floes with icicles along the surface, giant icebergs, an ice cave, a seamount arch. Lots of penguins, no turtles or pufferfish, twice the orcas.
+  - **Tropical Lagoon** (unlocks at 10,000 points): coral lagoon, sunken ruins, a volcano with a lava tube under it, trench vents. Extra turtles and pufferfish, no penguins.
+  - Each map has its own colors, zone names, decor (Blender-rendered coral, kelp, wrecks, landmarks), creature/predator mix and treasure spots (chests respawn 150 s after opening; a random chest can also appear on the abyss floor).
+  - Map select after the first run (Play -> map cards with a picture of the map, best score there, unlock progress). The pause screen shows the whole map with where you are and the treasure spots.
+- Vertical range from sky through surface to the abyss; depth zones are the same on every map:
 - Depth zones, each with own palette, creatures and hazards:
   1. **Surface / Sky** — water line, seabirds, jumping fish, boats (later). Seal can leap and fly ballistically.
   2. **Shallows / Reef** — small fish, crabs, coins, jellyfish.
   3. **Open Ocean** — schools, squid, penguins-in-water, sharks appear.
   4. **Deep** — anglerfish, mines, orcas, dim lighting.
   5. **Abyss** — endgame zone, big predators, rich rewards, hardest hunger drain.
-- Horizontal world is effectively infinite; a run's difficulty scales with elapsed time and distance.
+- A run's difficulty scales with elapsed time (and depth).
 
 ## Controls
 - **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Speed ramps from 0 at 18 px to full at 110 px from the seal, so pointing straight at nearby prey still chases at full speed. Mouse leaving the canvas = glide.
 - **Touch:** floating joystick, so the finger never covers the action. Touch anywhere except the buttons and a stick appears under the finger; drag to steer (direction and distance from where it landed; full speed at 90 design units, small centre deadzone). Dragging further pulls the stick along, so reversing is quick. Release to glide to a stop. A faint stick sits bottom-left as a hint. A touch that *starts* on the bottom-right Boost button boosts (works with a second finger while steering).
 - **Keyboard:** WASD/arrows to steer. Space/Shift = boost.
 - The most recently used device wins, so a resting mouse doesn't fight the keyboard.
-- **Pause:** Esc or P, or the pause button (top-right). The run also pauses by itself when the tab or window loses focus. Pause menu: Resume, Restart run, Quit to menu, sound.
+- **Pause:** Esc or P, or the pause button (top-right). The run also pauses by itself when the tab or window loses focus. Pause menu: Resume, Restart run, Settings, Quit to menu, sound, and the map.
 - Movement feel: smooth acceleration, turn rate limited (sharper when slow, wider arcs at speed), body rotates to heading, belly-roll flip when changing facing, levels out when idle.
 - Leaping: swimming up slowly rides along the surface; upward speed above ~210 px/s breaches and keeps momentum; gravity applies only in air (slight air control); splashing back in keeps ~72% speed.
 - Boost: stamina bar (drains ~2.4 s from full, regenerates after a short delay), ~1.75x top speed, bigger leaps. Water only.
@@ -118,7 +124,13 @@ Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enou
 - **Results screen:** a row of reward chips: missions done (+coins/gems), achievements unlocked, gems found, and the run's place on your top 5.
 - Save data in localStorage (save v4, migrates v1-v3): coins, gems, bests, runs, settings, upgrade levels, skins owned/equipped, lifetime stats, missions, achievements, top runs.
 
-## Audio (done, placeholder)
+## Settings (done)
+Title screen (gear) and pause menu: music volume, sound-effect volume, screen shake on/off, high-contrast warnings (predator "!" becomes big yellow with a black outline, warning flashes blink white instead of red, off-screen danger arrows turn yellow, mines blink white: readable without telling red from other colors). Saved with the game.
+
+## Audio (done, synthesized)
+Three music loops crossfade: menu, a brighter loop in the upper water (shallows/open ocean) and a dark ambient loop in the deep and abyss. Effects include chomps, splash, hurt, zap, explosion, boost, grow, frenzy, shark alert, bump, rock thud, pufferfish puff, chest open, gem, magnet, mission complete, combo, zone change, map unlock, buy, click and game over.
+
+## Audio notes
 All sounds are synthesized in code at startup (`src/audio/`): chomp / big chomp, coin, splash, hurt, jellyfish zap, explosion, boost whoosh, grow and frenzy arpeggios, shark "dun-dun" on its telegraph, bump, UI click, purchase, game over, and a calm 8-bar underwater music loop. Mute from the menu (persists). Replace with recorded audio later under the same keys.
 
 ## Onboarding (done)

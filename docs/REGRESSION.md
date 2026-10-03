@@ -30,3 +30,11 @@ Play feel (a few real runs):
 - [ ] A first run without upgrades lasts about 2-3 minutes for a new player; the death screen explains what happened.
 - [ ] Mission toasts, reward chips and achievements appear when expected and pay the right amounts.
 - [ ] Nothing feels unfair: predators telegraph before biting, hazards are visible in the dark.
+
+### Maps, audio and settings (Phase 8)
+- [ ] On every map: swim along walls, through tunnels, caves and arches; the seal slides, never sticks or passes through rock; creatures don't swim inside rock.
+- [ ] Crabs walk on the real seabed; chests sit on the ground at the treasure spots and come back later.
+- [ ] Map select: locked maps show the score needed and progress; a run that passes the score shows "New map unlocked" and the map opens.
+- [ ] The pause map shows the seal in the right place.
+- [ ] Music changes when diving into the deep and back up; volume sliders and the shake / high-contrast toggles apply right away and are remembered.
+- [ ] No seams or flicker between terrain chunks while swimming fast (boost) across the map.

@@ -50,6 +50,30 @@ export const TextureKeys = {
   SeabedNear: 'bg-seabed-near',
   SeabedGround: 'bg-seabed-ground',
   MarineSnow: 'bg-snow',
+  // Map decorations (Blender-rendered, tools/blender/decor.py).
+  DecorKelp: 'decor-kelp',
+  DecorSeaweed: 'decor-seaweed',
+  DecorCoralBranch: 'decor-coral-branch',
+  DecorCoralBrain: 'decor-coral-brain',
+  DecorCoralFan: 'decor-coral-fan',
+  DecorAnemone: 'decor-anemone',
+  DecorBoulder: 'decor-boulder',
+  DecorStarfish: 'decor-starfish',
+  DecorShell: 'decor-shell',
+  DecorUrchin: 'decor-urchin',
+  DecorAnchor: 'decor-anchor',
+  DecorBarrel: 'decor-barrel',
+  DecorShipwreck: 'decor-shipwreck',
+  DecorLighthouse: 'decor-lighthouse',
+  DecorPalm: 'decor-palm',
+  DecorColumn: 'decor-column',
+  DecorStatue: 'decor-statue',
+  DecorIceChunk: 'decor-ice-chunk',
+  DecorIcicle: 'decor-icicle',
+  DecorIgloo: 'decor-igloo',
+  DecorSkeleton: 'decor-skeleton',
+  DecorVent: 'decor-vent',
+  DecorClam: 'decor-clam',
 } as const;
 
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
@@ -80,21 +104,29 @@ export const SEAL_SHEET = {
   bite: [8, 9, 10],
   /** Turning toward the camera: 22.5, 45 and 67.5 degrees (mirrored for the second half). */
   turn: [11, 12, 13],
-  frameCount: 14,
+  /** Eyes squeezed shut, "ouch" (stunned). */
+  hurt: 14,
+  frameCount: 15,
 } as const;
 
 /** Pixels per design unit of the Blender-rendered sheets (tools/blender). */
 const SHEET_RES = 3;
 
 /** A Blender-rendered animation sheet: `<key>-sheet.png`, frames of w x h design units. */
-function sheet(key: TextureKey, w: number, h: number, file = `${key}-sheet.png`): AssetEntry {
+function sheet(
+  key: TextureKey,
+  w: number,
+  h: number,
+  file = `${key}-sheet.png`,
+  res = SHEET_RES,
+): AssetEntry {
   return {
     type: 'spritesheet',
     key,
     url: `assets/${file}`,
-    resolution: SHEET_RES,
-    frameWidth: w * SHEET_RES,
-    frameHeight: h * SHEET_RES,
+    resolution: res,
+    frameWidth: w * res,
+    frameHeight: h * res,
   };
 }
 
@@ -111,6 +143,9 @@ export const ANIM_FPS: Partial<Record<TextureKey, number>> = {
   [TextureKeys.Jellyfish]: 4,
   [TextureKeys.PufferfishPuffed]: 5,
   [TextureKeys.Orca]: 7,
+  [TextureKeys.DecorKelp]: 3,
+  [TextureKeys.DecorSeaweed]: 3.5,
+  [TextureKeys.DecorAnemone]: 3,
 };
 export const DEFAULT_ANIM_FPS = 8;
 
@@ -136,15 +171,15 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   sheet(TextureKeys.Crab, 52, 36),
   sheet(TextureKeys.Lanternfish, 38, 20),
   { type: 'image', key: TextureKeys.Darkness },
-  { type: 'image', key: TextureKeys.Chest },
-  { type: 'image', key: TextureKeys.ChestOpen },
-  { type: 'image', key: TextureKeys.MagnetOrb },
+  sheet(TextureKeys.Chest, 64, 52),
+  sheet(TextureKeys.ChestOpen, 64, 52),
+  sheet(TextureKeys.MagnetOrb, 40, 40),
   sheet(TextureKeys.Shark, 220, 104),
   sheet(TextureKeys.Orca, 250, 120),
   sheet(TextureKeys.Anglerfish, 130, 96),
   sheet(TextureKeys.Jellyfish, 60, 80),
-  { type: 'image', key: TextureKeys.Mine },
-  { type: 'image', key: TextureKeys.Coin },
+  sheet(TextureKeys.Mine, 68, 68),
+  sheet(TextureKeys.Coin, 30, 30),
   { type: 'image', key: TextureKeys.Spark },
   { type: 'image', key: TextureKeys.Vignette },
   { type: 'image', key: TextureKeys.Arrow },
@@ -159,4 +194,27 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { type: 'image', key: TextureKeys.SeabedNear },
   { type: 'image', key: TextureKeys.SeabedGround },
   { type: 'image', key: TextureKeys.MarineSnow },
+  sheet(TextureKeys.DecorKelp, 60, 260),
+  sheet(TextureKeys.DecorSeaweed, 60, 80),
+  sheet(TextureKeys.DecorCoralBranch, 90, 90),
+  sheet(TextureKeys.DecorCoralBrain, 80, 56),
+  sheet(TextureKeys.DecorCoralFan, 90, 100),
+  sheet(TextureKeys.DecorAnemone, 64, 60),
+  sheet(TextureKeys.DecorBoulder, 120, 80),
+  sheet(TextureKeys.DecorStarfish, 40, 30),
+  sheet(TextureKeys.DecorShell, 36, 30),
+  sheet(TextureKeys.DecorUrchin, 40, 34),
+  sheet(TextureKeys.DecorAnchor, 80, 100),
+  sheet(TextureKeys.DecorBarrel, 50, 60),
+  sheet(TextureKeys.DecorShipwreck, 900, 360, undefined, 2),
+  sheet(TextureKeys.DecorLighthouse, 140, 300),
+  sheet(TextureKeys.DecorPalm, 180, 260),
+  sheet(TextureKeys.DecorColumn, 70, 220),
+  sheet(TextureKeys.DecorStatue, 130, 160),
+  sheet(TextureKeys.DecorIceChunk, 120, 80),
+  sheet(TextureKeys.DecorIcicle, 40, 120),
+  sheet(TextureKeys.DecorIgloo, 160, 100),
+  sheet(TextureKeys.DecorSkeleton, 140, 60),
+  sheet(TextureKeys.DecorVent, 80, 120),
+  sheet(TextureKeys.DecorClam, 90, 60),
 ];

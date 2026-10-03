@@ -461,14 +461,14 @@ class Poser:
 # Rendering
 # ---------------------------------------------------------------------------------------
 
-def setup_render(w_du, h_du, center=(0.0, 0.0)):
+def setup_render(w_du, h_du, center=(0.0, 0.0), px=PX_PER_DU):
     """Ortho camera framing a w_du x h_du design-unit box centred on `center` (BU)."""
     scene = bpy.context.scene
     engines = {e.identifier for e in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items}
     scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engines else "BLENDER_EEVEE"
     scene.render.film_transparent = True
-    scene.render.resolution_x = int(w_du * PX_PER_DU)
-    scene.render.resolution_y = int(h_du * PX_PER_DU)
+    scene.render.resolution_x = int(w_du * px)
+    scene.render.resolution_y = int(h_du * px)
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"

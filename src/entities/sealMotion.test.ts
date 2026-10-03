@@ -171,3 +171,38 @@ describe('seal motion: boost', () => {
     expect(s.boosting).toBe(false);
   });
 });
+
+describe('seal motion: terrain', () => {
+  // A vertical rock wall at x >= 1000.
+  const wall = {
+    distance: (x: number) => 1000 - x,
+    normal: (_x: number, _y: number, out: { x: number; y: number }) => {
+      out.x = -1;
+      out.y = 0;
+      return out;
+    },
+  };
+  const env = { ...ENV, terrain: wall };
+
+  it('stops at a wall, slides along it and reports a hard hit', () => {
+    const s = createSealMotionState(900, 1500);
+    s.heading = -0.4; // up and to the right, into the wall
+    s.speed = 400;
+    const events: SealMotionEvent[] = [];
+    for (let i = 0; i < 60; i++) {
+      events.push(...stepSealMotion(s, { steerX: 0.9, steerY: -0.4, boost: false }, P, env, DT));
+      expect(s.x).toBeLessThanOrEqual(1000 - P.radius + 0.5);
+    }
+    expect(events.some((e) => e.type === 'wallHit')).toBe(true);
+    // Still moving: the part of the velocity along the wall (upward) survives.
+    expect(s.y).toBeLessThan(1500 - 50);
+  });
+
+  it('ignores gentle touches', () => {
+    const s = createSealMotionState(975, 1500);
+    s.heading = 0;
+    s.speed = 60;
+    const events = stepSealMotion(s, { steerX: 0.2, steerY: 0, boost: false }, P, env, DT);
+    expect(events.some((e) => e.type === 'wallHit')).toBe(false);
+  });
+});

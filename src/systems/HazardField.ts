@@ -6,7 +6,8 @@ import { HAZARD_LIST, HAZARDS, type HazardId } from '../config/hazards';
 import { Hazard } from '../entities/Hazard';
 import { hazardsAllowed } from './danger';
 import { pickForZone, pickOffscreenPoint, type Mover } from './spawnPoint';
-import { WATER_BOTTOM, WATER_TOP } from './Spawner';
+import { openSpot, WATER_BOTTOM, WATER_TOP } from './Spawner';
+import { currentMap } from '../world/GameMap';
 
 const POOL_SIZE = 16;
 
@@ -20,6 +21,10 @@ export class HazardField {
     private readonly random: () => number = Math.random,
   ) {
     this.group = scene.add.group({ classType: Hazard, maxSize: POOL_SIZE });
+  }
+
+  private get terrain() {
+    return currentMap().terrain;
   }
 
   /** Places a hazard at an exact spot (scripted events, playtests). */
@@ -36,6 +41,8 @@ export class HazardField {
       const h = child as Hazard;
       if (!h.active) continue;
       h.step(dt);
+      // Drifting into rock: drift back the other way.
+      if (this.terrain.distance(h.x, h.y) < h.radius + 10) h.bounce();
       if (Math.hypot(h.x - cx, h.y - cy) > SPAWN.despawnDistance) h.despawn();
       else this.alive.push(h);
     }
@@ -51,6 +58,7 @@ export class HazardField {
       aheadBias: SPAWN.aheadBias,
       top: WATER_TOP + 60,
       bottom: WATER_BOTTOM - 60,
+      accept: (x, y) => openSpot(this.terrain, x, y, 110),
     });
     if (!p) return;
     const def = pickForZone(HAZARD_LIST, p.y, this.random);

@@ -9,6 +9,8 @@ export const SceneKeys = {
   Shop: 'Shop',
   Skins: 'Skins',
   Stats: 'Stats',
+  Maps: 'Maps',
+  Settings: 'Settings',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

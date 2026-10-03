@@ -17,15 +17,32 @@ export const SoundKeys = {
   Click: 'sfx-click',
   Buy: 'sfx-buy',
   GameOver: 'sfx-game-over',
+  ChestOpen: 'sfx-chest-open',
+  Gem: 'sfx-gem',
+  Magnet: 'sfx-magnet',
+  Mission: 'sfx-mission',
+  Combo: 'sfx-combo',
+  Unlock: 'sfx-unlock',
+  Zone: 'sfx-zone',
+  Thud: 'sfx-thud',
+  Puff: 'sfx-puff',
+  /** Music: menus, the sunny upper water, and the dark depths. */
   Music: 'music-ocean',
+  MusicShallows: 'music-shallows',
+  MusicDeep: 'music-deep',
 } as const;
+
+export type MusicKey =
+  | typeof SoundKeys.Music
+  | typeof SoundKeys.MusicShallows
+  | typeof SoundKeys.MusicDeep;
 
 export type SoundKey = (typeof SoundKeys)[keyof typeof SoundKeys];
 
 const arp = (notes: number[], step: number, tone: Omit<Tone, 'freq' | 'start'>): Tone[] =>
   notes.map((freq, i) => ({ ...tone, freq, start: i * step }));
 
-export const EFFECT_TONES: Record<Exclude<SoundKey, 'music-ocean'>, Tone[]> = {
+export const EFFECT_TONES: Record<Exclude<SoundKey, MusicKey>, Tone[]> = {
   [SoundKeys.Chomp]: [
     {
       wave: 'noise',
@@ -153,6 +170,73 @@ export const EFFECT_TONES: Record<Exclude<SoundKey, 'music-ocean'>, Tone[]> = {
     curve: 1.4,
     lowpass: 6000,
   }),
+  [SoundKeys.ChestOpen]: [
+    { wave: 'noise', freq: 1, duration: 0.18, volume: 0.35, lowpass: 900, curve: 2 },
+    ...arp([1047, 1319, 1568, 2093, 2637], 0.05, {
+      wave: 'triangle',
+      duration: 0.25,
+      volume: 0.22,
+      curve: 1.6,
+    }).map((t) => ({ ...t, start: (t.start ?? 0) + 0.12 })),
+  ],
+  [SoundKeys.Gem]: arp([1568, 2093, 2637, 3136], 0.045, {
+    wave: 'sine',
+    duration: 0.3,
+    volume: 0.25,
+    curve: 1.8,
+  }),
+  [SoundKeys.Magnet]: [
+    {
+      wave: 'square',
+      freq: 220,
+      freqEnd: 880,
+      duration: 0.3,
+      volume: 0.14,
+      vibrato: { rate: 30, depth: 0.08 },
+      lowpass: 2500,
+      curve: 1,
+    },
+  ],
+  [SoundKeys.Mission]: arp([523, 659, 784, 1047, 784, 1047], 0.09, {
+    wave: 'square',
+    duration: 0.2,
+    volume: 0.13,
+    curve: 1.3,
+    lowpass: 5000,
+  }),
+  [SoundKeys.Combo]: arp([659, 880, 1175], 0.06, {
+    wave: 'triangle',
+    duration: 0.18,
+    volume: 0.3,
+    curve: 1.5,
+  }),
+  [SoundKeys.Unlock]: arp([392, 523, 659, 784, 1047, 1319, 1568], 0.08, {
+    wave: 'triangle',
+    duration: 0.35,
+    volume: 0.3,
+    curve: 1.2,
+  }),
+  [SoundKeys.Zone]: [
+    {
+      wave: 'noise',
+      freq: 1,
+      duration: 0.7,
+      volume: 0.25,
+      attack: 0.25,
+      lowpass: 300,
+      lowpassEnd: 1200,
+      curve: 1,
+    },
+    { wave: 'sine', freq: 220, freqEnd: 330, duration: 0.6, volume: 0.15, attack: 0.2, curve: 1 },
+  ],
+  [SoundKeys.Thud]: [
+    { wave: 'sine', freq: 110, freqEnd: 55, duration: 0.18, volume: 0.6, curve: 2 },
+    { wave: 'noise', freq: 1, duration: 0.1, volume: 0.35, lowpass: 600, curve: 2.5 },
+  ],
+  [SoundKeys.Puff]: [
+    { wave: 'sine', freq: 200, freqEnd: 520, duration: 0.22, volume: 0.35, curve: 1.2 },
+    { wave: 'noise', freq: 1, duration: 0.15, volume: 0.2, lowpass: 2000, curve: 2 },
+  ],
   [SoundKeys.GameOver]: arp([523, 440, 349, 262], 0.16, {
     wave: 'triangle',
     duration: 0.3,

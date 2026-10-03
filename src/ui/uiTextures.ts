@@ -38,6 +38,7 @@ export const UiTextures = {
   Star: 'ui-star',
   /** Colored (not tinted): the rare currency. */
   Gem: 'ui-gem',
+  Gear: 'ui-gear',
 } as const;
 
 export type UiTexture = (typeof UiTextures)[keyof typeof UiTextures];
@@ -64,6 +65,7 @@ const ICONS: Array<[UiTexture, (ctx: Ctx) => void]> = [
   [UiTextures.Check, drawCheck],
   [UiTextures.Lock, drawLock],
   [UiTextures.Star, drawStar],
+  [UiTextures.Gear, drawGear],
 ];
 
 /** Where the bite was taken out of the bitten wordmark, in design units from its top-left. */
@@ -381,6 +383,22 @@ function drawBack(ctx: Ctx): void {
     ],
     5.5,
   );
+}
+
+/** Cog with eight teeth (settings). */
+function drawGear(ctx: Ctx): void {
+  const cx = 24;
+  const cy = 24;
+  ctx.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const a0 = (i / 16) * TAU - TAU / 64;
+    const a1 = ((i + 1) / 16) * TAU - TAU / 64;
+    const r = i % 2 === 0 ? 17 : 12.5;
+    ctx.arc(cx, cy, r, a0, a1);
+  }
+  ctx.closePath();
+  ctx.arc(cx, cy, 5.5, 0, TAU, true);
+  ctx.fill('evenodd');
 }
 
 function drawRestart(ctx: Ctx): void {

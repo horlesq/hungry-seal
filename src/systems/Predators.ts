@@ -11,6 +11,9 @@ import { stepPredator, type PredatorContext, type PredatorEvent } from '../entit
 import { predatorsAllowed } from './danger';
 import { canEat } from './feeding';
 import { pickOffscreenPoint } from './spawnPoint';
+import { openSpot } from './Spawner';
+import { currentMap } from '../world/GameMap';
+import { saves } from '../services/SaveService';
 import { WATER_BOTTOM, WATER_TOP, type Threat } from './Spawner';
 
 const POOL_SIZE = 8;
@@ -49,6 +52,10 @@ export class Predators {
           .setVisible(false),
       );
     }
+    // High-contrast warnings: yellow arrows (the art is red).
+    if (saves.data.settings.highContrast) {
+      for (const a of this.arrows) a.setTint(0xffe14d).setTintMode(Phaser.TintModes.FILL);
+    }
     this.ctx = {
       preyX: 0,
       preyY: 0,
@@ -59,6 +66,7 @@ export class Predators {
       hardTop: WATER_TOP + 20,
       hardBottom: WATER_BOTTOM - 20,
       random,
+      terrain: currentMap().terrain,
     };
   }
 
@@ -84,6 +92,7 @@ export class Predators {
       if (!p.active) continue;
       ctx.bandTop = p.band.top;
       ctx.bandBottom = p.band.bottom;
+      ctx.radius = p.def.radius;
       // A dead seal (stage 0) can't be hunted; a big enough seal makes the predator flee.
       ctx.canEatPrey = seal.stage > 0 && !canEat(seal.stage, p.def.tier);
       for (const event of stepPredator(p.motion, p.def, ctx, dt)) {
@@ -103,7 +112,11 @@ export class Predators {
       if (timer > 0) continue;
       this.timers.set(def.id, DANGER.predatorSpawnInterval);
       const alive = this.alive.filter((p) => p.def.id === def.id).length;
-      if (alive < predatorsAllowed(def.spawn, elapsed, viewZone)) this.spawn(def, camera, seal);
+      // The map's mix: fewer (skip some spawns) or more (a higher cap) of this kind.
+      const mult = currentMap().def.predatorMult?.[def.id] ?? 1;
+      const allowed = predatorsAllowed(def.spawn, elapsed, viewZone);
+      const cap = mult > 1 ? Math.ceil(allowed * mult) : allowed;
+      if (alive < cap && (mult >= 1 || this.random() < mult)) this.spawn(def, camera, seal);
     }
 
     this.updateArrows(camera);
@@ -126,6 +139,7 @@ export class Predators {
       aheadBias: 0.5,
       top: Math.max(WATER_TOP + 60, band.top),
       bottom: Math.min(WATER_BOTTOM - 60, band.bottom),
+      accept: (x, y) => openSpot(currentMap().terrain, x, y, def.radius * 2 + 40),
     });
     if (!p) return null;
     const predator = this.group.get() as Predator | null;

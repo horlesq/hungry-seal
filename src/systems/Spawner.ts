@@ -15,6 +15,8 @@ import {
   type CreatureId,
 } from '../config/creatures';
 import { WORLD } from '../config/zones';
+import { currentMap } from '../world/GameMap';
+import type { TerrainField } from '../world/terrain';
 import { getViewport } from '../services/Viewport';
 import { Creature, School } from '../entities/Creature';
 import { stepCreatureMotion, type CreatureSteerContext } from '../entities/creatureAI';
@@ -26,7 +28,23 @@ export const WATER_TOP = WORLD.surfaceY + 16;
 export const WATER_BOTTOM = WORLD.floorY - 16;
 /** Birds only spawn while the view is within this distance of the water line. */
 const SKY_SPAWN_RANGE = 500;
-const STARTERS = SWIMMERS.filter((d) => d.tier === 1);
+/** Spawn points keep this much open water around them. */
+const SPAWN_CLEARANCE = 70;
+/** ...and stay this far from the map's left/right edges. */
+const EDGE_MARGIN = 160;
+
+/** The current map's creature mix: weights scaled, absent species dropped. */
+function forMap(list: readonly CreatureDef[]): CreatureDef[] {
+  const mult = currentMap().def.creatureMult ?? {};
+  return list
+    .map((d) => ({ ...d, weight: d.weight * (mult[d.id] ?? 1) }))
+    .filter((d) => d.weight > 0);
+}
+
+/** Open water (or sky) with room for a group, inside the map. */
+export function openSpot(terrain: TerrainField, x: number, y: number, clearance = SPAWN_CLEARANCE) {
+  return x > EDGE_MARGIN && x < terrain.width - EDGE_MARGIN && terrain.distance(x, y) > clearance;
+}
 
 export interface Threat {
   x: number;
@@ -43,12 +61,22 @@ export class Spawner {
   private timer = 0;
   private skyTimer = 0;
   private readonly ctx: CreatureSteerContext;
+  private readonly terrain: TerrainField;
+  private readonly swimmers: CreatureDef[];
+  private readonly flyers: CreatureDef[];
+  private readonly starters: CreatureDef[];
+  private readonly accept: (x: number, y: number) => boolean;
 
   constructor(
     scene: Phaser.Scene,
     private readonly random: () => number = Math.random,
   ) {
     this.group = scene.add.group({ classType: Creature, maxSize: POOL_SIZE });
+    this.terrain = currentMap().terrain;
+    this.swimmers = forMap(SWIMMERS);
+    this.flyers = forMap(FLYERS);
+    this.starters = this.swimmers.filter((d) => d.tier === 1);
+    this.accept = (x, y) => openSpot(this.terrain, x, y);
     this.ctx = {
       threatX: 0,
       threatY: 0,
@@ -61,6 +89,7 @@ export class Spawner {
       slotX: 0,
       slotY: 0,
       random,
+      terrain: this.terrain,
     };
   }
 
@@ -83,8 +112,9 @@ export class Spawner {
         WATER_BOTTOM - 30,
       );
       if (Math.hypot(x - seal.x, y - seal.y) < SPAWN.initialMinDistance) continue;
+      if (!this.accept(x, y)) continue;
       // Friendly opening: only prey a brand-new seal can eat. Bigger creatures swim in later.
-      const def = pickForZone(STARTERS, y, this.random);
+      const def = pickForZone(this.starters, y, this.random);
       if (!def) continue;
       this.spawnGroup(def, x, y, this.random() < 0.5 ? 0 : Math.PI);
       placed++;
@@ -112,6 +142,7 @@ export class Spawner {
       ctx.bandBottom = c.band.bottom;
       ctx.hardTop = c.hard.top;
       ctx.hardBottom = c.hard.bottom;
+      ctx.radius = c.def.radius;
       ctx.threatActive = canEat(seal.stage, c.def.tier);
       stepCreatureMotion(c.motion, c.params, ctx, dt);
       c.syncVisual(dt);
@@ -171,9 +202,10 @@ export class Spawner {
         aheadBias: SPAWN.aheadBias,
         top: WATER_TOP + 30,
         bottom: WATER_BOTTOM - 30,
+        accept: this.accept,
       });
       if (!p) return;
-      const def = pickSpawn(SWIMMERS, p.y, this.random, foodOnly ? seal.stage : null);
+      const def = pickSpawn(this.swimmers, p.y, this.random, foodOnly ? seal.stage : null);
       if (!def) continue;
       // Swim into the view so the player gets to see it.
       const heading = p.x < camera.midPoint.x ? 0 : Math.PI;
@@ -183,7 +215,7 @@ export class Spawner {
   }
 
   private spawnInSky(camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): void {
-    const def = FLYERS[Math.floor(this.random() * FLYERS.length)];
+    const def = this.flyers[Math.floor(this.random() * this.flyers.length)];
     if (!def?.band) return;
     const p = pickOffscreenPoint(camera, seal, this.random, {
       marginMin: SPAWN.marginMin,
@@ -191,6 +223,7 @@ export class Spawner {
       aheadBias: SPAWN.aheadBias,
       top: def.band.top,
       bottom: def.band.bottom,
+      accept: this.accept,
     });
     if (!p) return;
     this.spawnGroup(def, p.x, p.y, p.x < camera.midPoint.x ? 0 : Math.PI);
@@ -206,11 +239,21 @@ export class Spawner {
     const bottom = Math.min(hard.bottom, def.band?.bottom ?? hard.bottom);
 
     for (let i = 0; i < count; i++) {
-      const creature = this.group.get() as Creature | null;
-      if (!creature) return; // pool exhausted
       const slotX = i === 0 || !s ? 0 : (this.random() - 0.5) * s.spread * 2.8;
       const slotY = i === 0 || !s ? 0 : (this.random() - 0.5) * s.spread * 1.4;
-      creature.spawn(def, x + slotX, Phaser.Math.Clamp(y + slotY, top, bottom), heading);
+      const px = x + slotX;
+      let py = Phaser.Math.Clamp(y + slotY, top, bottom);
+      if (def.behaviors.includes('walk')) {
+        // Walkers start on the ground below the spot.
+        const ground = this.terrain.groundBelow(px, py, 2500);
+        if (ground === null) continue;
+        py = ground - def.radius * 0.8;
+      } else if (this.terrain.distance(px, py) < def.radius + 8) {
+        continue; // this school member would be inside rock
+      }
+      const creature = this.group.get() as Creature | null;
+      if (!creature) return; // pool exhausted
+      creature.spawn(def, px, py, heading);
       if (school) creature.joinSchool(school, slotX, slotY);
     }
   }

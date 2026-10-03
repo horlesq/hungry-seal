@@ -14,7 +14,10 @@
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 
-const server = await createServer({ server: { port: 5196, strictPort: true }, logLevel: 'error' });
+const server = await createServer({
+  server: { port: Number(process.env.BOT_PORT ?? 5196), strictPort: true },
+  logLevel: 'error',
+});
 await server.listen();
 const browser = await chromium.launch({
   channel: 'chrome',
@@ -35,13 +38,29 @@ if (upgradeLevel > 0) {
 }
 await page.goto('http://localhost:5196/');
 await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Menu'));
-await page.keyboard.press('Enter');
+if (process.env.BOT_MAP) {
+  // Unlock and select the map, then start the run directly (Play goes via the map select).
+  await page.evaluate((id) => {
+    const raw = localStorage.getItem('hungry-seal-save');
+    const save = raw ? JSON.parse(raw) : {};
+    save.bestScore = Math.max(save.bestScore ?? 0, 99999);
+    save.maps = { selected: id, best: {} };
+    localStorage.setItem('hungry-seal-save', JSON.stringify(save));
+  }, process.env.BOT_MAP);
+  await page.reload();
+  await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Menu'));
+  await page.evaluate(() => window.__PHASER_GAME__.scene.getScene('Menu').scene.start('Game'));
+} else {
+  await page.keyboard.press('Enter');
+}
 await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Game'));
 await page.mouse.move(640, 360);
 
 const human = (process.argv[2] ?? 'human') !== 'perfect';
 const seconds = Number(process.argv[3] ?? 150);
-console.log(`bot mode: ${human ? 'human' : 'perfect'}, upgrades ${upgradeLevel}`);
+console.log(
+  `bot mode: ${human ? 'human' : 'perfect'}, upgrades ${upgradeLevel}, map ${process.env.BOT_MAP ?? 'bay'}`,
+);
 
 const start = Date.now();
 let lastLog = 0;
@@ -67,6 +86,50 @@ while (Date.now() - start < seconds * 1000) {
       };
     const cam = s.cameras.main;
     const m = s.seal.motion;
+    const terrain = s.map.terrain;
+    // A player doesn't chase what's behind rock: check the straight line to a target.
+    const clear = (x2, y2) => {
+      const d = Math.hypot(x2 - m.x, y2 - m.y);
+      const n = Math.ceil(d / 24);
+      for (let i = 1; i < n; i++) {
+        const k = i / n;
+        if (terrain.distance(m.x + (x2 - m.x) * k, m.y + (y2 - m.y) * k) < 18) return false;
+      }
+      return true;
+    };
+    // Stuck against rock (barely moved for 1.5 s): back out upward, away from the wall.
+    const st = (window.__stuck ??= { at: s.elapsed, x: m.x, y: m.y, until: -1, tx: 0, ty: 0 });
+    if (s.elapsed - st.at >= 1.5) {
+      if (Math.hypot(m.x - st.x, m.y - st.y) < 70) {
+        const n = terrain.normal(m.x, m.y, { x: 0, y: 0 });
+        st.until = s.elapsed + 1.2;
+        st.tx = m.x + n.x * 250 + (Math.random() - 0.5) * 300;
+        st.ty = m.y - 260 + n.y * 120;
+      }
+      st.at = s.elapsed;
+      st.x = m.x;
+      st.y = m.y;
+    }
+    if (s.elapsed < st.until) {
+      return {
+        dead: false,
+        flee: false,
+        boost: false,
+        sx: (st.tx - cam.worldView.x) * cam.zoom,
+        sy: (st.ty - cam.worldView.y) * cam.zoom,
+        hunger: s.hunger.value,
+        score: s.score,
+        eaten: s.eaten,
+        stage: s.seal.stage,
+        t: s.elapsed,
+        dist: 0,
+        creatures: s.spawner.countActive(),
+        zone: s.seal.y,
+        hazards: s.hazards.alive.length,
+        predators: s.predators.alive.length,
+        coins: s.runCoins,
+      };
+    }
 
     // Danger first: steer away from close hazards and from predators hunting us.
     let fleeX = 0;
@@ -121,6 +184,7 @@ while (Date.now() - start < seconds * 1000) {
     for (const c of s.spawner.alive) {
       if (!c.active || c.def.tier > s.seal.stage || c.puffed) continue;
       if (human && !cam.worldView.contains(c.x, c.y)) continue;
+      if (!clear(c.x, c.y)) continue;
       const d = Math.hypot(c.x - m.x, c.y - m.y);
       if (d < bestD) {
         bestD = d;
@@ -129,8 +193,13 @@ while (Date.now() - start < seconds * 1000) {
     }
     // Lead the target a bit; otherwise drift toward the reef band.
     const lead = human ? 0 : 0.15;
-    const tx = best ? best.x + best.motion.vx * lead : m.x + 300;
-    const ty = best ? best.y + best.motion.vy * lead : 1100;
+    // No prey in sight: cruise along the reef band, or head up if rock is in the way.
+    let tx = best ? best.x + best.motion.vx * lead : m.x + 300;
+    let ty = best ? best.y + best.motion.vy * lead : 1100;
+    if (!best && !clear(tx, ty)) {
+      tx = m.x;
+      ty = m.y - 300;
+    }
     // Screen = (world - worldView) * zoom: the camera zooms out as the seal grows.
     return {
       dead: false,
@@ -167,6 +236,8 @@ while (Date.now() - start < seconds * 1000) {
   boosting = info.boost;
   if (info.t - lastLog >= 5) {
     lastLog = info.t;
+    // BOT_SHOTS=1: a screenshot every 5 s (.playtest/bot-<t>.png) to see what it's doing.
+    if (process.env.BOT_SHOTS) await page.screenshot({ path: `.playtest/bot-${Math.round(info.t)}.png` });
     console.log(
       `t=${info.t.toFixed(0).padStart(3)}s hunger=${info.hunger.toFixed(0).padStart(3)} score=${String(info.score).padStart(5)} eaten=${String(info.eaten).padStart(3)} stage=${info.stage} coins=${String(info.coins).padStart(3)} hazards=${info.hazards} predators=${info.predators} y=${info.zone.toFixed(0)}${info.flee ? ' FLEEING' : ''}`,
     );

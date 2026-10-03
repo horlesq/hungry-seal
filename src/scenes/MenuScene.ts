@@ -94,7 +94,8 @@ export class MenuScene extends Phaser.Scene {
       label: 'Play',
       variant: 'primary',
       fontSize: 42,
-      onClick: () => this.leave(SceneKeys.Game),
+      // First run: straight in. After that, pick a map first.
+      onClick: () => this.leave(save.runs > 0 ? SceneKeys.Maps : SceneKeys.Game),
     }).setName('play');
     const upgrades = new Button(this, L.buttonsX - 88, L.playY + 100, {
       width: 164,
@@ -175,6 +176,19 @@ export class MenuScene extends Phaser.Scene {
       onClick: () => this.leave(SceneKeys.Stats),
     }).setName('stats');
     buttons.push(stats);
+    pillRight -= 60 + 16;
+    const settings = new Button(this, pillRight - 30, barY, {
+      width: 60,
+      height: 60,
+      round: true,
+      icon: UiTextures.Gear,
+      variant: 'quiet',
+      onClick: () => {
+        this.scene.launch(SceneKeys.Settings, { from: SceneKeys.Menu });
+        this.scene.pause();
+      },
+    }).setName('settings');
+    buttons.push(settings);
     pillRight -= 60 + 16;
     const coins = new CurrencyPill(this, pillRight, barY - 3, save.coins).setName('coins');
     new CurrencyPill(this, pillRight - coins.pillWidth - 12, barY - 3, save.gems, 'gems').setName(
@@ -327,6 +341,7 @@ export class MenuScene extends Phaser.Scene {
   private leave(
     target:
       | typeof SceneKeys.Game
+      | typeof SceneKeys.Maps
       | typeof SceneKeys.Shop
       | typeof SceneKeys.Skins
       | typeof SceneKeys.Stats,

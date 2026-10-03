@@ -53,7 +53,15 @@ export interface PredatorContext {
   hardTop: number;
   hardBottom: number;
   random: () => number;
+  /** Solid terrain to steer around (see world/terrain.ts). */
+  terrain?: {
+    distance(x: number, y: number): number;
+    normal(x: number, y: number, out: { x: number; y: number }): { x: number; y: number };
+  };
+  radius?: number;
 }
+
+const wallNormal = { x: 0, y: 0 };
 
 const BAND_MARGIN = 90;
 const NOTICE_SPEED = 40;
@@ -161,6 +169,20 @@ export function stepPredator(
 
   if (keepInBand) target = bandSteer(m, ctx, target);
 
+  // Slide along rock in the way (even mid-chase: big predators can't swim through walls).
+  const terrain = ctx.terrain;
+  const radius = ctx.radius ?? 30;
+  if (terrain) {
+    const look = 60 + radius * 1.5 + m.speed * 0.45;
+    const ax = m.x + Math.cos(target) * look;
+    const ay = m.y + Math.sin(target) * look;
+    if (terrain.distance(ax, ay) < radius + 30) {
+      const n = terrain.normal(ax, ay, wallNormal);
+      target = Math.atan2(Math.sin(target) + n.y * 1.8, Math.cos(target) + n.x * 1.8);
+      if (m.state === 'patrol') m.targetHeading = target;
+    }
+  }
+
   m.heading = rotateTowards(m.heading, target, turnRate * dt);
   m.speed = moveTowards(m.speed, targetSpeed, p.accel * dt);
   m.vx = Math.cos(m.heading) * m.speed;
@@ -169,6 +191,14 @@ export function stepPredator(
   m.y += m.vy * dt;
   if (m.y < ctx.hardTop) m.y = ctx.hardTop;
   else if (m.y > ctx.hardBottom) m.y = ctx.hardBottom;
+  if (terrain) {
+    const d = terrain.distance(m.x, m.y);
+    if (d < radius) {
+      const n = terrain.normal(m.x, m.y, wallNormal);
+      m.x += n.x * (radius - d);
+      m.y += n.y * (radius - d);
+    }
+  }
   return events;
 }
 

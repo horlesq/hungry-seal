@@ -142,6 +142,11 @@ export class Effects {
     this.bubbles.emitParticleAt(x, y, 8);
   }
 
+  /** A puff of bubbles (e.g. bumping into rock). */
+  bubbleBurst(x: number, y: number, count: number): void {
+    this.bubbles.emitParticleAt(x, y, count);
+  }
+
   coinPickup(x: number, y: number): void {
     this.sparks.emitParticleAt(x, y, 4);
   }

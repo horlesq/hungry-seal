@@ -120,7 +120,13 @@ for (let i = 0; i < RESTARTS; i++) {
     await page.keyboard.press('Escape');
     await active('Menu');
     await page.waitForTimeout(300);
+    // Play opens the map select after the first run; Swim! starts the run.
     await page.keyboard.press('Enter');
+    await active('Maps');
+    await page.waitForTimeout(400);
+    await page.evaluate(() =>
+      window.__PHASER_GAME__.scene.getScene('Maps').children.getByName('swim').press(),
+    );
   } else {
     await page.keyboard.press('Enter');
   }

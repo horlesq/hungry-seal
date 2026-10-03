@@ -127,6 +127,7 @@ export class GameOverScene extends Phaser.Scene {
     // One row of three; upright phones stack Swim again above Upgrades + Menu.
     // Rewards earned this run (missions, achievements, gems, top-run rank), then buttons.
     const rewards = this.rewardsRow(result, cx, top + 542, v.viewWidth - 40);
+    if (result.unlockedMaps?.length) this.time.delayedCall(700, () => audio.play(SoundKeys.Unlock));
     const rowY = top + 616;
     const stacked = v.portrait;
     const at = {
@@ -274,6 +275,14 @@ export class GameOverScene extends Phaser.Scene {
         tint: COLORS.glacier,
         text: `#${r.rank} of your top runs`,
         color: CSS.foam,
+      });
+    }
+    for (const name of r.unlockedMaps ?? []) {
+      chips.unshift({
+        icon: UiTextures.Lock,
+        tint: COLORS.glacier,
+        text: `New map unlocked: ${name}!`,
+        color: CSS.glacier,
       });
     }
     if (chips.length === 0) return null;

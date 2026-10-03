@@ -31,6 +31,8 @@ export interface SpawnPointOptions {
   top: number;
   bottom: number;
   attempts?: number;
+  /** Extra test a point must pass (e.g. open water inside the map). */
+  accept?: (x: number, y: number) => boolean;
 }
 
 export interface Mover {
@@ -50,7 +52,7 @@ export function pickOffscreenPoint(
   const halfH = view.height / 2;
   const moving = Math.hypot(seal.vx, seal.vy) > 40;
 
-  for (let attempt = 0; attempt < (opts.attempts ?? 5); attempt++) {
+  for (let attempt = 0; attempt < (opts.attempts ?? 8); attempt++) {
     const angle =
       moving && random() < opts.aheadBias
         ? Math.atan2(seal.vy, seal.vx) + (random() - 0.5) * 2.1
@@ -66,7 +68,7 @@ export function pickOffscreenPoint(
     const x = camera.midPoint.x + cos * dist;
     const y = Math.min(opts.bottom, Math.max(opts.top, camera.midPoint.y + sin * dist));
     // Clamping into the band may have pulled the point into view; try another angle.
-    if (!view.contains(x, y)) return { x, y };
+    if (!view.contains(x, y) && (!opts.accept || opts.accept(x, y))) return { x, y };
   }
   return null;
 }

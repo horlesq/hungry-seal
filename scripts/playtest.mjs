@@ -16,7 +16,15 @@ const URL = `http://localhost:${PORT}/?debug&calm`;
 const DANGER_URL = `http://localhost:${PORT}/?debug`;
 const GAME_W = 1280;
 const GAME_H = 720;
-const FLOOR_CONTACT_Y = 6400 - 22;
+// Spots on Seal Bay (the default map) for flows that need open water at a given depth.
+const BAY = {
+  /** Open water from the surface down to the trench floor. */
+  diveColumn: { x: 9300, y: 900 },
+  /** Open ocean just below the shallows. */
+  ocean: { x: 7000, y: 2300 },
+  /** Abyss water above the trench floor, under the cave rock. */
+  abyss: { x: 10600, y: 6150 },
+};
 
 const errors = [];
 const warnings = [];
@@ -139,6 +147,28 @@ const targetAlive = (page) =>
   );
 
 /** Waits for a scene to be running; on timeout the error lists every scene's status. */
+/** Moves the seal (and the camera) to (x, y). */
+async function teleport(page, x, y) {
+  await page.evaluate(
+    ([x, y]) => {
+      const s = window.__PHASER_GAME__.scene.getScene('Game');
+      s.seal.motion.x = x;
+      s.seal.motion.y = y;
+      s.seal.setPosition(x, y);
+      s.cameras.main.centerOn(x, y);
+    },
+    [x, y],
+  );
+}
+
+/** World-y of the seabed (first rock) below (x, y) on the current map. */
+async function groundBelow(page, x, y) {
+  return page.evaluate(
+    ([x, y]) => window.__PHASER_GAME__.scene.getScene('Game').map.terrain.groundBelow(x, y, 7000),
+    [x, y],
+  );
+}
+
 async function sceneActive(page, key) {
   try {
     await page.waitForFunction((k) => window.__PHASER_GAME__?.scene.isActive(k), key, {
@@ -344,23 +374,32 @@ async function desktop(browser) {
   const down = await until(page, (s) => s.inWater, 4000);
   check('splashes back into the water', down.ok);
 
-  // Dive into the deep, then all the way to the seabed.
+  // Dive into the deep, then all the way to the seabed (from a deep, open part of the map).
+  await teleport(page, BAY.diveColumn.x, BAY.diveColumn.y);
+  await page.waitForTimeout(400);
+  const top = await sealState(page);
+  const ground = await groundBelow(page, top.x, top.y);
   await page.keyboard.down('s');
-  const deep = await until(page, (s) => s.y > s0.y + 1800, 10000);
+  const deep = await until(page, (s) => s.y > top.y + 1800, 10000);
   await page.screenshot({ path: `${OUT}/04-deep.png` });
   check('dives deep', deep.ok, `y=${deep.last.y.toFixed(0)}`);
-  const floor = await until(page, (s) => s.y >= FLOOR_CONTACT_Y - 0.5, 20000);
-  await page.waitForTimeout(400);
+  // The seal rests on the rock: within a body length above the ground, never inside it.
+  const floor = await until(page, (s) => s.y >= ground - 400, 20000);
+  await page.waitForTimeout(2000);
   const onFloor = await sealState(page);
   await page.keyboard.up('s');
   await page.screenshot({ path: `${OUT}/05-seabed.png` });
+  // It may have slid along the slope: measure the ground under where it ended up.
+  const under = await groundBelow(page, onFloor.x, onFloor.y - 120);
   check(
     'stops at the seabed',
-    floor.ok && onFloor.y <= FLOOR_CONTACT_Y + 0.5,
-    `y=${onFloor.y.toFixed(1)}`,
+    floor.ok && under !== null && onFloor.y < under - 5 && onFloor.y > under - 80,
+    `y=${onFloor.y.toFixed(1)} ground=${under?.toFixed(0)}`,
   );
 
-  // Mouse: seal swims toward the cursor without clicking.
+  // Mouse: seal swims toward the cursor without clicking (back in open water first).
+  await teleport(page, BAY.diveColumn.x, 3000);
+  await page.waitForTimeout(500);
   const leftPt = await toPage(page, 150, 360);
   const m0 = await sealState(page);
   await page.mouse.move(leftPt.x, leftPt.y, { steps: 5 });
@@ -660,7 +699,9 @@ async function danger(browser) {
   check('mine explodes (big damage)', boom.hunger <= 55, `hunger=${boom.hunger.toFixed(1)}`);
   check('mine is used up', !boom.mine);
 
-  // Shark: telegraph, chase, bite.
+  // Shark: telegraph, chase, bite (in open water, clear of the reef).
+  await teleport(page, BAY.ocean.x, BAY.ocean.y);
+  await page.waitForTimeout(500);
   await waitVulnerable(page);
   await setHunger(80);
   await inGame(page, (s) => {
@@ -923,9 +964,7 @@ async function phase4(browser) {
   await page.screenshot({ path: `${OUT}/17-frenzy.png` });
 
   // Zone banner on entering the open ocean.
-  await inGame(page, (s) => {
-    s.seal.motion.y = 2300;
-  });
+  await teleport(page, BAY.ocean.x, BAY.ocean.y);
   await page.waitForTimeout(700);
   const banner = await page.evaluate(() => {
     const hud = window.__PHASER_GAME__.scene.getScene('Hud');
@@ -1055,28 +1094,29 @@ async function phase5(browser) {
   // The abyss: dark, lit by glows; crabs walk the seabed.
   // Teleport first and let the camera arrive; things spawned far from the camera are
   // recycled immediately (as they should be in real play).
-  await inGame(page, (s) => {
-    s.seal.motion.y = 6150;
-  });
+  await teleport(page, BAY.abyss.x, BAY.abyss.y);
   await page.waitForTimeout(1800);
   await inGame(page, (s) => {
-    s.spawner.spawnAt('crab', s.seal.x + 160, 6380, Math.PI);
-    s.spawner.spawnAt('lanternfish', s.seal.x - 200, 6050, 0);
-    s.predators.spawnAt('anglerfish', s.seal.x + 380, 6000, Math.PI);
-    s.pickups.spawnAt('chest', s.seal.x - 300, 6376);
+    const t = s.map.terrain;
+    const g = (x) => t.groundBelow(x, s.seal.y, 1500) ?? s.seal.y + 200;
+    s.spawner.spawnAt('crab', s.seal.x + 160, g(s.seal.x + 160) - 60, Math.PI);
+    s.spawner.spawnAt('lanternfish', s.seal.x - 200, s.seal.y - 100, 0);
+    s.predators.spawnAt('anglerfish', s.seal.x + 380, s.seal.y - 150, Math.PI);
+    s.pickups.spawnAt('chest', s.seal.x - 300, g(s.seal.x - 300) - 24);
   });
   await page.waitForTimeout(1500);
   const deep = await inGame(page, (s) => ({
     dark: s.darkness.level,
+    // Each crab's height above the ground right under it.
     crabs: s.spawner.alive
       .filter((c) => c.active && c.def.id === 'crab')
-      .map((c) => Math.round(c.y)),
+      .map((c) => Math.round((s.map.terrain.groundBelow(c.x, c.y - 40, 400) ?? 1e9) - c.y)),
   }));
   check('the abyss is dark', deep.dark > 0.6, `darkness=${deep.dark.toFixed(2)}`);
   check(
     'crabs walk on the seabed',
-    deep.crabs.length > 0 && deep.crabs.every((y) => y >= 6370 && y <= 6384),
-    `y=${deep.crabs.join(',')}`,
+    deep.crabs.length > 0 && deep.crabs.every((h) => h >= 0 && h <= 24),
+    `above ground=${deep.crabs.join(',')}`,
   );
   await page.screenshot({ path: `${OUT}/19-abyss.png` });
   await ctx.close();
@@ -1398,7 +1438,17 @@ async function skins(browser) {
     () => window.__PHASER_GAME__.scene.getScene('Menu').children.getByName('seal').texture.key,
   );
   check('skins: the title screen shows the equipped skin', menuSeal === 'seal-arctic', menuSeal);
+  // After the first run, Play opens the map select; Swim! starts the selected map.
   await page.keyboard.press('Enter');
+  await sceneActive(page, 'Maps');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/33-maps.png` });
+  const maps = await page.evaluate(() => {
+    const sc = window.__PHASER_GAME__.scene.getScene('Maps');
+    return ['bay', 'arctic', 'tropical'].map((id) => !!sc.children.getByName(`map-${id}`));
+  });
+  check('maps: a card per map', maps.every(Boolean), maps.join(','));
+  await clickButton(page, 'Maps', 'swim');
   await sceneActive(page, 'Game');
   await page.waitForTimeout(500);
   const runSeal = await inGame(page, (sc) => sc.seal.texture.key);

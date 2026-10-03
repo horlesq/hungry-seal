@@ -35,10 +35,19 @@ export interface SealMotionParams {
   };
 }
 
+/** Solid terrain (rock); see world/terrain.ts. */
+export interface TerrainQuery {
+  /** Signed distance to rock: > 0 in open water/air. */
+  distance(x: number, y: number): number;
+  /** Unit normal pointing out of the rock. */
+  normal(x: number, y: number, out: { x: number; y: number }): { x: number; y: number };
+}
+
 export interface SealMotionEnv {
   ceilingY: number;
   surfaceY: number;
   floorY: number;
+  terrain?: TerrainQuery;
 }
 
 export interface SealMotionInput {
@@ -70,7 +79,12 @@ export interface SealMotionState {
 
 export type SealMotionEvent =
   | { type: 'breach' | 'splashdown'; x: number; y: number; vx: number; vy: number }
-  | { type: 'boostStart' | 'boostEnd' };
+  | { type: 'boostStart' | 'boostEnd' }
+  /** Hit rock at `speed` px/s (the part of the velocity going into the wall). */
+  | { type: 'wallHit'; x: number; y: number; speed: number };
+
+/** Hitting rock faster than this (into the wall) reports a wallHit. */
+export const WALL_HIT_SPEED = 220;
 
 export function createSealMotionState(x: number, y: number): SealMotionState {
   return {
@@ -121,7 +135,45 @@ export function stepSealMotion(
 
   resolveSurface(s, p, env, events);
   resolveBounds(s, p, env, dt);
+  if (env.terrain) resolveTerrain(s, p, env.terrain, events);
   return events;
+}
+
+const normal = { x: 0, y: 0 };
+
+/**
+ * Keeps the seal out of the rock: pushes it back out and drops the part of its velocity
+ * going into the wall, so it slides along the surface instead of sticking.
+ */
+function resolveTerrain(
+  s: SealMotionState,
+  p: SealMotionParams,
+  terrain: TerrainQuery,
+  events: SealMotionEvent[],
+): void {
+  const d = terrain.distance(s.x, s.y);
+  if (d >= p.radius) return;
+  const n = terrain.normal(s.x, s.y, normal);
+  const push = p.radius - d;
+  s.x += n.x * push;
+  s.y += n.y * push;
+  const vn = s.vx * n.x + s.vy * n.y;
+  if (vn < -WALL_HIT_SPEED) {
+    events.push({ type: 'wallHit', x: s.x - n.x * p.radius, y: s.y - n.y * p.radius, speed: -vn });
+  }
+  if (vn < 0) {
+    s.vx -= vn * n.x;
+    s.vy -= vn * n.y;
+    if (s.inWater) {
+      s.speed = Math.hypot(s.vx, s.vy);
+      if (s.speed > 1) s.heading = Math.atan2(s.vy, s.vx);
+    }
+  }
+  const kn = s.kx * n.x + s.ky * n.y;
+  if (kn < 0) {
+    s.kx -= kn * n.x;
+    s.ky -= kn * n.y;
+  }
 }
 
 function updateBoost(

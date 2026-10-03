@@ -1,5 +1,5 @@
-// Endless-scrolling ocean backdrop: depth gradient, sky, parallax seabed, marine snow,
-// light rays and the water line.
+// Ocean backdrop behind the map's terrain: depth gradient (in the map's colors), sky,
+// distant parallax seabed ridges, marine snow, light rays and the water line.
 //
 // Every layer lives in world space and is re-positioned each frame from the camera's
 // worldView, so it works at any zoom/aspect ratio. Horizontal parallax: the layer stays over
@@ -8,9 +8,16 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { textureScale } from '../services/Viewport';
-import { FLOOR_COLOR, SKY_HORIZON_COLOR, WORLD, ZONES } from '../config/zones';
+import { WORLD, ZONES } from '../config/zones';
+import type { GameMap } from '../world/GameMap';
+import { Depths } from '../config/depths';
+import { createRng } from '../utils/rng';
 
 const GRADIENT_KEY = 'bg-depth-gradient';
+const CAUSTICS_KEY = 'fx-caustics';
+/** Caustics fade out between these depths (world y). */
+const CAUSTICS_FULL = WORLD.surfaceY + 500;
+const CAUSTICS_GONE = 2300;
 /** Extra size around the view so camera shake and one-frame lag never reveal edges. */
 const MARGIN = 120;
 
@@ -41,9 +48,14 @@ export class WorldBackground {
   private readonly flat: TileLayer[] = [];
   private readonly seabed: SeabedLayer[] = [];
   private readonly snow: SnowLayer[] = [];
+  /** Sunlight caustics in the shallows: two layers drifting different ways. */
+  private readonly caustics: Phaser.GameObjects.TileSprite[] = [];
 
-  constructor(private readonly scene: Phaser.Scene) {
-    createGradientTexture(scene);
+  constructor(
+    private readonly scene: Phaser.Scene,
+    map: GameMap,
+  ) {
+    createGradientTexture(scene, map);
 
     this.gradient = scene.add.image(0, 0, GRADIENT_KEY).setOrigin(0.5, 0).setDepth(-100);
     this.sun = scene.add
@@ -57,7 +69,6 @@ export class WorldBackground {
       .setBlendMode(Phaser.BlendModes.ADD)
       .setAlpha(0.35);
     this.addFlat(TextureKeys.Surface, WORLD.surfaceY - 20, 64, 0.9, 0.02, -85);
-    this.addFlat(TextureKeys.SeabedGround, WORLD.floorY - 34, 200, 1, 0, -40);
     // Front water line: translucent so the seal looks half-submerged riding the surface.
     this.addFlat(TextureKeys.Surface, WORLD.surfaceY - 20, 64, 1, -0.03, 20).setAlpha(0.55);
 
@@ -68,6 +79,19 @@ export class WorldBackground {
     // Marine snow: covers the view, clipped to below the water line.
     this.addSnow(0.45, 0.35, -60, 0.012);
     this.addSnow(0.85, 0.6, -30, 0.02);
+
+    // Caustics over the rock and water (below the swimmers, above the terrain).
+    createCausticsTexture(scene);
+    for (let i = 0; i < 2; i++) {
+      this.caustics.push(
+        scene.add
+          .tileSprite(0, 0, 100, 100, CAUSTICS_KEY)
+          .setOrigin(0.5, 0)
+          .setTileScale(i === 0 ? 1.6 : 2.3)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setDepth(Depths.Terrain + 0.5),
+      );
+    }
   }
 
   update(time: number, camera: Phaser.Cameras.Scene2D.Camera): void {
@@ -94,6 +118,21 @@ export class WorldBackground {
       s.y = v.y + v.height - layer.bottomAtFloor + (maxViewY - v.y) * layer.vFactor;
       s.tilePositionX = (v.x * layer.factor) / layer.ts;
     }
+
+    // Caustics: from the water line down, strongest near the surface.
+    const cTop = Math.max(v.y - MARGIN, WORLD.surfaceY + 4);
+    const cBottom = Math.min(v.bottom + MARGIN, CAUSTICS_GONE);
+    const fade = Phaser.Math.Clamp(1 - (v.centerY - CAUSTICS_FULL) / (CAUSTICS_GONE - CAUSTICS_FULL), 0, 1);
+    this.caustics.forEach((c, i) => {
+      const on = cBottom > cTop && fade > 0;
+      c.setVisible(on);
+      if (!on) return;
+      this.fitWidth(c, width, cBottom - cTop);
+      c.setPosition(cx, cTop).setAlpha((i === 0 ? 0.11 : 0.08) * fade);
+      const dir = i === 0 ? 1 : -1;
+      c.tilePositionX = (v.x + time * 0.012 * dir) / c.tileScaleX;
+      c.tilePositionY = (cTop + time * 0.008) / c.tileScaleY;
+    });
 
     // Snow only below the water line: its top follows the view but stops at the surface.
     const top = Math.max(v.y - MARGIN, WORLD.surfaceY + 6);
@@ -158,9 +197,59 @@ export class WorldBackground {
   }
 }
 
-/** Vertical gradient covering sky -> each zone -> seabed, built from the zone config. */
-function createGradientTexture(scene: Phaser.Scene): void {
-  if (scene.textures.exists(GRADIENT_KEY)) return;
+/** Tileable web of bright wavy lines (Voronoi cell edges), like sunlight through waves. */
+function createCausticsTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists(CAUSTICS_KEY)) return;
+  const size = 256;
+  const tex = scene.textures.createCanvas(CAUSTICS_KEY, size, size);
+  if (!tex) return;
+  const ctx = tex.context;
+  const img = ctx.createImageData(size, size);
+  const rng = createRng(31);
+  const cells = 6;
+  const pts: Array<[number, number]> = [];
+  for (let gy = 0; gy < cells; gy++) {
+    for (let gx = 0; gx < cells; gx++) {
+      pts.push([((gx + rng()) / cells) * size, ((gy + rng()) / cells) * size]);
+    }
+  }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let d1 = Infinity;
+      let d2 = Infinity;
+      for (const [px, py] of pts) {
+        // Wrap so the texture tiles seamlessly.
+        let dx = Math.abs(x - px);
+        let dy = Math.abs(y - py);
+        dx = Math.min(dx, size - dx);
+        dy = Math.min(dy, size - dy);
+        const d = dx * dx + dy * dy;
+        if (d < d1) {
+          d2 = d1;
+          d1 = d;
+        } else if (d < d2) d2 = d;
+      }
+      const edge = Math.sqrt(d2) - Math.sqrt(d1);
+      const a = Math.max(0, 1 - edge / 7) ** 2;
+      const i = (y * size + x) * 4;
+      img.data[i] = 230;
+      img.data[i + 1] = 255;
+      img.data[i + 2] = 255;
+      img.data[i + 3] = Math.round(a * 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.refresh();
+}
+
+/** Vertical gradient covering sky -> each zone -> seabed, in the map's colors. */
+function createGradientTexture(scene: Phaser.Scene, map: GameMap): void {
+  if (scene.textures.exists(GRADIENT_KEY)) {
+    const data = scene.textures.get(GRADIENT_KEY).customData as { map?: string };
+    if (data.map === map.id) return;
+    scene.textures.remove(GRADIENT_KEY);
+  }
+  const p = map.def.palette;
   const height = 2048;
   const texture = scene.textures.createCanvas(GRADIENT_KEY, 4, height);
   if (!texture) return;
@@ -168,14 +257,15 @@ function createGradientTexture(scene: Phaser.Scene): void {
   const at = (y: number) => Phaser.Math.Clamp(y / WORLD.height, 0, 1);
 
   const grad = ctx.createLinearGradient(0, 0, 0, height);
-  grad.addColorStop(0, ZONES[0].color);
-  grad.addColorStop(at(WORLD.surfaceY), SKY_HORIZON_COLOR);
+  grad.addColorStop(0, p.sky);
+  grad.addColorStop(at(WORLD.surfaceY), p.horizon);
   // Hard edge at the water line: two stops at the same offset.
-  for (const zone of ZONES.slice(1)) grad.addColorStop(at(zone.top), zone.color);
-  grad.addColorStop(at(WORLD.floorY), FLOOR_COLOR);
-  grad.addColorStop(1, FLOOR_COLOR);
+  for (const zone of ZONES.slice(1)) grad.addColorStop(at(zone.top), map.zoneColor(zone.id));
+  grad.addColorStop(at(WORLD.floorY), p.floor);
+  grad.addColorStop(1, p.floor);
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 4, height);
   texture.refresh();
+  (texture.customData as { map?: string }).map = map.id;
 }

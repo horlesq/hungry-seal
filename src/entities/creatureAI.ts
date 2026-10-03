@@ -62,7 +62,21 @@ export interface CreatureSteerContext {
   slotX: number;
   slotY: number;
   random: () => number;
+  /** Solid terrain to steer around (and, for walkers, to walk on). */
+  terrain?: CreatureTerrain;
+  /** Body radius, for keeping clear of rock. */
+  radius?: number;
 }
+
+export interface CreatureTerrain {
+  distance(x: number, y: number): number;
+  normal(x: number, y: number, out: { x: number; y: number }): { x: number; y: number };
+  groundBelow(x: number, y: number, maxScan?: number): number | null;
+}
+
+const wallNormal = { x: 0, y: 0 };
+/** Walkers turn back where the ground steps more than this between frames' probes. */
+const WALK_MAX_STEP = 26;
 
 const BAND_MARGIN = 70;
 const FLEE_MEMORY = 0.9;
@@ -198,6 +212,20 @@ export function stepCreatureMotion(
     }
   }
 
+  // Look ahead along the wanted direction and slide along any rock in the way.
+  const terrain = ctx.terrain;
+  const radius = ctx.radius ?? 12;
+  if (terrain && !p.walk) {
+    const look = 40 + radius * 2 + m.speed * 0.4;
+    const ax = m.x + Math.cos(target) * look;
+    const ay = m.y + Math.sin(target) * look;
+    if (terrain.distance(ax, ay) < radius + 24) {
+      const n = terrain.normal(ax, ay, wallNormal);
+      target = Math.atan2(Math.sin(target) + n.y * 1.6, Math.cos(target) + n.x * 1.6);
+      if (!fleeing && !ctx.leader) m.targetHeading = target;
+    }
+  }
+
   const turn = p.turnRate * (fleeing ? FLEE_TURN_BOOST : 1) * dt;
   m.heading = rotateTowards(m.heading, target, turn);
   m.speed = moveTowards(m.speed, targetSpeed, p.accel * dt);
@@ -216,6 +244,10 @@ export function stepCreatureMotion(
   if (p.walk) {
     m.vx = Math.cos(m.heading) >= 0 ? m.speed : -m.speed;
     m.vy = 0;
+    if (terrain) {
+      walkOnGround(m, terrain, radius, dt);
+      return;
+    }
     m.y = ctx.bandBottom;
   }
 
@@ -223,4 +255,35 @@ export function stepCreatureMotion(
   m.y += m.vy * dt;
   if (m.y < ctx.hardTop) m.y = ctx.hardTop;
   else if (m.y > ctx.hardBottom) m.y = ctx.hardBottom;
+  if (terrain) {
+    const d = terrain.distance(m.x, m.y);
+    if (d < radius) {
+      const n = terrain.normal(m.x, m.y, wallNormal);
+      m.x += n.x * (radius - d);
+      m.y += n.y * (radius - d);
+    }
+  }
+}
+
+/** Walkers follow the ground under them and turn around at cliffs and walls. */
+function walkOnGround(m: CreatureMotion, terrain: CreatureTerrain, radius: number, dt: number): void {
+  const nx = m.x + m.vx * dt;
+  const probe = m.y - radius * 2;
+  const ground = terrain.groundBelow(nx, probe, radius * 6);
+  const next = ground === null ? null : ground - radius * 0.8;
+  if (next !== null && m.age < 0.25) {
+    // Just spawned: settle onto the ground.
+    m.x = nx;
+    m.y = next;
+    return;
+  }
+  if (next === null || Math.abs(next - m.y) > WALK_MAX_STEP || terrain.distance(nx, m.y) < radius * 0.5) {
+    // Cliff or wall ahead: turn around.
+    m.heading = Math.cos(m.heading) >= 0 ? Math.PI : 0;
+    m.targetHeading = m.heading;
+    m.vx = -m.vx;
+    return;
+  }
+  m.x = nx;
+  m.y = next;
 }

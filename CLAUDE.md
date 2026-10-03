@@ -36,6 +36,7 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 - One playable seal, cosmetic skins only.
 - Art style: bright, chunky, cartoon, close to Hungry Shark. Free packs (Kenney, CC0) plus generated art; placeholders first.
 - Data-driven creatures and upgrades (config tables, not hardcoded in scenes).
+- Bounded maps with solid terrain (like Hungry Shark), not an endless ocean: 3 maps (Seal Bay free, Arctic and Tropical Lagoon unlocked by score). Terrain is a signed distance field built from shapes in `config/maps.ts`.
 
 ## Working rules
 - Update the phase checklist in docs/ROADMAP.md as work completes.

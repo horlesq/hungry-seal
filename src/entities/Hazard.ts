@@ -7,6 +7,7 @@ import { textureScale } from '../services/Viewport';
 import { TAU } from '../utils/math';
 import { Depths } from '../config/depths';
 import { loopFrames } from './sheetAnim';
+import { saves } from '../services/SaveService';
 
 export class Hazard extends Phaser.GameObjects.Sprite {
   def!: HazardDef;
@@ -64,8 +65,10 @@ export class Hazard extends Phaser.GameObjects.Sprite {
     if (d.explodes) {
       // Mines sway on their chain and blink their light.
       this.setRotation(Math.sin(phase) * 0.12);
-      if (blinkOn) this.setTint(0xffc0b0);
-      else this.clearTint();
+      if (!blinkOn) this.clearTint();
+      else if (saves.data.settings.highContrast) {
+        this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+      } else this.setTint(0xffc0b0).setTintMode(Phaser.TintModes.MULTIPLY);
     } else if (this.texture.frameTotal > 2) {
       // Animated sheet: the pulse is in the frames.
       loopFrames(this, this.age);
@@ -78,6 +81,12 @@ export class Hazard extends Phaser.GameObjects.Sprite {
     this.glow
       ?.setPosition(this.x, this.y - (d.explodes ? 8 : 6))
       .setAlpha(d.glow.blink ? (blinkOn ? 0.9 : 0.25) : 0.55 + 0.15 * Math.sin(phase * 2));
+  }
+
+  /** Reverses the drift (bumped into rock). */
+  bounce(): void {
+    this.dir = -this.dir;
+    this.x += this.def.driftSpeed * this.dir * 0.1;
   }
 
   despawn(): void {

@@ -11,6 +11,8 @@ import { PreloadScene } from './scenes/PreloadScene';
 import { ShopScene } from './scenes/ShopScene';
 import { SkinsScene } from './scenes/SkinsScene';
 import { StatsScene } from './scenes/StatsScene';
+import { MapScene } from './scenes/MapScene';
+import { SettingsScene } from './scenes/SettingsScene';
 import { EventBus } from './services/EventBus';
 import { applyViewport, measureViewport } from './services/Viewport';
 
@@ -42,10 +44,12 @@ function start(): void {
         ShopScene,
         SkinsScene,
         StatsScene,
+        MapScene,
         GameScene,
         HudScene,
         GameOverScene,
         PauseScene,
+        SettingsScene,
       ],
       measureViewport(),
     ),

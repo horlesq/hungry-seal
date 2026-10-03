@@ -16,7 +16,7 @@ hungry-seal/
   docs/                 design, architecture, roadmap, assets notes
   public/
     favicon.svg
-    assets/             (planned) images, atlases, audio, fonts (served as-is)
+    assets/             Blender-rendered sprite sheets (seals, creatures, decor, pickups)
   scripts/
     playtest.mjs        headless browser smoke playtest (npm run playtest)
     balance-bot.mjs     bot plays a run and logs hunger/score/stage (npm run balance)
@@ -38,6 +38,12 @@ hungry-seal/
       skins.ts          seal skins (name, description, texture, price, currency); cosmetic only
       missions.ts       mission pool (metric, target, run/total scope, rewards), starters
       achievements.ts   achievements (lifetime metric, target, gem reward)
+      maps.ts           maps: terrain (seabed profile + rock shapes added/cut), palette, zone names,
+                        creature/predator mix, decor, scatter rules, treasure spots, unlock score
+    world/
+      terrain.ts        signed distance field terrain: shapes, bake to a 16 px grid, distance/normal/
+                        groundBelow/ceilingAbove/pushOut queries (pure, unit tested)
+      GameMap.ts        map definition + baked terrain (cached per map), the current map
     scenes/
       BootScene.ts      reads ?debug, starts Preload
       PreloadScene.ts   load manifest, progress bar, generate missing placeholders + UI textures
@@ -48,7 +54,9 @@ hungry-seal/
       ShopScene.ts      "Upgrades": two columns of upgrade rows, gold buy buttons, Back / Play
       SkinsScene.ts     skin preview + card grid, Buy (gold; coins or gems) / Equip
       StatsScene.ts     top runs, lifetime stats, achievement badges
-      PauseScene.ts     pause overlay: Resume / Restart run / Quit to menu, sound toggle
+      PauseScene.ts     pause overlay: Resume / Restart run / Settings / Quit, sound toggle, map panel
+      MapScene.ts       map select: card per map (thumbnail, best, unlock progress), Swim!
+      SettingsScene.ts  overlay: music/sfx volume, screen shake, high-contrast warnings
     ui/
       theme.ts          design tokens: palette (COLORS/CSS), type scale + uiText(), drawPanel, EDGE,
                         reducedMotion(), formatNumber()
@@ -58,6 +66,7 @@ hungry-seal/
       uiTextures.ts     Canvas 2D UI textures: ice-floe wordmark (+ bitten), icons, upgrade symbols
       widgets.ts        ocean backdrop, CurrencyPill (coins/gems), drawSegments, drawBar
       missions.ts       MissionPanel (title screen mission list)
+      mapThumb.ts       picture of a whole map drawn from its terrain (map cards, pause map)
     audio/
       synth.ts          PURE offline synth: effects + seamless stereo music loop (+ tests)
       sounds.ts         SoundKeys + tone recipes for every effect
@@ -136,7 +145,7 @@ hungry-seal/
 - **Pure core logic:** movement (and later hunger, growth, combo, upgrade math) lives in Phaser-free modules that take state + input + params + dt and are unit-tested. Phaser classes are thin adapters.
 - **Behaviors are composable:** a creature config lists behaviors (`['wander','flee']`); behavior modules are small functions/classes operating on the creature.
 - **Pooling:** use Phaser groups with `maxSize` and reuse; never create/destroy per-frame. Particle emitters always set `maxParticles`.
-- **Spawning is camera-relative:** spawn just outside the view ahead of/around the seal by zone; despawn far behind. World is not pre-generated.
+- **Spawning is camera-relative:** spawn just outside the view ahead of/around the seal by zone, in open water; despawn far behind. Only the terrain and decor are built per map; creatures are not pre-placed.
 - **Stats pipeline:** base stats (balance.ts) + upgrade levels + growth stage + frenzy modifiers = final stats, computed in one place (`Seal.stats`).
 - **Fixed feel constants** live in `balance.ts`; nothing tunable is hardcoded in entities.
 - **Save schema is versioned** (`version` field, migration function) so saves survive updates.
@@ -144,9 +153,13 @@ hungry-seal/
 - **Assets:** code only uses keys from `TextureKeys`. A manifest entry without a `url` (or that fails to load) gets a generated placeholder under the same key.
 
 ## World and background
-- World is endless horizontally, bounded vertically: sky `0..surfaceY(640)`, water to `floorY(6400)`, world bottom `6560`. Camera bounds `x: ±1e7`.
-- Background layers are pinned horizontally (`scrollFactorX = 0`) and scroll their tile texture by `camera.scrollX * factor`, so they repeat forever. Vertical parallax uses `scrollFactorY`.
-- The depth gradient is a generated 4x2048 canvas texture stretched over the world height, built from the zone colors in `zones.ts`.
+- The world is a **map** (`config/maps.ts`, runtime `world/GameMap.ts`): `0..width` horizontally, sky `0..surfaceY(640)`, water below, world bottom `6560`; camera bounds = the map. GameScene sets the current map first (`setCurrentMap`), and systems read `currentMap().terrain`.
+- **Terrain** is a signed distance field (`world/terrain.ts`): seabed profile + shapes added (`add`, smooth blend, rocky noise) or cut (`cut`: caves, tunnels, arches), plus invisible edge walls. Baked once per map (~100-150 ms) into a 16 px grid; queries are bilinear lookups, so collision, spawning and steering stay cheap.
+- Collision: `sealMotion` pushes the seal out along the normal and drops the into-wall velocity (slides; a hard hit emits `wallHit`). Creatures and predators look ahead and steer along walls, then push out; walkers (crabs) follow `groundBelow` and turn back at cliffs. Spawn points (creatures, predators, hazards, coins, magnet) must pass `openSpot` (open water, inside the map); jellyfish bounce off rock.
+- **TerrainRenderer** draws rock into 512 px canvas chunks around the camera (marching squares fill in one path per chunk, lit rim, depth-graded color, speckle texture, outline; 2 px overlap hides seams), skips all-water chunks and destroys far ones. Rock sits at depth 7 (behind every mover); chunks crossing the water line also get a cropped copy above the front water line so it doesn't show across islands.
+- **Decor** (`systems/Decor.ts`): hand-placed landmarks plus decor scattered on upward-facing ground (or hanging from ceilings) per map rules; culled to the view; plants loop their frames.
+- Background layers are pinned horizontally (`scrollFactorX = 0`) and scroll their tile texture by `camera.scrollX * factor`. Vertical parallax uses `scrollFactorY`. Sunlight caustics (generated tile, two drifting layers, additive) cover the shallows and fade out with depth.
+- The depth gradient is a generated 4x2048 canvas texture stretched over the world height, built from the map's palette.
 - Marine snow layers are full-screen TileSprites clipped to below the water line every frame.
 
 ## Rendering / scale (no letterboxing, native resolution)

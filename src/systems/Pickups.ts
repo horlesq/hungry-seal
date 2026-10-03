@@ -5,11 +5,12 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { PICKUPS, SPAWN } from '../config/balance';
 import { Depths } from '../config/depths';
-import { WORLD } from '../config/zones';
+import { zoneAt } from '../config/zones';
+import { currentMap } from '../world/GameMap';
 import { textureScale } from '../services/Viewport';
 import { circlesOverlap } from './feeding';
 import { pickOffscreenPoint, type Mover } from './spawnPoint';
-import { WATER_BOTTOM, WATER_TOP } from './Spawner';
+import { openSpot, WATER_BOTTOM, WATER_TOP } from './Spawner';
 
 export type PickupKind = 'chest' | 'magnet';
 
@@ -28,15 +29,24 @@ interface Pickup {
   /** Seconds left before it disappears (chests: after opening). */
   life: number;
   opened: boolean;
+  /** Index of the map treasure spot it sits on, if any. */
+  spot: number | null;
 }
 
-const CHEST_Y = WORLD.floorY - 24;
+/** Chests sit this far above the ground (sprite centre). */
+const CHEST_LIFT = 24;
+/** A map treasure spot comes back this long after its chest is opened. */
+const SPOT_RESPAWN = 150;
+/** Treasure spots get their chest when the view comes this close. */
+const SPOT_RANGE = 1700;
 
 export class Pickups {
   private readonly items: Pickup[] = [];
   private chestTimer = 0;
   private magnetTimer: number = PICKUPS.magnetInterval * 0.6;
   private readonly events: PickupEvent[] = [];
+  /** Seconds until each map treasure spot can hold a chest again. */
+  private readonly spotCooldown: number[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -44,7 +54,7 @@ export class Pickups {
   ) {}
 
   /** Places a pickup at an exact spot (scripted events, playtests). */
-  spawnAt(kind: PickupKind, x: number, y: number): void {
+  spawnAt(kind: PickupKind, x: number, y: number, spot: number | null = null): void {
     const texture = kind === 'chest' ? TextureKeys.Chest : TextureKeys.MagnetOrb;
     const ts = textureScale(this.scene, texture);
     const sprite = this.scene.add.image(x, y, texture).setScale(ts).setDepth(9);
@@ -63,6 +73,7 @@ export class Pickups {
       age: this.random() * 5,
       life: kind === 'chest' ? Infinity : PICKUPS.magnetLifetime,
       opened: false,
+      spot,
     });
   }
 
@@ -103,6 +114,7 @@ export class Pickups {
           // Chests stay open for a moment, then fade.
           p.opened = true;
           p.life = 3;
+          if (p.spot !== null) this.spotCooldown[p.spot] = SPOT_RESPAWN;
           p.sprite.setTexture(TextureKeys.ChestOpen);
           p.glow.setVisible(false);
         } else {
@@ -127,15 +139,35 @@ export class Pickups {
   }
 
   private spawnChest(dt: number, camera: Phaser.Cameras.Scene2D.Camera, seal: Mover): void {
+    for (let i = 0; i < this.spotCooldown.length; i++) {
+      this.spotCooldown[i] = Math.max(0, (this.spotCooldown[i] ?? 0) - dt);
+    }
     this.chestTimer -= dt;
     if (this.chestTimer > 0) return;
     this.chestTimer = PICKUPS.chestCheckInterval;
-    const nearFloor = camera.worldView.bottom > WORLD.floorY - PICKUPS.chestNearFloor;
-    if (!nearFloor || this.count('chest') > 0) return;
-    // Just off-screen to the side the seal is heading (chests live on the seabed).
+    const terrain = currentMap().terrain;
+    const cx = camera.midPoint.x;
+    const cy = camera.midPoint.y;
+
+    // The map's treasure spots (caves, wrecks) fill up as the seal comes near.
+    currentMap().def.treasure.forEach((s, i) => {
+      if ((this.spotCooldown[i] ?? 0) > 0) return;
+      if (this.items.some((p) => p.spot === i)) return;
+      if (Math.hypot(s.x - cx, s.y - cy) > SPOT_RANGE) return;
+      const ground = terrain.groundBelow(s.x, s.y - 120, 600);
+      this.spawnAt('chest', s.x, (ground ?? s.y) - CHEST_LIFT, i);
+    });
+
+    // Plus the odd chest on the abyss seabed, just off-screen ahead.
+    const randomChests = this.items.filter((p) => p.kind === 'chest' && p.spot === null).length;
+    if (randomChests > 0 || zoneAt(cy).id !== 'abyss') return;
     const dir = seal.vx >= 0 ? 1 : -1;
-    const x = camera.midPoint.x + dir * (camera.worldView.width / 2 + 150 + this.random() * 300);
-    this.spawnAt('chest', x, CHEST_Y);
+    const x = cx + dir * (camera.worldView.width / 2 + 150 + this.random() * 300);
+    const ground = terrain.groundBelow(x, cy - 300, PICKUPS.chestNearFloor + 600);
+    if (ground === null || zoneAt(ground).id !== 'abyss' || !openSpot(terrain, x, ground - 60, 30)) {
+      return;
+    }
+    this.spawnAt('chest', x, ground - CHEST_LIFT);
   }
 
   private spawnMagnet(dt: number, camera: Phaser.Cameras.Scene2D.Camera, seal: Mover): void {
@@ -148,6 +180,7 @@ export class Pickups {
       aheadBias: 0.9,
       top: WATER_TOP + 80,
       bottom: WATER_BOTTOM - 120,
+      accept: (x, y) => openSpot(currentMap().terrain, x, y, 60),
     });
     if (p) this.spawnAt('magnet', p.x, p.y);
   }

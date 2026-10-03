@@ -76,6 +76,8 @@ export interface RunResult {
   achievements: Array<{ name: string; gems: number }>;
   /** Place on the top-runs list (1-5), or null. */
   rank: number | null;
+  /** Names of maps this run unlocked. */
+  unlockedMaps: string[];
 }
 
 export interface DebugInfo {

@@ -21,6 +21,10 @@ import { RegistryKeys, SceneKeys } from '../config/keys';
 import { missionDef } from '../config/missions';
 import { skinDef } from '../config/skins';
 import { WORLD, depthMeters, zoneAt, type ZoneId } from '../config/zones';
+import { TerrainRenderer } from '../systems/TerrainRenderer';
+import { Decor } from '../systems/Decor';
+import { GameMap, setCurrentMap } from '../world/GameMap';
+import { MAPS } from '../config/maps';
 import type { Creature } from '../entities/Creature';
 import { startle } from '../entities/creatureAI';
 import type { Predator } from '../entities/Predator';
@@ -87,6 +91,10 @@ export class GameScene extends Phaser.Scene {
   private seal!: Seal;
   private controls!: InputController;
   private background!: WorldBackground;
+  /** The map being played and its rock. */
+  map!: GameMap;
+  private terrainView!: TerrainRenderer;
+  private decor!: Decor;
   private effects!: Effects;
   private spawner!: Spawner;
   private hazards!: HazardField;
@@ -194,7 +202,10 @@ export class GameScene extends Phaser.Scene {
     this.sharkNoticed = false;
     this.zoneBannerAt.clear();
 
-    this.background = new WorldBackground(this);
+    // The map: set it first, the spawners and the seal read its terrain.
+    this.map = GameMap.get(saves.data.maps.selected);
+    setCurrentMap(this.map);
+    this.background = new WorldBackground(this, this.map);
     this.effects = new Effects(this);
     this.spawner = new Spawner(this);
     this.hazards = new HazardField(this);
@@ -202,7 +213,8 @@ export class GameScene extends Phaser.Scene {
     this.pickups = new Pickups(this);
     this.darkness = new Darkness(this);
     const skin = skinDef(saves.data.skins.equipped);
-    this.seal = new Seal(this, 0, WORLD.surfaceY + 260, mods, skin.texture);
+    const start = this.map.def.start;
+    this.seal = new Seal(this, start.x, start.y, mods, skin.texture);
     this.predators = new Predators(this);
     this.controls = new InputController(this);
     this.debugGfx = this.add.graphics().setDepth(50);
@@ -214,13 +226,16 @@ export class GameScene extends Phaser.Scene {
       fitWorldCamera(cam);
       sharpenTexts(this);
     });
-    // Endless horizontally, bounded between the sky and the seabed.
-    cam.setBounds(-1e7, WORLD.ceilingY, 2e7, WORLD.height - WORLD.ceilingY);
+    // Bounded by the map: its width, and the sky to the seabed.
+    cam.setBounds(0, WORLD.ceilingY, this.map.width, WORLD.height - WORLD.ceilingY);
+    this.terrainView = new TerrainRenderer(this, this.map);
+    this.decor = new Decor(this, this.map);
     cam.centerOn(this.seal.x, this.seal.y);
     cam.startFollow(this.seal, false, CAMERA.lerpX, CAMERA.lerpY);
     cam.fadeIn(400, 4, 20, 37);
 
     this.currentZone = zoneAt(this.seal.y).id;
+    this.updateMusic();
     this.updateThreat();
     this.spawner.populate(this.seal.x, this.seal.y, this.threat);
 
@@ -230,6 +245,8 @@ export class GameScene extends Phaser.Scene {
     sharpenTexts(this);
     this.scene.launch(SceneKeys.Hud);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.terrainView.destroy();
+      this.decor.destroy();
       this.scene.stop(SceneKeys.Hud);
       this.scene.stop(SceneKeys.GameOver);
       this.scene.stop(SceneKeys.Pause);
@@ -296,6 +313,7 @@ export class GameScene extends Phaser.Scene {
       const ended = this.combo.update(dt);
       if (ended >= COMBO_CALLOUT_MIN) {
         this.effects.floatText(this.seal.x, this.seal.y - 80, `${ended} COMBO!`, '#ffb3ff', 34);
+        audio.play(SoundKeys.Combo);
       }
       if (this.frenzy.update(dt)) this.endFrenzy();
       this.updateZone();
@@ -358,6 +376,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.effects.update(dt, cam);
+    this.terrainView.update(cam);
+    this.decor.update(dt, cam);
     this.background.update(time, cam);
     this.publishHudState(dt);
     this.drawDebug();
@@ -388,20 +408,32 @@ export class GameScene extends Phaser.Scene {
       if (Math.random() < PICKUPS.chestGemChance) {
         this.runGems++;
         this.effects.floatText(e.x, e.y - 95, '+1 GEM', '#ff8ae0', 34);
+        this.time.delayedCall(250, () => audio.play(SoundKeys.Gem));
       }
       const [min, max] = PICKUPS.chestCoins;
       this.coins.drop(e.x, e.y - 12, Phaser.Math.Between(min, max));
       this.score += PICKUPS.chestScore;
       this.effects.growBurst(e.x, e.y);
       this.effects.floatText(e.x, e.y - 50, 'TREASURE!', '#ffd23c', 40);
-      audio.play(SoundKeys.Buy);
+      audio.play(SoundKeys.ChestOpen);
     } else {
       this.magnetLeft = PICKUPS.magnetDuration;
       this.effects.coinPickup(e.x, e.y);
       this.effects.floatText(e.x, e.y - 40, 'COIN MAGNET!', '#ff8a7a', 34);
-      audio.play(SoundKeys.Grow);
+      audio.play(SoundKeys.Magnet);
     }
     this.hudDirty = true;
+  }
+
+  /** Bright music up top, the dark loop in the deep and the abyss. */
+  private updateMusic(): void {
+    const deep = this.currentZone === 'deep' || this.currentZone === 'abyss';
+    audio.setMusic(deep ? SoundKeys.MusicDeep : SoundKeys.MusicShallows);
+  }
+
+  /** Camera shake, unless the player turned it off in Settings. */
+  private shake(duration: number, intensity: number): void {
+    if (saves.data.settings.shake) this.cameras.main.shake(duration, intensity);
   }
 
   /** Bite tier for eating checks: the growth stage, or anything during a frenzy. */
@@ -411,13 +443,15 @@ export class GameScene extends Phaser.Scene {
 
   /** Banner when swimming into a new depth zone (not the sky), rate-limited per zone. */
   private updateZone(): void {
-    const zone = zoneAt(this.seal.y);
+    const zone = this.map.zone(zoneAt(this.seal.y));
     if (zone.id === this.currentZone || zone.id === 'surface') return;
     this.currentZone = zone.id;
+    this.updateMusic();
     const last = this.zoneBannerAt.get(zone.id) ?? -Infinity;
     if (this.elapsed - last < ZONE_BANNER_COOLDOWN) return;
     this.zoneBannerAt.set(zone.id, this.elapsed);
     EventBus.emit('zone:enter', { name: zone.name, blurb: zone.blurb });
+    audio.play(SoundKeys.Zone);
   }
 
   private updateTutorial(dt: number): void {
@@ -490,7 +524,7 @@ export class GameScene extends Phaser.Scene {
     audio.play(SoundKeys.Frenzy);
     this.effects.floatText(this.seal.x, this.seal.y - 90, 'FRENZY!', '#ffb13c', 56);
     this.cameras.main.flash(250, 255, 210, 120);
-    this.cameras.main.shake(250, 0.008);
+    this.shake(250, 0.008);
   }
 
   private endFrenzy(): void {
@@ -529,7 +563,7 @@ export class GameScene extends Phaser.Scene {
     audio.play(SoundKeys.ChompBig);
     this.coins.drop(p.x, p.y, def.coins);
     this.hitStop = HITSTOP.explode;
-    this.cameras.main.shake(260, 0.01);
+    this.shake(260, 0.01);
     this.countMeal(def.id);
     this.feed(p.x, p.y, def);
     p.despawn();
@@ -565,6 +599,7 @@ export class GameScene extends Phaser.Scene {
       const def = missionDef(id);
       if (!def) continue;
       EventBus.emit('mission:complete', { text: def.text, coins: def.coins, gems: def.gems ?? 0 });
+      audio.play(SoundKeys.Mission);
       audio.play(SoundKeys.Buy);
     }
   }
@@ -575,7 +610,7 @@ export class GameScene extends Phaser.Scene {
     const label = this.growth.isMaxStage ? 'MAX SIZE!' : 'BIGGER!';
     this.effects.floatText(this.seal.x, this.seal.y - 70, label, '#7dfcff', 38);
     audio.play(SoundKeys.Grow);
-    this.cameras.main.shake(180, 0.005);
+    this.shake(180, 0.005);
   }
 
   private bumpInto(c: Creature, time: number): void {
@@ -584,7 +619,7 @@ export class GameScene extends Phaser.Scene {
     this.seal.bump();
     startle(c.motion, Math.random);
     audio.play(SoundKeys.Bump);
-    this.cameras.main.shake(90, 0.003);
+    this.shake(90, 0.003);
     if (time - this.lastTooBigAt > TOO_BIG_TEXT_COOLDOWN) {
       this.lastTooBigAt = time;
       this.effects.floatText(c.x, c.y - 30, 'Too big!', '#d8e3ea', 22);
@@ -617,7 +652,7 @@ export class GameScene extends Phaser.Scene {
       if (def.explodes) {
         this.effects.explosion(h.x, h.y);
         audio.play(SoundKeys.Explode);
-        this.cameras.main.shake(320, 0.014);
+        this.shake(320, 0.014);
         this.hitStop = HITSTOP.explode;
         h.despawn();
       } else {
@@ -658,7 +693,7 @@ export class GameScene extends Phaser.Scene {
     this.combo.reset();
     this.lastHit = { source, at: this.elapsed };
     this.hitStop = Math.max(this.hitStop, HITSTOP.hurt);
-    this.cameras.main.shake(220, 0.01);
+    this.shake(220, 0.01);
     this.effects.floatText(this.seal.x, this.seal.y - 40, `-${damage}`, '#ff6b5b', 30);
     this.hudDirty = true;
     EventBus.emit('seal:hurt', { source, damage });
@@ -672,7 +707,7 @@ export class GameScene extends Phaser.Scene {
     // One run is enough of an introduction.
     saves.completeTutorial();
     if (this.hintShown) EventBus.emit('hint', null);
-    this.cameras.main.shake(250, 0.006);
+    this.shake(250, 0.006);
     const recent = this.lastHit && this.elapsed - this.lastHit.at <= DAMAGE.killWindow;
     const cause: DeathCause = recent && this.lastHit ? this.lastHit.source : 'starved';
     const distance = Math.round(this.distance);
@@ -697,6 +732,7 @@ export class GameScene extends Phaser.Scene {
       missions: settled.missions.map((m) => ({ text: m.text, coins: m.coins, gems: m.gems ?? 0 })),
       achievements: settled.achievements.map((a) => ({ name: a.name, gems: a.gems })),
       rank: settled.rank,
+      unlockedMaps: settled.unlockedMaps.map((id) => MAPS[id].name),
     };
     EventBus.emit('run:over', result);
     this.time.delayedCall(GAME_OVER_DELAY, () => this.scene.launch(SceneKeys.GameOver, result));
@@ -712,14 +748,22 @@ export class GameScene extends Phaser.Scene {
       case 'splashdown':
         this.effects.splash(e.x, e.vy);
         if (Math.abs(e.vy) >= EFFECTS.splashMinSpeed) audio.play(SoundKeys.Splash);
-        if (e.type === 'splashdown' && e.vy > 650) this.cameras.main.shake(120, 0.004);
+        if (e.type === 'splashdown' && e.vy > 650) this.shake(120, 0.004);
         break;
       case 'boostStart':
         audio.play(SoundKeys.Boost);
-        this.cameras.main.shake(90, 0.002);
+        this.shake(90, 0.002);
         break;
       case 'boostEnd':
         break;
+      case 'wallHit': {
+        // Bonk: a thud, a little shake and some grit.
+        const k = Math.min(1, e.speed / 600);
+        audio.play(SoundKeys.Thud, { volume: 0.3 + 0.5 * k });
+        this.effects.bubbleBurst(e.x, e.y, Math.round(3 + 6 * k));
+        if (k > 0.5) this.shake(100, 0.003 * k);
+        break;
+      }
     }
   }
 
@@ -806,7 +850,7 @@ export class GameScene extends Phaser.Scene {
       x: m.x,
       y: m.y,
       depthM: depthMeters(m.y),
-      zone: zone.name,
+      zone: this.map.zone(zone).name,
       speed: m.speed,
       headingDeg: Phaser.Math.RadToDeg(m.heading),
       inWater: m.inWater,

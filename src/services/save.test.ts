@@ -5,8 +5,11 @@ import { emptyUpgrades } from '../systems/UpgradeSystem';
 import {
   defaultSave,
   equipSkin,
+  isMapUnlocked,
   migrateSave,
   purchase,
+  SAVE_VERSION,
+  selectMap,
   purchaseSkin,
   settleRun,
   type SaveData,
@@ -64,7 +67,7 @@ describe('save data', () => {
 
   it('migrates a v1 save: keeps progress, adds upgrades, skips the tutorial for veterans', () => {
     const s = migrateSave({ version: 1, coins: 80, bestScore: 900, runs: 3 });
-    expect(s.version).toBe(4);
+    expect(s.version).toBe(SAVE_VERSION);
     expect(s.coins).toBe(80);
     expect(s.upgrades).toEqual(emptyUpgrades());
     expect(s.tutorialDone).toBe(true);
@@ -100,7 +103,7 @@ describe('save data', () => {
       runs: 5,
       skins: { owned: ['harbor', 'walrus'], equipped: 'walrus' },
     });
-    expect(s).toMatchObject({ version: 4, coins: 300, gems: 0, runs: 5, achievements: [] });
+    expect(s).toMatchObject({ version: SAVE_VERSION, coins: 300, gems: 0, runs: 5, achievements: [] });
     expect(s.skins.equipped).toBe('walrus');
     expect(s.stats).toEqual(emptyLifetimeStats());
     expect(s.missions.active.map((m) => m.id)).toEqual(STARTER_MISSIONS);
@@ -158,6 +161,43 @@ describe('save data', () => {
     const withGems = purchaseSkin({ ...defaultSave(), gems: 25 }, 'golden');
     expect(withGems?.gems).toBe(5);
     expect(withGems?.skins.equipped).toBe('golden');
+  });
+
+  it('unlocks maps by best score and only selects open ones', () => {
+    const fresh = defaultSave();
+    expect(isMapUnlocked(fresh, 'bay')).toBe(true);
+    expect(isMapUnlocked(fresh, 'arctic')).toBe(false);
+    expect(selectMap(fresh, 'arctic')).toBeNull();
+    const good = { ...fresh, bestScore: 5000 };
+    expect(selectMap(good, 'arctic')?.maps.selected).toBe('arctic');
+    expect(selectMap(good, 'tropical')).toBeNull();
+  });
+
+  it('reports maps a run unlocks and keeps a best score per map', () => {
+    const run: RunStats = { ...emptyRunStats(), score: 4200 };
+    const r = settleRun({ ...defaultSave(), bestScore: 3000 }, run, {
+      random: () => 0.5,
+      date: '2026-10-03',
+      map: 'bay',
+    });
+    expect(r.unlockedMaps).toEqual(['arctic']);
+    expect(r.data.maps.best.bay).toBe(4200);
+    const again = settleRun(r.data, run, { random: () => 0.5, date: '2026-10-03', map: 'bay' });
+    expect(again.unlockedMaps).toEqual([]);
+  });
+
+  it('migrates v4 saves to v5: map selection, volumes and toggles', () => {
+    const s = migrateSave({ version: 4, bestScore: 100, settings: { muted: true } });
+    expect(s.maps).toEqual({ selected: 'bay', best: {} });
+    expect(s.settings).toMatchObject({ muted: true, music: 0.6, sfx: 0.8, shake: true });
+    // A locked selection (or junk) falls back to the home map; volumes are clamped.
+    const t = migrateSave({
+      bestScore: 100,
+      maps: { selected: 'tropical', best: { bay: 50, nowhere: 9 } },
+      settings: { music: 3, sfx: -1, shake: false, highContrast: true },
+    });
+    expect(t.maps).toEqual({ selected: 'bay', best: { bay: 50 } });
+    expect(t.settings).toMatchObject({ music: 1, sfx: 0, shake: false, highContrast: true });
   });
 });
 

@@ -1,11 +1,14 @@
 // localStorage-backed save. Storage can be missing or throw (private mode, blocked
 // cookies), so every access is guarded and the game keeps working with in-memory data.
+import type { MapId } from '../config/maps';
 import type { SkinId } from '../config/skins';
 import type { UpgradeId } from '../config/upgrades';
 import {
   defaultSave,
   equipSkin,
   migrateSave,
+  selectMap,
+  type Settings,
   purchase,
   purchaseSkin,
   settleRun,
@@ -69,6 +72,17 @@ export class SaveService {
   /** Wears an owned skin. Returns false if it isn't owned. */
   equipSkin(id: SkinId): boolean {
     return this.apply(equipSkin(this.current, id));
+  }
+
+  /** Picks the map to play. Returns false if it's still locked. */
+  selectMap(id: MapId): boolean {
+    return this.apply(selectMap(this.current, id));
+  }
+
+  /** Updates settings (volumes, shake, high contrast). */
+  updateSettings(patch: Partial<Settings>): void {
+    this.current = { ...this.current, settings: { ...this.current.settings, ...patch } };
+    this.persist();
   }
 
   setMuted(muted: boolean): void {

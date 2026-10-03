@@ -35,6 +35,7 @@ BITE_OPEN = (0.35, 0.7, 1.0)  # mouth openness per bite frame
 # Degrees, head swinging toward the camera. The game mirrors these for the second half of
 # a turn (a yaw of 180 - a looks like a flipped), so 90 isn't needed.
 TURN_YAWS = (22.5, 45.0, 67.5)
+# Last frame: hurt (eyes squeezed shut, mouth open in an "ouch").
 SHEET_COLS = 3
 
 # Swim pose tuning (BU / radians).
@@ -156,6 +157,8 @@ def build(style):
     ey = surface_y(body, ex, ez)
     EYE[:] = (ex, ey, ez)
     near.append(ellipsoid("Eye", (ex, ey, ez), (0.21 * er, 0.08, 0.24 * er), m_eye))
+    near.append(skin_tube(body, "Squint", [(ex - 0.13 * er, ez + 0.15 * er), (ex + 0.09 * er, ez),
+                                           (ex - 0.13 * er, ez - 0.15 * er)], m_line, 0.035, 0.03))
     near.append(ellipsoid("EyeShine", (ex + 0.06 * er, ey - 0.08, ez + 0.09 * er),
                           (0.075 * er, 0.02, 0.075 * er), m_white, segments=16, rings=8))
     near.append(ellipsoid("EyeShine2", (ex - 0.06 * er, ey - 0.08, ez - 0.10 * er),
@@ -323,7 +326,14 @@ class SealPoser:
         return (TAIL_AMP * tail * np.sin(phase - WAVE_K * (0.6 - x))
                 + HEAD_BOB * head * np.sin(phase + math.pi))
 
-    def frame(self, phase=0.0, bite=0.0, yaw=0.0):
+    def frame(self, phase=0.0, bite=0.0, yaw=0.0, hurt=False):
+        # Hurt: swap the open eyes for squeezed-shut ones.
+        for obj in bpy.data.objects:
+            if obj.name.startswith("Squint"):
+                obj.hide_render = not hurt
+            elif obj.name.startswith("Eye") and not obj.name.endswith("Far"):
+                obj.hide_render = hurt
+
         sweep = FLIPPER_SWING * math.sin(phase + 0.6)
         hinge = self.mx - 0.32
         line = self.mz - 0.12
@@ -390,6 +400,7 @@ def render_skin(skin):
     poses = [dict(phase=2 * math.pi * i / SWIM_FRAMES) for i in range(SWIM_FRAMES)]
     poses += [dict(bite=b) for b in BITE_OPEN]
     poses += [dict(yaw=y) for y in TURN_YAWS]
+    poses += [dict(bite=0.55, hurt=True)]
     name = SHEET_NAMES.get(skin, f"seal-{skin}-sheet.png")
     return render_frames(Frames(), poses, os.path.join(OUT_DIR, name), SHEET_COLS)
 

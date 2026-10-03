@@ -1,6 +1,7 @@
 // Persistent save data: schema, defaults, validation/migration and pure update helpers.
 // No storage access here (SaveService does the I/O) so it can be unit tested.
 import { ACHIEVEMENTS, type AchievementDef } from '../config/achievements';
+import { MAP_ORDER, MAPS, type MapId } from '../config/maps';
 import { ACTIVE_MISSIONS, MISSIONS, STARTER_MISSIONS, type MissionDef } from '../config/missions';
 import { DEFAULT_SKIN, SKIN_IDS, skinDef, type SkinId } from '../config/skins';
 import { UPGRADE_IDS, type UpgradeId } from '../config/upgrades';
@@ -24,7 +25,7 @@ import {
   type UpgradeLevels,
 } from '../systems/UpgradeSystem';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -48,9 +49,36 @@ export interface SaveData {
   topRuns: TopRun[];
   /** First-run hints have been shown. */
   tutorialDone: boolean;
-  settings: {
-    muted: boolean;
-  };
+  /** The map to play, and the best score on each map (v5). */
+  maps: { selected: MapId; best: Partial<Record<MapId, number>> };
+  settings: Settings;
+}
+
+export interface Settings {
+  muted: boolean;
+  /** 0..1 */
+  music: number;
+  sfx: number;
+  /** Camera shake on hits and big bites. */
+  shake: boolean;
+  /** Warnings ("!", hazards) get extra shape cues and high-contrast colors. */
+  highContrast: boolean;
+}
+
+export function defaultSettings(): Settings {
+  return { muted: false, music: 0.6, sfx: 0.8, shake: true, highContrast: false };
+}
+
+/** A map is open once the best score (any map) reaches its unlock score. */
+export function isMapUnlocked(data: SaveData, id: MapId): boolean {
+  const need = MAPS[id].unlockScore;
+  return need === null || data.bestScore >= need;
+}
+
+/** Selects a map if it's unlocked. Returns null if not possible. */
+export function selectMap(data: SaveData, id: MapId): SaveData | null {
+  if (!isMapUnlocked(data, id)) return null;
+  return { ...data, maps: { ...data.maps, selected: id } };
 }
 
 export function defaultSave(): SaveData {
@@ -68,7 +96,8 @@ export function defaultSave(): SaveData {
     achievements: [],
     topRuns: [],
     tutorialDone: false,
-    settings: { muted: false },
+    maps: { selected: 'bay', best: {} },
+    settings: defaultSettings(),
   };
 }
 
@@ -183,6 +212,22 @@ export function migrateSave(raw: unknown): SaveData {
   data.tutorialDone = typeof r.tutorialDone === 'boolean' ? r.tutorialDone : data.runs > 0;
   const settings = record(r.settings);
   if (settings && typeof settings.muted === 'boolean') data.settings.muted = settings.muted;
+  const unit = (v: unknown, d: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : d;
+  data.settings.music = unit(settings?.music, data.settings.music);
+  data.settings.sfx = unit(settings?.sfx, data.settings.sfx);
+  if (typeof settings?.shake === 'boolean') data.settings.shake = settings.shake;
+  if (typeof settings?.highContrast === 'boolean') data.settings.highContrast = settings.highContrast;
+
+  // Maps (v5): per-map bests for known maps; keep the selection only if it's unlocked.
+  const maps = record(r.maps);
+  const best = record(maps?.best) ?? {};
+  for (const id of MAP_ORDER) {
+    const n = count(best[id]);
+    if (n > 0) data.maps.best[id] = n;
+  }
+  const selected = maps?.selected as MapId;
+  if (MAP_ORDER.includes(selected) && isMapUnlocked(data, selected)) data.maps.selected = selected;
   return data;
 }
 
@@ -196,6 +241,8 @@ export interface RunSettlement {
   /** Paid by missions and achievements (on top of what the run collected). */
   rewardCoins: number;
   rewardGems: number;
+  /** Maps this run's score unlocked. */
+  unlockedMaps: MapId[];
 }
 
 /**
@@ -205,8 +252,9 @@ export interface RunSettlement {
 export function settleRun(
   data: SaveData,
   run: RunStats,
-  options: { random: () => number; date: string },
+  options: { random: () => number; date: string; map?: MapId },
 ): RunSettlement {
+  const map = options.map ?? data.maps.selected;
   const missions = settleMissions(data.missions.active, run, options.random);
   const statsAfterRun = addRunToStats(data.stats, run, missions);
   const achievements = newAchievements(statsAfterRun, data.achievements);
@@ -221,7 +269,13 @@ export function settleRun(
     date: options.date,
   });
   const rewardGems = missions.gems + achievementGems;
+  const bestScore = Math.max(data.bestScore, count(run.score));
+  const unlockedMaps = MAP_ORDER.filter((id) => {
+    const need = MAPS[id].unlockScore;
+    return need !== null && data.bestScore < need && bestScore >= need;
+  });
   return {
+    unlockedMaps,
     newBest: run.score > data.bestScore,
     rank: top.rank,
     missions: missions.completed,
@@ -232,7 +286,11 @@ export function settleRun(
       ...data,
       coins: data.coins + count(run.coins) + missions.coins,
       gems: data.gems + count(run.gems) + rewardGems,
-      bestScore: Math.max(data.bestScore, count(run.score)),
+      bestScore,
+      maps: {
+        ...data.maps,
+        best: { ...data.maps.best, [map]: Math.max(data.maps.best[map] ?? 0, count(run.score)) },
+      },
       bestDistance: Math.max(data.bestDistance, count(Math.round(run.distance))),
       runs: data.runs + 1,
       stats,

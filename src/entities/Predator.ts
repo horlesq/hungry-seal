@@ -9,6 +9,7 @@ import type { PredatorDef } from '../config/predators';
 import { zoneBand } from '../config/zones';
 import { textureScale, uiTextResolution } from '../services/Viewport';
 import { createPredatorMotion, type PredatorMotion } from './predatorAI';
+import { saves } from '../services/SaveService';
 import { loopFrames } from './sheetAnim';
 
 export class Predator extends Phaser.GameObjects.Sprite {
@@ -46,6 +47,12 @@ export class Predator extends Phaser.GameObjects.Sprite {
     this.band = zoneBand(def.zones);
     this.facing = Math.cos(heading) >= 0 ? 1 : -1;
     this.animTime = Math.random() * 10;
+    // High-contrast warnings: a bigger yellow "!" with a black outline (colour-blind safe).
+    const hc = saves.data.settings.highContrast;
+    this.alert
+      .setColor(hc ? '#ffe14d' : '#ff4d3d')
+      .setStroke(hc ? '#000000' : '#ffffff', hc ? 10 : 8)
+      .setFontSize(hc ? 72 : 54);
     this.setTexture(def.texture)
       .clearTint()
       .setAlpha(1)
@@ -99,8 +106,11 @@ export class Predator extends Phaser.GameObjects.Sprite {
 
     // Telegraph: flash red and show "!" while winding up to charge.
     const warning = m.state === 'notice';
-    if (warning && Math.floor(time / 90) % 2 === 0) this.setTint(0xff8080);
-    else this.clearTint();
+    if (warning && Math.floor(time / 90) % 2 === 0) {
+      // High contrast: a white blink (brightness, not hue) instead of a red tint.
+      if (saves.data.settings.highContrast) this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+      else this.setTint(0xff8080).setTintMode(Phaser.TintModes.MULTIPLY);
+    } else this.clearTint();
     this.alert
       .setVisible(warning || (m.state === 'chase' && m.stateTime < 0.4))
       .setPosition(m.x, m.y - 50);

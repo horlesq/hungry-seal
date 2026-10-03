@@ -4,7 +4,8 @@ import Phaser from 'phaser';
 import { COINS, SPAWN } from '../config/balance';
 import { Coin } from '../entities/Coin';
 import { pickOffscreenPoint, type Mover } from './spawnPoint';
-import { WATER_BOTTOM, WATER_TOP } from './Spawner';
+import { currentMap } from '../world/GameMap';
+import { openSpot, WATER_BOTTOM, WATER_TOP } from './Spawner';
 
 const POOL_SIZE = 60;
 /** World coins spawned in an arc; how far apart. */
@@ -92,6 +93,7 @@ export class CoinField {
       aheadBias: 0.85,
       top: WATER_TOP + 80,
       bottom: WATER_BOTTOM - 80,
+      accept: (x, y) => openSpot(currentMap().terrain, x, y, 90),
     });
     if (!p) return;
     const count = min + Math.floor(this.random() * (max - min + 1));
@@ -100,7 +102,10 @@ export class CoinField {
       const coin = this.group.get() as Coin | null;
       if (!coin) return;
       const t = i - (count - 1) / 2;
-      coin.spawn(p.x + t * CLUSTER_SPACING, p.y + t * t * arc * 400 - 10, false, this.random);
+      const x = p.x + t * CLUSTER_SPACING;
+      const y = p.y + t * t * arc * 400 - 10;
+      if (!openSpot(currentMap().terrain, x, y, 20)) continue;
+      coin.spawn(x, y, false, this.random);
     }
   }
 }

@@ -7,12 +7,14 @@ import { SEAL_SHEET, TextureKeys, type TextureKey } from '../config/assets';
 import { FEEDING, GROWTH, SEAL_MOTION, SEAL_VISUAL } from '../config/balance';
 import { WORLD } from '../config/zones';
 import { textureScale } from '../services/Viewport';
+import { currentMap } from '../world/GameMap';
 import type { RunModifiers } from '../systems/UpgradeSystem';
 import { damp } from '../utils/math';
 import {
   applyKnockback,
   createSealMotionState,
   stepSealMotion,
+  type SealMotionEnv,
   type SealMotionEvent,
   type SealMotionInput,
   type SealMotionParams,
@@ -52,6 +54,8 @@ export class Seal extends Phaser.GameObjects.Sprite {
   private speedBonus = 1;
   private frenzy = false;
   private frenzyHue = 0;
+  /** World limits and the map's rock. */
+  private readonly env: SealMotionEnv = { ...WORLD, terrain: currentMap().terrain };
 
   /** `texture`: the equipped skin (cosmetic only). */
   constructor(
@@ -89,7 +93,7 @@ export class Seal extends Phaser.GameObjects.Sprite {
     this.invuln = Math.max(0, this.invuln - dt);
     this.stun = Math.max(0, this.stun - dt);
     this.flash = Math.max(0, this.flash - dt);
-    const events = stepSealMotion(this.motion, input, this.params, WORLD, dt);
+    const events = stepSealMotion(this.motion, input, this.params, this.env, dt);
     this.setPosition(this.motion.x, this.motion.y);
     this.updateVisuals(dt);
     return events;
@@ -266,6 +270,7 @@ export class Seal extends Phaser.GameObjects.Sprite {
     const step = Math.round(Math.min(turn, 1 - turn) * 8); // 22.5 degree steps, 0..4
     let frame: number;
     if (step > 0) frame = SEAL_SHEET.turn[Math.min(step, SEAL_SHEET.turn.length) - 1];
+    else if (this.stun > 0 || this.flash > 0) frame = SEAL_SHEET.hurt;
     else if (this.biteLeft > 0) {
       const open = Math.sin(Math.PI * (1 - this.biteLeft / SEAL_VISUAL.biteTime));
       const n = SEAL_SHEET.bite.length;

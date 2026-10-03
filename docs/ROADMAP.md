@@ -123,17 +123,18 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] Pooling audit (creatures, hazards, predators, coins, float texts, rings, glows all pooled; only rare pickups are created/destroyed) and `npm run soak`: 4-minute run through every zone + 20 restarts with flat heap (~76 MB after GC), bounded objects, no listener growth, 165 fps
 **Exit (Feature-complete beta):** everything in v1 scope present and balanced.
 
-## Phase 8 — Art, audio, and polish
-- [~] Final consistent art style pass (Hungry Shark-like chunky cartoon): seal, creatures, backgrounds, UI, icons
+## Phase 8 — Art, audio, maps and polish ✅ (2026-10-03)
+- [x] Final consistent art style pass (Hungry Shark-like chunky cartoon): seal, creatures, backgrounds, UI, icons
   - [x] Blender pipeline: `tools/blender/bridge.mjs` drives Blender over MCP; toon shader + inverted-hull outline
   - [x] All 9 seal skins modeled in Blender (`tools/blender/seal.py`), animated sheets (swim, bite, turn)
   - [x] All creatures, predators and the jellyfish modeled (`tools/blender/creatures.py`) with looping animations
-  - [ ] Chest, mine, coin, pickups, backgrounds in the same style
-- [~] Animations: swim cycle, bite, hurt, death, creature idles (seal swim/bite/turn and creature swim/flap/walk/pulse loops done)
-- [ ] Lighting/effects: light rays, caustics, depth fog, splash, bubble trails
-- [ ] Full SFX set and 2-3 music tracks per zone/menu, volume settings
-- [~] Menu/shop/game-over UI polish, transitions (done in the UI/UX refresh); tutorial refinement
-- [ ] Accessibility: reduced motion honoured by UI intros (done); in-game shake toggle, colorblind-safe warnings
+  - [x] Chest, mine, coin, magnet orb and 23 map decorations (`tools/blender/decor.py`)
+- [x] Maps like Hungry Shark: bounded worlds with solid terrain (SDF), collision and steering, caves, tunnels, islands, decor, treasure spots; Seal Bay, Arctic, Tropical Lagoon; map select with score unlocks; pause-screen map
+- [x] Animations: seal swim/bite/turn/hurt, creature swim/flap/walk/pulse loops, swaying plants; death = belly-up float
+- [x] Lighting/effects: light rays, caustics in the shallows, depth gradient + darkness, splash, bubble trails, rock-bump bubbles
+- [x] SFX set (new: chest, gem, magnet, mission, combo, zone, thud, puff, unlock) and 3 music loops (menu, shallows, deep) crossfading by depth; music/sfx volume settings
+- [x] Menu/shop/game-over UI polish, transitions; map unlock shown on results
+- [x] Accessibility: reduced motion for UI intros, screen-shake toggle, high-contrast (colour-blind safe) warnings
 
 ## Phase 9 — Performance, mobile, and release
 - [ ] Mobile perf profiling (target 60 FPS mid-range); texture atlases, resolution scaling

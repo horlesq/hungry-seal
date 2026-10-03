@@ -13,6 +13,8 @@ import {
 } from './creatureAI';
 import { Depths } from '../config/depths';
 import { loopFrames } from './sheetAnim';
+import { SoundKeys } from '../audio/sounds';
+import { audio } from '../services/AudioManager';
 
 /** A group of creatures that follow the first living member. */
 export class School {
@@ -131,6 +133,7 @@ export class Creature extends Phaser.GameObjects.Sprite {
     if (this.params.puff && this.shownPuffed !== m.puffed) {
       this.shownPuffed = m.puffed;
       this.setTexture(m.puffed ? TextureKeys.PufferfishPuffed : this.def.texture);
+      if (m.puffed && this.scene.cameras.main.worldView.contains(m.x, m.y)) audio.play(SoundKeys.Puff);
     }
     const s = this.displayScale * (m.puffed ? PUFFED_SCALE : 1);
 
