@@ -29,6 +29,17 @@ Characters are modeled by Python scripts in `tools/blender/` and rendered side-o
 - Outline and line widths are sized for the in-game display (~130 px wide); judge the sprite in a playtest screenshot, not at full render size.
 - The add-on runs whatever code it gets without guards, so only run scripts from this repo.
 
+## Terrain
+The rock is drawn on the GPU by `systems/TerrainShader.ts` (one full-view quad, plus a copy over the water line for islands and beaches), from the map's distance field uploaded as a texture (`terrain-sdf-<map>`, 1 texel per 16 px grid node, +-128 px in 8 bits) and the material atlas `public/assets/terrain-materials.png`.
+- `node tools/blender/bridge.mjs exec tools/blender/materials.py` renders the atlas: four 512 px seamless tiles in a 2x2 grid, 0 cobbled rock, 1 rippled sand, 2 porous coral stone, 3 cracked plates (ice, basalt, ruins). Grayscale and lit from the top-left; the shader tints them with the map palette.
+- Each map picks its tiles in `palette.tiles` (underwater rock, land, top caps, deep rock); default `[0, 1, 1, 0]`.
+- The shader adds a bevel lit from the top-left, a sand/snow cap on upward faces (its lower edge wanders with the texture), ambient occlusion deep in the rock, depth fog, and the ink edge. Land material reaches a wavy line ~40 px under the water.
+- Phaser 4 uploads textures flipped (v = 1 is the image's top row); the shader flips its lookups.
+- `?canvasTerrain` in the URL (or a non-WebGL renderer) uses the old canvas chunk renderer, `systems/TerrainRenderer.ts`.
+
+## Visual target
+Decision (2026-10-03): the shader terrain replaces the canvas rock. Judged on West Beach + Coral Gardens in Seal Bay at size 1, 1280x720 (`.playtest/art-old-bay-*.png` vs `art-new-bay-*.png`). The flat brown fill with spots and a thin sand stripe became lit cobbles with a sand drift on top and a 3D bevel, matching the Blender characters. Frame time is unchanged in the headless capture (~110-140 FPS). The rest of the art pass (edge props, beach props, new creatures) is checked against this look.
+
 ## Technical rules
 - Everything loaded via the manifest in `src/config/assets.ts` (key -> path -> type). Code uses keys only.
 - Sprites: PNG, power-of-two atlases preferred, packed with a texture atlas tool (free-tex-packer or similar). Target atlas <= 2048x2048 for mobile.
@@ -42,7 +53,7 @@ Characters are modeled by Python scripts in `tools/blender/` and rendered side-o
 - **P4 (demo):** art v1 for seal, ~8 creatures, coins, HUD bars, buttons; SFX (bite, splash, coin, hurt, boost, click); one music loop.
 - **P5:** full creature set, zone backgrounds/parallax layers, chests, power-ups.
 - **P6:** skins, mission/achievement icons, gems.
-- **P8 (done):** everything in game is Blender-rendered except the UI (painted in code), the background layers (clouds, light rays, far ridges, snow: code-painted) and the terrain (drawn at runtime from the map's distance field). Audio is synthesized in code (`audio/synth.ts`).
+- **P8 (done):** everything in game is Blender-rendered except the UI (painted in code), the background layers (clouds, light rays, far ridges, snow: code-painted) and the terrain (GPU shader over the map's distance field with Blender-rendered material tiles, see Terrain). Audio is synthesized in code (`audio/synth.ts`).
 
 ## Seal skins
 Each skin is its own texture key (`seal` = harbor, `seal-arctic`, `seal-sealion`, `seal-tropical`, `seal-leopard`, `seal-walrus`, `seal-elephant`, and the gem skins `seal-pirate`, `seal-golden`), 176x88 design units facing right, all rendered from Blender as animated sheets (see Blender pipeline); `systems/sealArt.ts` only paints fallbacks if a sheet fails to load. Real art must keep the muzzle at the right end (x ~150-165) so the mouth hit circle lines up. Distinct looks per growth stage are still open (art pass).

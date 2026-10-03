@@ -47,6 +47,7 @@ export const TROPICAL: MapDef = {
     outline: '#241826',
     landRim: '#fff0c2',
     land: '#f0d595',
+    tiles: [2, 1, 1, 0],
   },
   zones: {
     reef: { name: 'Lagoon', blurb: 'Coral gardens full of fish, pufferfish and turtles' },

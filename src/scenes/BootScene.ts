@@ -13,6 +13,8 @@ export class BootScene extends Phaser.Scene {
     this.registry.set(RegistryKeys.Debug, params.has('debug'));
     // `?calm` turns off hazards and predators.
     this.registry.set(RegistryKeys.Calm, params.has('calm'));
+    // `?canvasTerrain` draws the terrain with the canvas fallback instead of the shader.
+    this.registry.set(RegistryKeys.CanvasTerrain, params.has('canvasTerrain'));
     this.scene.start(SceneKeys.Preload);
   }
 }

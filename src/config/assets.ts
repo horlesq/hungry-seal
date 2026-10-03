@@ -29,6 +29,8 @@ export const TextureKeys = {
   MorayEel: 'creature-moray',
   ElectricEel: 'creature-eel-electric',
   Boat: 'boat-fishing',
+  /** Terrain material atlas (tools/blender/materials.py). */
+  TerrainMaterials: 'terrain-materials',
   Net: 'hazard-net',
   Harpoon: 'hazard-harpoon',
   Crate: 'item-crate',
@@ -200,6 +202,7 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { type: 'image', key: TextureKeys.SeabedNear },
   { type: 'image', key: TextureKeys.SeabedGround },
   { type: 'image', key: TextureKeys.MarineSnow },
+  { type: 'image', key: TextureKeys.TerrainMaterials, url: 'assets/terrain-materials.png' },
   sheet(TextureKeys.DecorKelp, 60, 260),
   sheet(TextureKeys.DecorSeaweed, 60, 80),
   sheet(TextureKeys.DecorCoralBranch, 90, 90),

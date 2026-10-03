@@ -74,6 +74,7 @@ export const ARCTIC: MapDef = {
     landRim: '#ffffff',
     land: '#e8f6fd',
     speckle: 0.07,
+    tiles: [3, 3, 1, 3],
   },
   zones: {
     reef: { name: 'Ice Shelf', blurb: 'Penguins under the floes. Leap through the gaps!' },

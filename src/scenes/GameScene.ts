@@ -22,6 +22,7 @@ import { missionDef } from '../config/missions';
 import { skinDef } from '../config/skins';
 import { WORLD, depthMeters, zoneAt, type ZoneId } from '../config/zones';
 import { TerrainRenderer } from '../systems/TerrainRenderer';
+import { TerrainShader } from '../systems/TerrainShader';
 import { Decor } from '../systems/Decor';
 import { Gates } from '../systems/Gates';
 import { Eels } from '../systems/Eels';
@@ -100,7 +101,7 @@ export class GameScene extends Phaser.Scene {
   private background!: WorldBackground;
   /** The map being played and its rock. */
   map!: GameMap;
-  private terrainView!: TerrainRenderer;
+  private terrainView!: TerrainRenderer | TerrainShader;
   private decor!: Decor;
   private gates!: Gates;
   private eels!: Eels;
@@ -246,7 +247,11 @@ export class GameScene extends Phaser.Scene {
     });
     // Bounded by the map: its width, and the sky to the seabed.
     cam.setBounds(0, WORLD.ceilingY, this.map.width, WORLD.height - WORLD.ceilingY);
-    this.terrainView = new TerrainRenderer(this, this.map);
+    // GPU terrain where WebGL is available; canvas chunks otherwise.
+    this.terrainView =
+      this.renderer.type === Phaser.WEBGL && !this.registry.get(RegistryKeys.CanvasTerrain)
+        ? new TerrainShader(this, this.map)
+        : new TerrainRenderer(this, this.map);
     this.decor = new Decor(this, this.map);
     this.gates = new Gates(this, this.map);
     this.seal.setFlow(this.gates.flow);

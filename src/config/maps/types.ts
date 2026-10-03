@@ -24,8 +24,13 @@ export interface MapPalette {
   /** Rock that sticks out above the water (islands, icebergs, beaches). */
   landRim: string;
   land: string;
-  /** Strength of the rock speckle texture (default 0.22). */
+  /** Strength of the rock speckle texture (default 0.22; canvas fallback renderer). */
   speckle?: number;
+  /**
+   * Material atlas tiles (0 rock, 1 sand, 2 coral stone, 3 plates) for: underwater rock, land,
+   * top caps, deep rock.
+   */
+  tiles?: readonly [number, number, number, number];
 }
 
 export interface DecorPlacement {

@@ -19,4 +19,5 @@ export const RegistryKeys = {
   Debug: 'debug',
   /** No hazards or predators (URL `?calm`), for movement testing and tuning. */
   Calm: 'calm',
+  CanvasTerrain: 'canvasTerrain',
 } as const;
