@@ -7,8 +7,10 @@ import { Depths } from '../config/depths';
 import { darknessAt } from '../config/zones';
 import { damp } from '../utils/math';
 
-/** Overlay size in world units: big enough to cover the view around the seal at any zoom. */
+/** Smallest overlay size in world units; it grows with the view so it always covers it. */
 const SIZE = 3600;
+/** Overlay size / the view's longer side (covers the view with the seal off-centre). */
+const VIEW_COVER = 2.4;
 
 export class Darkness {
   private readonly overlay: Phaser.GameObjects.Image;
@@ -22,9 +24,11 @@ export class Darkness {
       .setAlpha(0);
   }
 
-  update(dt: number, x: number, y: number): void {
+  update(dt: number, x: number, y: number, view: { width: number; height: number }): void {
     // Smooth so a leap or a hit doesn't flicker the light.
     this.level = damp(this.level, darknessAt(y), 3, dt);
+    const size = Math.max(SIZE, VIEW_COVER * Math.max(view.width, view.height));
+    if (Math.abs(this.overlay.displayWidth - size) > 1) this.overlay.setDisplaySize(size, size);
     this.overlay
       .setPosition(x, y)
       .setAlpha(this.level)

@@ -138,7 +138,8 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] Level design pass ([LEVEL_DESIGN.md](LEVEL_DESIGN.md), `level-design` skill): 40,000 px maps with beaches at both ends, named regions with danger 1-5 (banner + pause map), size-gate currents, 6 pearls per map (3 open the next map), giant-squid boss lairs, eel dens, urchin beds, minefields, toxic/heat clouds, fishing-boat lanes (nets, harpoons, crates), barracuda packs and hammerheads; every map checked reachable per size (`world/mapCheck.test.ts`); terrain bake in a worker
 - [x] Art pass 2 ([ART_DIRECTION.md](ART_DIRECTION.md), `create-game-assets` skill): GPU terrain shader with Blender material tiles; Blender barracuda, hammerhead, moray, electric eel, three squid bosses, fishing boat, net, harpoon, crate; rock/coral/ice clusters set into the terrain edge; beach props (lifeguard tower, umbrellas, sandcastles, huts)
 - [ ] Balance the 40k maps (balance bot per map) and playtest by hand ([REGRESSION.md](REGRESSION.md))
-- [ ] Size ladder: 8 sizes (~4x growth) with camera zoom-out, re-tiered prey and predators, bigger-prey feel (LEVEL_DESIGN.md metrics); opens the size-7 boss gates and boat ramming
+- [x] Size ladder: 8 sizes (~4x growth, LEVEL_DESIGN.md metrics) with camera zoom-out to 0.55, re-tiered and re-sized prey and predators, gulp on eating, spawn density and recycling that follow the view size, darkness sized to the view, a bigger boss; size-7 boss gates and boat ramming are now reachable
+- [ ] Balance the size ladder (stage costs, growth per meal) with the bot on all three maps
 
 ## Phase 9 — Performance, mobile, and release
 - [ ] Mobile perf profiling (target 60 FPS mid-range); texture atlases, resolution scaling

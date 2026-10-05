@@ -56,11 +56,13 @@ export const BOSSES: Record<
 };
 
 export const BOSS = {
-  bodyRadius: 120,
+  /** Display scale of the boss art (380 du wide): towers over even a full-grown seal. */
+  scale: 1.7,
+  bodyRadius: 200,
   telegraph: 0.8,
   lungeTime: 0.65,
   sweepTime: 0.55,
-  sweepRadius: 300,
+  sweepRadius: 430,
   exposed: 2.0,
   recover: 1.6,
   damage: 30,
@@ -106,13 +108,13 @@ export class Boss {
     this.y = lair.y;
     this.sprite = scene.add
       .sprite(this.x, this.y, this.def.texture)
-      .setScale(textureScale(scene, this.def.texture))
+      .setScale(BOSS.scale * textureScale(scene, this.def.texture))
       .setDepth(11);
     this.glow = scene.add
       .image(this.x, this.y, TextureKeys.Glow)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setTint(this.def.glow)
-      .setScale(1.6 * textureScale(scene, TextureKeys.Glow))
+      .setScale(2.7 * textureScale(scene, TextureKeys.Glow))
       .setAlpha(0.35)
       .setDepth(Depths.Glow);
     this.ring = scene.add.graphics().setDepth(12);
@@ -128,10 +130,19 @@ export class Boss {
 
   /** The body the seal can bite (only counts while exposed). */
   get body(): { x: number; y: number; r: number; exposed: boolean } {
-    return { x: this.x, y: this.y, r: BOSS.bodyRadius, exposed: this.state === 'exposed' && this.guard <= 0 };
+    return {
+      x: this.x,
+      y: this.y,
+      r: BOSS.bodyRadius,
+      exposed: this.state === 'exposed' && this.guard <= 0,
+    };
   }
 
-  update(dt: number, seal: { x: number; y: number; radius: number }, vulnerable: boolean): readonly BossEvent[] {
+  update(
+    dt: number,
+    seal: { x: number; y: number; radius: number },
+    vulnerable: boolean,
+  ): readonly BossEvent[] {
     this.events.length = 0;
     if (this.state === 'dead') {
       // Sinks and fades.
@@ -147,7 +158,13 @@ export class Boss {
     const inLair = Math.hypot(seal.x - L.x, seal.y - L.y) < L.lairRadius;
     if (inLair !== this.wasShown) {
       this.wasShown = inLair;
-      this.events.push({ type: 'hp', name: this.def.name, hp: this.hp, max: this.def.hp, show: inLair });
+      this.events.push({
+        type: 'hp',
+        name: this.def.name,
+        hp: this.hp,
+        max: this.def.hp,
+        show: inLair,
+      });
     }
     const toSeal = Math.atan2(seal.y - this.y, seal.x - this.x);
 
@@ -155,7 +172,11 @@ export class Boss {
       case 'idle': {
         // Slow loop around the lair.
         const a = this.t * 0.35;
-        this.steerTo(L.x + Math.cos(a) * L.lairRadius * 0.4, L.y + Math.sin(a) * L.lairRadius * 0.2, this.def.speed);
+        this.steerTo(
+          L.x + Math.cos(a) * L.lairRadius * 0.4,
+          L.y + Math.sin(a) * L.lairRadius * 0.2,
+          this.def.speed,
+        );
         if (inLair && vulnerable) this.enter('telegraph');
         break;
       }
@@ -179,7 +200,10 @@ export class Boss {
         }
         break;
       case 'lunge':
-        if (vulnerable && circlesOverlap(this.x, this.y, BOSS.bodyRadius, seal.x, seal.y, seal.radius)) {
+        if (
+          vulnerable &&
+          circlesOverlap(this.x, this.y, BOSS.bodyRadius, seal.x, seal.y, seal.radius)
+        ) {
           this.events.push({ type: 'hit-seal', x: this.x, y: this.y });
         }
         if (this.t >= BOSS.lungeTime) this.enter('exposed');
@@ -242,7 +266,13 @@ export class Boss {
     this.hp--;
     this.guard = BOSS.hitGuard;
     this.events.push({ type: 'hurt', x: this.x, y: this.y, hp: this.hp });
-    this.events.push({ type: 'hp', name: this.def.name, hp: this.hp, max: this.def.hp, show: true });
+    this.events.push({
+      type: 'hp',
+      name: this.def.name,
+      hp: this.hp,
+      max: this.def.hp,
+      show: true,
+    });
     if (this.hp <= 0) {
       this.state = 'dead';
       this.t = 0;

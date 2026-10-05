@@ -49,8 +49,10 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
 - Feedback: gulp squash, star sparks, floating "+score" text; brief hit-stop on bigger prey.
 
 ### Growth
-- Growth meter fills from eating. Filling it grows the seal by a stage (visible size increase, up to 5 stages per run) and raises bite tier. Stage resets at the start of each run; upgrades set the starting stage/baseline.
-  - Current tuning: stage costs 80 / 200 / 380 / 600 growth points; scale 0.72 → 1.12; top speed +4% per stage.
+- Growth meter fills from eating. Filling it grows the seal by a stage (8 sizes per run, ~4x longer from size 1 to 8) and raises bite tier: size N eats tier N. Stage resets at the start of each run.
+  - Size is physical: everything edible at a size looks clearly smaller than the seal, and predators are bigger than it until it outgrows them. Small seals fit through grottos; big ones push through size-gate currents. The camera pulls back as the seal grows (zoom 1 -> 0.55) and the ocean fills up to match (spawn counts follow the view size).
+  - Eating: the meal is pulled into the mouth and shrinks away (a gulp), with the chomp burst.
+  - Current tuning (`GROWTH` in balance.ts, metrics table in [LEVEL_DESIGN.md](LEVEL_DESIGN.md)): stage costs 60 / 130 / 220 / 340 / 480 / 650 / 850 growth points; scale 0.6 -> 2.4; top speed up to +30%.
 
 ### Combo and Frenzy
 - Eating within 2.2 s of the last meal builds a combo (done). Multiplier on score: x2 at 2 meals, x3 at 5, x4 at 10, x5 at 16. Getting hurt breaks the combo. Combos of 5+ get a "N COMBO!" callout when they end. HUD shows multiplier, count and a shrinking timer bar.
@@ -81,29 +83,24 @@ Appear from 25 s into a run: 2 allowed at first, +2 per minute, max 7 (`DANGER` 
 - Shark ✅ (ocean/deep, from 45 s), Orca ✅ (ocean/deep, from 3 min; tier 6 = never edible outside a frenzy, 40 damage), Anglerfish ✅ (deep/abyss while you're there: lurks still behind a glowing lure, 0.35 s telegraph, short 540 px/s lunge; edible from size 4), Barracuda ✅ (packs of 3-4 in their home regions; fast, small bites), Hammerhead ✅ (tier 6, open-water regions, charges). Giant squid bosses ✅ (one per map lair, 6-8 hearts; see Maps).
 - States: patrol → notice (0.8 s telegraph: stops, turns to the seal, flashes red, "!") → chase (370 px/s, turns slower than the seal, gives up after 6 s or 900 px) → bite → recover (swims off, then 4 s cooldown). Only hunts a seal that's in the water. Off-screen hunters show a red arrow at the screen edge.
 - Shark bite: 28 damage + knockback. Outrun it with boost, out-turn it, or leap out of the water.
-- Seal outgrowing a predator's tier (shark = tier 5, max size) makes it flee and turns it into a big reward (45 nutrition, 250 score, 5 coins).
+- Seal outgrowing a predator's tier makes it flee and turns it into a big reward. Tiers: barracuda 4, anglerfish 5, shark 6, hammerhead 7, orca 8 (moray 5, electric eel 6).
 - Schedule: first shark at 45 s, up to 2 at 150 s, 3 at 270 s.
 
-## Prey table (initial; tune in `src/config/creatures.ts`)
-Implemented so far: minnow, shrimp, sardine. Prey flee only from a seal big enough to eat them.
+## Prey table (tune in `src/config/creatures.ts`)
+Prey flee only from a seal big enough to eat them. Display size grows with tier (`scale`): tier 1 ~40-50 px, tier 2 ~55-70, tier 3 ~95-100, tier 4 ~130.
 
 | Tier | Creature | Zone | Nutrition | Score | Behaviour |
 |---|---|---|---|---|---|
 | 1 | Minnow ✅ | Reef/Ocean | 6 | 10 | schools of 3-6, flees at 290 px/s |
 | 1 | Shrimp ✅ | Reef | 5 | 8 | drifts and bobs, flees at 230 px/s |
 | 2 | Sardine school ✅ | Ocean/Deep | 11 | 20 | schools of 6-10, flees at 330 px/s |
-| 2 | Seabird ✅ | Sky above the surface | 12 | 50 | glides and swoops low; leap out of the water to catch |
+| 3 | Seabird ✅ | Sky above the surface | 12 | 50 | glides and swoops low; leap out of the water to catch |
 | 3 | Squid ✅ | Ocean/Deep | 16 | 60 | cruises slowly, escapes in jet bursts (420 px/s kicks) |
 | 3 | Penguin ✅ | Upper reef (near surface) | 20 | 90 | groups of 2-3, fast (390 px/s flee) |
 | 4 | Sea turtle ✅ | Reef/Ocean | 32 | 120 | slow, doesn't flee: a big safe meal once you're size 4 |
 | 2 | Pufferfish ✅ | Reef/Ocean | 14 | 40 | doesn't flee; puffs into a spiky ball near you for 2 s (bigger hitbox), then has to catch its breath for 2.5 s: eat it then. Eating it puffed stings: 14 damage + knockback |
 | 1 | Lanternfish ✅ | Deep/Abyss | 7 | 15 | glowing schools of 4-7; food for small seals in the dark |
 | 2 | Crab ✅ | Abyss seabed | 16 | 45 | walks along the floor, scuttles sideways away from you |
-| 2 | Crab | Reef floor | 10 | 25 | walks, snaps |
-| 3 | Seabird | Surface/Air | 15 | 50 | glides, dives |
-| 3 | Squid | Ocean | 18 | 60 | jets away |
-| 4 | Penguin | Surface/Ocean | 25 | 100 | swims fast |
-| 4 | Turtle | Reef | 30 | 120 | slow, tanky |
 | 5 | Small shark | Deep | 45 | 250 | fights back |
 
 ## Currency and progression

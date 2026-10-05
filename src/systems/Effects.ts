@@ -1,5 +1,5 @@
-// Visual effects: surface splashes, bubble trails, chomp bursts and floating text.
-// All emitters are capped (maxParticles) and texts/rings are pooled and reused.
+// Visual effects: surface splashes, bubble trails, chomp bursts, gulps and floating text.
+// All emitters are capped (maxParticles) and texts/rings/gulps are pooled and reused.
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { EFFECTS } from '../config/balance';
@@ -10,6 +10,21 @@ import { clamp } from '../utils/math';
 
 const SPLASH_RINGS = 4;
 const FLOAT_TEXTS = 16;
+const GULPS = 10;
+/** Between creatures (8) and the seal (10): the meal disappears behind the seal's head. */
+const GULP_DEPTH = 9.5;
+
+/** An eaten creature's copy being pulled into the mouth. */
+interface Gulp {
+  img: Phaser.GameObjects.Image;
+  /** 0..1 progress (1 = done). */
+  t: number;
+  x0: number;
+  y0: number;
+  sx: number;
+  sy: number;
+  target: { x: number; y: number };
+}
 
 export class Effects {
   private readonly bubbles: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -19,13 +34,19 @@ export class Effects {
   private readonly zaps: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly rings: Phaser.GameObjects.Image[] = [];
   private readonly texts: Phaser.GameObjects.Text[] = [];
+  private readonly gulps: Gulp[] = [];
   private readonly ringScale: number;
+  private nextGulp = 0;
   private nextRing = 0;
   private nextText = 0;
   private trailTimer = 0;
   private ambientTimer = 0;
 
   constructor(private readonly scene: Phaser.Scene) {
+    for (let i = 0; i < GULPS; i++) {
+      const img = scene.add.image(0, 0, TextureKeys.Bubble).setVisible(false).setDepth(GULP_DEPTH);
+      this.gulps.push({ img, t: 1, x0: 0, y0: 0, sx: 1, sy: 1, target: { x: 0, y: 0 } });
+    }
     // Particle scales are in design units; divide out each texture's pixel density.
     const tsBubble = textureScale(scene, TextureKeys.Bubble);
     const tsDrop = textureScale(scene, TextureKeys.Droplet);
@@ -151,6 +172,29 @@ export class Effects {
     this.sparks.emitParticleAt(x, y, 4);
   }
 
+  /**
+   * The eaten creature is pulled into the mouth and shrinks away instead of vanishing, so a
+   * meal reads as swallowed. `mouth` is followed while the gulp plays (keep it updated).
+   */
+  gulp(src: Phaser.GameObjects.Sprite, mouth: { x: number; y: number }): void {
+    const g = this.gulps[this.nextGulp];
+    this.nextGulp = (this.nextGulp + 1) % this.gulps.length;
+    g.img
+      .setTexture(src.texture.key, src.frame.name)
+      .setPosition(src.x, src.y)
+      .setScale(src.scaleX, src.scaleY)
+      .setRotation(src.rotation)
+      .setFlip(src.flipX, src.flipY)
+      .setAlpha(1)
+      .setVisible(true);
+    g.t = 0;
+    g.x0 = src.x;
+    g.y0 = src.y;
+    g.sx = src.scaleX;
+    g.sy = src.scaleY;
+    g.target = mouth;
+  }
+
   /** Celebration burst when the seal grows a stage. */
   growBurst(x: number, y: number): void {
     this.sparks.emitParticleAt(x, y, 24);
@@ -224,8 +268,23 @@ export class Effects {
     this.bubbles.emitParticleAt(x, y, 1);
   }
 
-  /** Ambient bubbles drifting up from below the view. */
   update(dt: number, camera: Phaser.Cameras.Scene2D.Camera): void {
+    for (const g of this.gulps) {
+      if (g.t >= 1) continue;
+      g.t = Math.min(1, g.t + dt / EFFECTS.gulpTime);
+      const k = 1 - (1 - g.t) * (1 - g.t);
+      const shrink = 1 - 0.85 * g.t;
+      g.img
+        .setPosition(g.x0 + (g.target.x - g.x0) * k, g.y0 + (g.target.y - g.y0) * k)
+        .setScale(g.sx * shrink, g.sy * shrink)
+        .setAlpha(1 - g.t * g.t);
+      if (g.t >= 1) g.img.setVisible(false);
+    }
+    this.ambient(dt, camera);
+  }
+
+  /** Ambient bubbles drifting up from below the view. */
+  private ambient(dt: number, camera: Phaser.Cameras.Scene2D.Camera): void {
     this.ambientTimer -= dt;
     if (this.ambientTimer > 0) return;
     this.ambientTimer = 1 / EFFECTS.ambientBubblesPerSec;

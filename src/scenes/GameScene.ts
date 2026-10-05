@@ -425,7 +425,7 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.boss.update(dt, sealBody, vulnerable)) this.onBossEvent(e);
     this.mapHazards.update(dt, cam);
     this.magnetLeft = Math.max(0, this.magnetLeft - dt);
-    this.darkness.update(dt, this.seal.x, this.seal.y);
+    this.darkness.update(dt, this.seal.x, this.seal.y, cam.worldView);
 
     if (!this.dead) {
       this.checkFeeding(time);
@@ -625,6 +625,7 @@ export class GameScene extends Phaser.Scene {
       );
     }
     const big = def.tier >= 2;
+    this.effects.gulp(c, this.mouth);
     this.effects.chomp(c.x, c.y, big);
     audio.play(big ? SoundKeys.ChompBig : SoundKeys.Chomp);
     if (big) this.hitStop = HITSTOP.eatBig;
@@ -637,6 +638,7 @@ export class GameScene extends Phaser.Scene {
 
   private eatPredator(p: Predator): void {
     const def = p.def;
+    this.effects.gulp(p, this.mouth);
     this.effects.chomp(p.x, p.y, true);
     this.effects.growBurst(p.x, p.y);
     audio.play(SoundKeys.ChompBig);
@@ -820,13 +822,20 @@ export class GameScene extends Phaser.Scene {
     const gate = this.gates.blocking(s.x, s.y);
     if (gate && this.elapsed - this.lastGateHint > 4) {
       this.lastGateHint = this.elapsed;
-      this.effects.floatText(s.x, s.y - 70, `Too strong! Grow to size ${gate.minStage}`, '#ffe08a', 30);
+      this.effects.floatText(
+        s.x,
+        s.y - 70,
+        `Too strong! Grow to size ${gate.minStage}`,
+        '#ffe08a',
+        30,
+      );
       audio.play(SoundKeys.Bump);
     }
     const cloud = this.mapHazards.cloudAt(s.x, s.y);
     if (cloud && this.elapsed - this.lastCloudHint > 5) {
       this.lastCloudHint = this.elapsed;
-      const text = cloud === 'toxic' ? 'Toxic water! Hunger drains fast' : 'Hot water! Hunger drains fast';
+      const text =
+        cloud === 'toxic' ? 'Toxic water! Hunger drains fast' : 'Hot water! Hunger drains fast';
       this.effects.floatText(s.x, s.y - 70, text, cloud === 'toxic' ? '#9dff6a' : '#ffae6a', 28);
     }
   }

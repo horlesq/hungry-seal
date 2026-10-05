@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { COINS, SPAWN } from '../config/balance';
 import { Coin } from '../entities/Coin';
-import { pickOffscreenPoint, type Mover } from './spawnPoint';
+import { despawnRange, pickOffscreenPoint, type Mover } from './spawnPoint';
 import { currentMap } from '../world/GameMap';
 import { openSpot, WATER_BOTTOM, WATER_TOP } from './Spawner';
 
@@ -60,7 +60,7 @@ export class CoinField {
         collected++;
         continue;
       }
-      if (Math.hypot(coin.x - cx, coin.y - cy) > SPAWN.despawnDistance) {
+      if (Math.hypot(coin.x - cx, coin.y - cy) > despawnRange(camera.worldView)) {
         coin.despawn();
         continue;
       }

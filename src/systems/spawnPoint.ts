@@ -1,8 +1,28 @@
 // Shared helper: pick a point just outside the camera view, biased ahead of the seal's
 // movement, clamped to a vertical band. Used by every spawner (prey, hazards, predators, coins).
 import type Phaser from 'phaser';
+import { SPAWN } from '../config/balance';
 import { zoneAt, type ZoneId } from '../config/zones';
 import { canEat } from './feeding';
+
+/** Reference world view (16:9 desktop at size 1) that spawn densities are tuned for. */
+const REF_VIEW = { width: 1455, height: 720 };
+
+/** How much bigger (linear) the view is than the reference: a zoomed-out view needs more life. */
+export function viewScale(view: { width: number; height: number }): number {
+  return Math.max(1, Math.sqrt((view.width * view.height) / (REF_VIEW.width * REF_VIEW.height)));
+}
+
+/**
+ * Recycle distance from the view centre: the base distance, or farther when the view is big
+ * (spawns land just beyond the edge and must not be recycled right away).
+ */
+export function despawnRange(view: { width: number; height: number }): number {
+  return Math.max(
+    SPAWN.despawnDistance,
+    Math.hypot(view.width, view.height) / 2 + SPAWN.marginMax + 350,
+  );
+}
 
 /** Weighted random pick among entries allowed in the zone at world-y `y`, or null. */
 export function pickForZone<T extends { zones: readonly ZoneId[]; weight: number }>(

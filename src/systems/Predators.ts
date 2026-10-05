@@ -10,7 +10,7 @@ import { Predator } from '../entities/Predator';
 import { stepPredator, type PredatorContext, type PredatorEvent } from '../entities/predatorAI';
 import { predatorsAllowed } from './danger';
 import { canEat } from './feeding';
-import { pickOffscreenPoint } from './spawnPoint';
+import { despawnRange, pickOffscreenPoint } from './spawnPoint';
 import { openSpot } from './Spawner';
 import { currentMap } from '../world/GameMap';
 import { saves } from '../services/SaveService';
@@ -18,7 +18,6 @@ import { WATER_BOTTOM, WATER_TOP, type Threat } from './Spawner';
 
 const POOL_SIZE = 8;
 /** Predators are big and slow to re-find; keep them around longer than prey. */
-const DESPAWN_DISTANCE = SPAWN.despawnDistance * 1.6;
 const ARROW_INSET = 42;
 
 export interface SealInfo extends Threat {
@@ -99,7 +98,7 @@ export class Predators {
         this.events.push({ predator: p, event });
       }
       p.syncVisual(dt, time);
-      const far = Math.hypot(p.x - cx, p.y - cy) > DESPAWN_DISTANCE;
+      const far = Math.hypot(p.x - cx, p.y - cy) > despawnRange(camera.worldView) * 1.6;
       if (far && !p.isHunting) p.despawn();
       else this.alive.push(p);
     }

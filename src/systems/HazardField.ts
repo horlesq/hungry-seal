@@ -5,7 +5,7 @@ import { DANGER, SPAWN } from '../config/balance';
 import { HAZARD_LIST, HAZARDS, type HazardId } from '../config/hazards';
 import { Hazard } from '../entities/Hazard';
 import { hazardsAllowed } from './danger';
-import { pickForZone, pickOffscreenPoint, type Mover } from './spawnPoint';
+import { despawnRange, pickForZone, pickOffscreenPoint, type Mover } from './spawnPoint';
 import { openSpot, WATER_BOTTOM, WATER_TOP } from './Spawner';
 import { currentMap } from '../world/GameMap';
 
@@ -43,7 +43,7 @@ export class HazardField {
       h.step(dt);
       // Drifting into rock: drift back the other way.
       if (this.terrain.distance(h.x, h.y) < h.radius + 10) h.bounce();
-      if (Math.hypot(h.x - cx, h.y - cy) > SPAWN.despawnDistance) h.despawn();
+      if (Math.hypot(h.x - cx, h.y - cy) > despawnRange(camera.worldView)) h.despawn();
       else this.alive.push(h);
     }
 

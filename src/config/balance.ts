@@ -13,7 +13,8 @@ export const SEAL_MOTION: SealMotionParams = {
   levelOutRate: 1.6,
   floorDeflectRate: 7,
   steerDeadzone: 0.12,
-  radius: 22,
+  /** Body radius at size 1 (scale 0.6); grows with the seal (30 px per unit of scale). */
+  radius: 18,
   knockDecay: 4,
   boost: {
     speedMult: 1.75,
@@ -95,17 +96,21 @@ export const HUNGER = {
 
 export const GROWTH = {
   /** Growth points to go from stage N to N+1 (index 0 = stage 1 -> 2). Max stage = length + 1. */
-  stageCosts: [80, 200, 380, 600],
+  stageCosts: [60, 130, 220, 340, 480, 650, 850],
   /**
-   * Per stage, index 0 = stage 1. Bite tier = stage number. `zoom` pulls the camera back as
-   * the seal grows so a big seal still sees as much ocean around it.
+   * Per stage, index 0 = stage 1 (docs/LEVEL_DESIGN.md metrics: the seal grows ~4x, 106 ->
+   * 422 px long). Bite tier = stage number. `zoom` pulls the camera back as the seal grows so
+   * a big seal still sees plenty of ocean around it.
    */
   stages: [
-    { scale: 0.72, speedMult: 1, zoom: 1 },
-    { scale: 0.82, speedMult: 1.04, zoom: 0.96 },
-    { scale: 0.92, speedMult: 1.08, zoom: 0.91 },
-    { scale: 1.02, speedMult: 1.12, zoom: 0.86 },
-    { scale: 1.12, speedMult: 1.16, zoom: 0.82 },
+    { scale: 0.6, speedMult: 1, zoom: 1 },
+    { scale: 0.75, speedMult: 1.04, zoom: 0.95 },
+    { scale: 0.92, speedMult: 1.08, zoom: 0.89 },
+    { scale: 1.12, speedMult: 1.12, zoom: 0.82 },
+    { scale: 1.36, speedMult: 1.16, zoom: 0.75 },
+    { scale: 1.64, speedMult: 1.21, zoom: 0.68 },
+    { scale: 1.98, speedMult: 1.26, zoom: 0.61 },
+    { scale: 2.4, speedMult: 1.3, zoom: 0.55 },
   ],
 } as const;
 
@@ -143,7 +148,11 @@ export const SPAWN = {
   /** Spawn this far beyond the screen edge (min/max px). */
   marginMin: 80,
   marginMax: 340,
-  /** Creatures farther than this from the camera centre are recycled. */
+  /**
+   * Creatures farther than this from the camera centre are recycled (at least: a zoomed-out
+   * view pushes it out, see despawnRange). Counts and foodRadius above are for a 1455x720 view
+   * and scale with the view's size (viewScale).
+   */
   despawnDistance: 1500,
   /** Chance a spawn is placed ahead of the seal's movement. */
   aheadBias: 0.7,
@@ -242,4 +251,6 @@ export const EFFECTS = {
   trailInterval: 0.045,
   /** Ambient bubbles spawned per second around the camera. */
   ambientBubblesPerSec: 3,
+  /** Seconds an eaten creature takes to be pulled into the seal's mouth and shrink away. */
+  gulpTime: 0.16,
 } as const;

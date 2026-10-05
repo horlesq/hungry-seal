@@ -1007,7 +1007,7 @@ async function phase5(browser) {
 
   // Pufferfish puffs up near the seal and stings when eaten puffed.
   await inGame(page, (s) => {
-    window.__puffer = s.spawner.spawnAt('pufferfish', s.seal.x + 120, s.seal.y);
+    window.__puffer = s.spawner.spawnAt('pufferfish', s.seal.x + 260, s.seal.y);
     window.__pufferMotion = window.__puffer.motion;
   });
   await page.waitForTimeout(400);
@@ -1053,17 +1053,22 @@ async function phase5(browser) {
   );
   void hBefore;
 
-  // Orcas hunt even a max-size seal; anglerfish flee from it.
+  // Orcas (tier 8) hunt a size-7 seal and flee a full-grown one; anglerfish flee it too.
   await inGame(page, (s) => {
+    s.seal.setStage(7, false);
     window.__orca = s.predators.spawnAt('orca', s.seal.x - 380, s.seal.y, 0);
   });
   await page.waitForTimeout(400);
   const orcaState = await page.evaluate(() => window.__orca.motion.state);
-  check(
-    'orca hunts even a max-size seal',
-    orcaState === 'notice' || orcaState === 'chase',
-    orcaState,
-  );
+  check('orca hunts a size-7 seal', orcaState === 'notice' || orcaState === 'chase', orcaState);
+  await inGame(page, (s) => {
+    window.__orca.despawn();
+    s.seal.setStage(8, false);
+    window.__orca = s.predators.spawnAt('orca', s.seal.x - 380, s.seal.y, 0);
+  });
+  await page.waitForTimeout(400);
+  const orcaFlee = await page.evaluate(() => window.__orca.motion.state);
+  check('orca flees a full-grown seal', orcaFlee === 'flee', orcaFlee);
   await inGame(page, (s) => {
     window.__orca.despawn();
     window.__angler = s.predators.spawnAt('anglerfish', s.seal.x + 200, s.seal.y, Math.PI);

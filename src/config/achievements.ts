@@ -62,7 +62,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     name: 'Fully Grown',
     description: 'Grow to full size',
     metric: 'maxStage',
-    target: 5,
+    target: 8,
     gems: 3,
   },
   {

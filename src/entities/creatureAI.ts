@@ -51,6 +51,11 @@ export interface CreatureSteerContext {
   threatY: number;
   /** Only a threat that can eat this creature makes it flee. */
   threatActive: boolean;
+  /**
+   * How much farther the threat's mouth reaches than a size-1 seal's: flee and puff distances
+   * grow by this, so prey still see a big seal coming before it's on them. Optional (0).
+   */
+  threatReach?: number;
   /** Preferred vertical range (from the creature's zones). */
   bandTop: number;
   bandBottom: number;
@@ -144,7 +149,8 @@ export function stepCreatureMotion(
   if (p.flee && ctx.threatActive) {
     const dx = m.x - ctx.threatX;
     const dy = m.y - ctx.threatY;
-    if (dx * dx + dy * dy < p.fleeRadius * p.fleeRadius) {
+    const r = p.fleeRadius + (ctx.threatReach ?? 0);
+    if (dx * dx + dy * dy < r * r) {
       if (m.fleeTimer <= 0) m.fleeJitter = (ctx.random() - 0.5) * 0.8;
       m.fleeTimer = FLEE_MEMORY;
     }
@@ -190,7 +196,10 @@ export function stepCreatureMotion(
       if (m.puffTimer <= 0) m.puffCooldown = PUFF_RECOVER;
     } else if (m.puffCooldown > 0) {
       m.puffCooldown -= dt;
-    } else if (Math.hypot(m.x - ctx.threatX, m.y - ctx.threatY) < PUFF_RADIUS) {
+    } else if (
+      Math.hypot(m.x - ctx.threatX, m.y - ctx.threatY) <
+      PUFF_RADIUS + (ctx.threatReach ?? 0)
+    ) {
       m.puffTimer = PUFF_TIME;
     }
     m.puffed = m.puffTimer > 0;
@@ -266,7 +275,12 @@ export function stepCreatureMotion(
 }
 
 /** Walkers follow the ground under them and turn around at cliffs and walls. */
-function walkOnGround(m: CreatureMotion, terrain: CreatureTerrain, radius: number, dt: number): void {
+function walkOnGround(
+  m: CreatureMotion,
+  terrain: CreatureTerrain,
+  radius: number,
+  dt: number,
+): void {
   const nx = m.x + m.vx * dt;
   const probe = m.y - radius * 2;
   const ground = terrain.groundBelow(nx, probe, radius * 6);
@@ -277,7 +291,11 @@ function walkOnGround(m: CreatureMotion, terrain: CreatureTerrain, radius: numbe
     m.y = next;
     return;
   }
-  if (next === null || Math.abs(next - m.y) > WALK_MAX_STEP || terrain.distance(nx, m.y) < radius * 0.5) {
+  if (
+    next === null ||
+    Math.abs(next - m.y) > WALK_MAX_STEP ||
+    terrain.distance(nx, m.y) < radius * 0.5
+  ) {
     // Cliff or wall ahead: turn around.
     m.heading = Math.cos(m.heading) >= 0 ? Math.PI : 0;
     m.targetHeading = m.heading;

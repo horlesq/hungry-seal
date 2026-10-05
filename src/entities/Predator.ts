@@ -66,7 +66,7 @@ export class Predator extends Phaser.GameObjects.Sprite {
         .setDepth(Depths.Glow);
       this.glow
         .setTint(def.glow.color)
-        .setScale(def.glow.size * textureScale(this.scene, TextureKeys.Glow))
+        .setScale(def.glow.size * def.scale * textureScale(this.scene, TextureKeys.Glow))
         .setVisible(true);
     } else {
       this.glow?.setVisible(false);
@@ -108,9 +108,11 @@ export class Predator extends Phaser.GameObjects.Sprite {
     const warning = m.state === 'notice';
     if (warning && Math.floor(time / 90) % 2 === 0) {
       // High contrast: a white blink (brightness, not hue) instead of a red tint.
-      if (saves.data.settings.highContrast) this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+      if (saves.data.settings.highContrast)
+        this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       else this.setTint(0xff8080).setTintMode(Phaser.TintModes.MULTIPLY);
-    } else if (this.def.tint !== undefined) this.setTint(this.def.tint).setTintMode(Phaser.TintModes.MULTIPLY);
+    } else if (this.def.tint !== undefined)
+      this.setTint(this.def.tint).setTintMode(Phaser.TintModes.MULTIPLY);
     else this.clearTint();
     this.alert
       .setVisible(warning || (m.state === 'chase' && m.stateTime < 0.4))
@@ -119,10 +121,12 @@ export class Predator extends Phaser.GameObjects.Sprite {
     const g = this.def.glow;
     if (g && this.glow) {
       // Offset is authored facing right; mirror vertically when facing left, then rotate.
-      const oy = g.y * (this.facing >= 0 ? 1 : -1);
+      const k = this.def.scale;
+      const ox = g.x * k;
+      const oy = g.y * k * (this.facing >= 0 ? 1 : -1);
       const sin = Math.sin(m.heading);
       this.glow
-        .setPosition(m.x + g.x * cos - oy * sin, m.y + g.x * sin + oy * cos)
+        .setPosition(m.x + ox * cos - oy * sin, m.y + ox * sin + oy * cos)
         // Pulse; flare while about to strike.
         .setAlpha(warning ? 1 : 0.65 + 0.25 * Math.sin(time * 0.004));
     }

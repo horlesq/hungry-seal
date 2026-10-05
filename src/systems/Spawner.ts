@@ -20,10 +20,10 @@ import type { TerrainField } from '../world/terrain';
 import { getViewport } from '../services/Viewport';
 import { Creature, School } from '../entities/Creature';
 import { stepCreatureMotion, type CreatureSteerContext } from '../entities/creatureAI';
-import { canEat } from './feeding';
-import { pickForZone, pickOffscreenPoint, pickSpawn } from './spawnPoint';
+import { canEat, extraReach } from './feeding';
+import { despawnRange, pickForZone, pickOffscreenPoint, pickSpawn, viewScale } from './spawnPoint';
 
-const POOL_SIZE = 120;
+const POOL_SIZE = 150;
 export const WATER_TOP = WORLD.surfaceY + 16;
 export const WATER_BOTTOM = WORLD.floorY - 16;
 /** Birds only spawn while the view is within this distance of the water line. */
@@ -79,6 +79,7 @@ export class Spawner {
       threatX: 0,
       threatY: 0,
       threatActive: false,
+      threatReach: 0,
       bandTop: 0,
       bandBottom: 0,
       hardTop: WATER_TOP,
@@ -127,9 +128,13 @@ export class Spawner {
     const ctx = this.ctx;
     ctx.threatX = seal.x;
     ctx.threatY = seal.y;
+    ctx.threatReach = extraReach(seal.stage);
     let swimmers = 0;
     let flyers = 0;
     let food = 0;
+    const k = viewScale(camera.worldView);
+    const range = despawnRange(camera.worldView);
+    const foodRadius = SPAWN.foodRadius * k;
 
     for (const c of this.alive) {
       const leader = c.school?.leader;
@@ -145,19 +150,20 @@ export class Spawner {
       stepCreatureMotion(c.motion, c.params, ctx, dt);
       c.syncVisual(dt);
 
-      if (Math.hypot(c.x - cx, c.y - cy) > SPAWN.despawnDistance) c.despawn();
+      if (Math.hypot(c.x - cx, c.y - cy) > range) c.despawn();
       else if (c.flies) flyers++;
       else {
         swimmers++;
-        if (ctx.threatActive && Math.hypot(c.x - cx, c.y - cy) < SPAWN.foodRadius) food++;
+        if (ctx.threatActive && Math.hypot(c.x - cx, c.y - cy) < foodRadius) food++;
       }
     }
 
     this.timer -= dt;
     if (this.timer <= 0) {
       this.timer = SPAWN.interval;
-      const short = food < SPAWN.minFood;
-      if (swimmers < SPAWN.targetAlive || (short && swimmers < SPAWN.maxAlive)) {
+      const short = food < SPAWN.minFood * k;
+      const maxAlive = Math.min(POOL_SIZE - SPAWN.maxFlyers, SPAWN.maxAlive * k);
+      if (swimmers < SPAWN.targetAlive * k || (short && swimmers < maxAlive)) {
         this.spawnOffscreen(camera, seal, short);
       }
     }
