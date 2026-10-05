@@ -123,7 +123,7 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] Pooling audit (creatures, hazards, predators, coins, float texts, rings, glows all pooled; only rare pickups are created/destroyed) and `npm run soak`: 4-minute run through every zone + 20 restarts with flat heap (~76 MB after GC), bounded objects, no listener growth, 165 fps
 **Exit (Feature-complete beta):** everything in v1 scope present and balanced.
 
-## Phase 8 — Art, audio, maps and polish ✅ (2026-10-03)
+## Phase 8 — Art, audio, maps and polish (level design + art pass in progress)
 - [x] Final consistent art style pass (Hungry Shark-like chunky cartoon): seal, creatures, backgrounds, UI, icons
   - [x] Blender pipeline: `tools/blender/bridge.mjs` drives Blender over MCP; toon shader + inverted-hull outline
   - [x] All 9 seal skins modeled in Blender (`tools/blender/seal.py`), animated sheets (swim, bite, turn)
@@ -135,6 +135,10 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] SFX set (new: chest, gem, magnet, mission, combo, zone, thud, puff, unlock) and 3 music loops (menu, shallows, deep) crossfading by depth; music/sfx volume settings
 - [x] Menu/shop/game-over UI polish, transitions; map unlock shown on results
 - [x] Accessibility: reduced motion for UI intros, screen-shake toggle, high-contrast (colour-blind safe) warnings
+- [x] Level design pass ([LEVEL_DESIGN.md](LEVEL_DESIGN.md), `level-design` skill): 40,000 px maps with beaches at both ends, named regions with danger 1-5 (banner + pause map), size-gate currents, 6 pearls per map (3 open the next map), giant-squid boss lairs, eel dens, urchin beds, minefields, toxic/heat clouds, fishing-boat lanes (nets, harpoons, crates), barracuda packs and hammerheads; every map checked reachable per size (`world/mapCheck.test.ts`); terrain bake in a worker
+- [x] Art pass 2 ([ART_DIRECTION.md](ART_DIRECTION.md), `create-game-assets` skill): GPU terrain shader with Blender material tiles; Blender barracuda, hammerhead, moray, electric eel, three squid bosses, fishing boat, net, harpoon, crate; rock/coral/ice clusters set into the terrain edge; beach props (lifeguard tower, umbrellas, sandcastles, huts)
+- [ ] Balance the 40k maps (balance bot per map) and playtest by hand ([REGRESSION.md](REGRESSION.md))
+- [ ] Size ladder: 8 sizes (~4x growth) with camera zoom-out, re-tiered prey and predators, bigger-prey feel (LEVEL_DESIGN.md metrics); opens the size-7 boss gates and boat ramming
 
 ## Phase 9 — Performance, mobile, and release
 - [ ] Mobile perf profiling (target 60 FPS mid-range); texture atlases, resolution scaling

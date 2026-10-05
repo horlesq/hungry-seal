@@ -135,8 +135,9 @@ export class TerrainShader {
   private readonly overWater: Phaser.GameObjects.Shader;
   private readonly uniforms: Record<string, number | number[]>;
   private px = 1;
-  private origin = [0, 0];
-  private size = [1, 1];
+  /** Each quad's world rect (origin, size), read by its uniforms. */
+  private readonly mainRect = { origin: [0, 0], size: [1, 1] };
+  private readonly bandRect = { origin: [0, 0], size: [1, 1] };
 
   constructor(scene: Phaser.Scene, map: GameMap) {
     const sdfKey = uploadSdf(scene, map);
@@ -161,7 +162,7 @@ export class TerrainShader {
       uFogDeep: rgb(p.water.abyss),
       uTiles: [...(p.tiles ?? DEFAULT_TILES)],
     };
-    const make = (band: [number, number], depth: number) => {
+    const make = (band: [number, number], depth: number, rect: { origin: number[]; size: number[] }) => {
       const shader = scene.add
         .shader(
           {
@@ -170,8 +171,8 @@ export class TerrainShader {
             setupUniforms: (set: (name: string, value: unknown) => void) => {
               for (const [k, v] of Object.entries(this.uniforms)) set(k, v);
               set('uBand', band);
-              set('uOrigin', this.origin);
-              set('uSize', this.size);
+              set('uOrigin', rect.origin);
+              set('uSize', rect.size);
               set('uPx', this.px);
             },
           },
@@ -187,10 +188,11 @@ export class TerrainShader {
       shader.setTextureCoordinates(0, 0, 1, 0, 0, 1, 1, 1);
       return shader;
     };
-    this.main = make([-1e9, 1e9], Depths.Terrain);
+    this.main = make([-1e9, 1e9], Depths.Terrain, this.mainRect);
     this.overWater = make(
       [WORLD.surfaceY - WATERLINE_BAND, WORLD.surfaceY + WATERLINE_BAND],
       Depths.TerrainOverWater,
+      this.bandRect,
     );
   }
 
@@ -200,12 +202,26 @@ export class TerrainShader {
     const y = v.y - MARGIN;
     const w = v.width + MARGIN * 2;
     const h = v.height + MARGIN * 2;
-    this.origin = [x, y];
-    this.size = [w, h];
     this.px = 1 / camera.zoom;
-    for (const s of [this.main, this.overWater]) s.setPosition(x, y).setSize(w, h);
-    // The water-line copy only matters when the band is in view.
-    this.overWater.setVisible(v.y < WORLD.surfaceY + WATERLINE_BAND && v.bottom > WORLD.surfaceY - WATERLINE_BAND);
+    this.place(this.main, this.mainRect, x, y, w, h);
+    // The water-line copy only covers the band (when it's in view).
+    const by0 = Math.max(y, WORLD.surfaceY - WATERLINE_BAND);
+    const by1 = Math.min(y + h, WORLD.surfaceY + WATERLINE_BAND);
+    this.overWater.setVisible(by1 > by0);
+    if (by1 > by0) this.place(this.overWater, this.bandRect, x, by0, w, by1 - by0);
+  }
+
+  private place(
+    shader: Phaser.GameObjects.Shader,
+    rect: { origin: number[]; size: number[] },
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ): void {
+    rect.origin = [x, y];
+    rect.size = [w, h];
+    shader.setPosition(x, y).setSize(w, h);
   }
 
   destroy(): void {

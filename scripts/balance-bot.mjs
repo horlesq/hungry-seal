@@ -14,8 +14,10 @@
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 
+const PORT = Number(process.env.BOT_PORT ?? 5196);
+// No hot reload or file watching: editing src/ during a long run must not reload the page.
 const server = await createServer({
-  server: { port: Number(process.env.BOT_PORT ?? 5196), strictPort: true },
+  server: { port: PORT, strictPort: true, hmr: false, watch: null },
   logLevel: 'error',
 });
 await server.listen();
@@ -36,7 +38,7 @@ if (upgradeLevel > 0) {
     );
   }, upgradeLevel);
 }
-await page.goto('http://localhost:5196/');
+await page.goto(`http://localhost:${PORT}/`);
 await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Menu'));
 if (process.env.BOT_MAP) {
   // Unlock and select the map, then start the run directly (Play goes via the map select).

@@ -34,7 +34,12 @@ Play feel (a few real runs):
 ### Maps, audio and settings (Phase 8)
 - [ ] On every map: swim along walls, through tunnels, caves and arches; the seal slides, never sticks or passes through rock; creatures don't swim inside rock.
 - [ ] Crabs walk on the real seabed; chests sit on the ground at the treasure spots and come back later.
-- [ ] Map select: locked maps show the score needed and progress; a run that passes the score shows "New map unlocked" and the map opens.
+- [ ] Map select: locked maps show the pearls needed and progress; the third pearl on a map opens the next one ("New map unlocked").
+- [ ] Size gates push a small seal back with the "Too strong" badge and let a big enough one through; the gate looks like a current.
+- [ ] Pearls are saved the moment they're taken (quit right after and they stay found); grotto pearls fit a small seal only.
+- [ ] Boss: the bar shows at the bottom in the lair, the squid telegraphs (flash) before each lunge/sweep, can only be bitten while exposed, and drops treasure when beaten.
+- [ ] Fishing boats: nets slow, harpoons hurt, both readable; boats sit on the water line on every screen size.
+- [ ] Eels poke out of their dens, lunge/zap with a visible wind-up; rock/coral/ice clusters along the edges never hide a passage or look like they float.
 - [ ] The pause map shows the seal in the right place.
 - [ ] Music changes when diving into the deep and back up; volume sliders and the shake / high-contrast toggles apply right away and are remembered.
-- [ ] No seams or flicker between terrain chunks while swimming fast (boost) across the map.
+- [ ] Terrain shader: no seams or flicker while swimming fast (boost) across the map; beaches blend from sand to rock without a hard line at the water; compare with `?canvasTerrain` if anything looks off.

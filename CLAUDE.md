@@ -7,6 +7,8 @@ Web-based side-scrolling arcade game in the style of Hungry Shark Evolution / Fe
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — stack, folder layout, scenes, systems, conventions
 - [docs/ROADMAP.md](docs/ROADMAP.md) — development phases from scaffold to finished product (track progress here)
 - [docs/ASSETS.md](docs/ASSETS.md) — art/audio style, sources, manifest rules
+- [docs/LEVEL_DESIGN.md](docs/LEVEL_DESIGN.md) — size metrics, passage widths, map structure, regions, validation
+- [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md) — visual system and technical contract every asset is checked against
 
 ## Stack
 TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circle contact checks (see ARCHITECTURE.md). No UI framework; HUD and menus are Phaser scenes. Targets desktop and mobile browsers.
@@ -19,7 +21,7 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 - `node tools/blender/bridge.mjs exec tools/blender/<name>.py` — rebuild and render a Blender-modeled sprite (Blender open with the MCP add-on; see ASSETS.md).
 - `npm run soak` — long run + 20 restarts; fails on growing objects, listeners or heap.
 - Release checklist: [docs/REGRESSION.md](docs/REGRESSION.md).
-- URL flags: `?debug` (overlay + hit circles, or press `), `?calm` (no hazards/predators).
+- URL flags: `?debug` (overlay + hit circles, or press `), `?calm` (no hazards/predators), `?canvasTerrain` (old canvas terrain instead of the shader).
 - Git: `main` holds finished phases; do each phase on a `phase-N-...` branch.
 - Phaser API lookup: grep `node_modules/phaser/types/phaser.d.ts`.
 - Skills live in `.agents/skills/` (tracked, versions in `skills-lock.json`); `.claude/skills/` holds junctions to them (gitignored, recreate after cloning). Use `frontend-design` + `game-ui-ux` for UI work, `phaser-coder` for Phaser code.

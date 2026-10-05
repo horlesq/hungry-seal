@@ -5,12 +5,13 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
 
 ## Camera and world
 - Side view, camera follows the seal with slight look-ahead.
-- **Maps (done):** each map is a bounded world (~14-16k px wide, ~11-12 screens) with solid terrain like Hungry Shark: islands above the water, reefs and arches, kelp slopes, a shipwreck, a deep trench with a cave system and treasure chambers. You slide along rock (a hard bump thuds); creatures and predators steer around it; crabs walk on the real ground. Creatures still spawn around the camera by depth zone, only in open water.
-  - **Seal Bay** (free): lighthouse island, reef arch, kelp slope, wreck ledge, swim-through rock ring, trench caves, pillars, sea-stack island.
-  - **Arctic** (unlocks at 12,000 points in one run): ice floes with icicles along the surface, giant icebergs, an ice cave, a seamount arch. Lots of penguins, no turtles or pufferfish, twice the orcas.
-  - **Tropical Lagoon** (unlocks at 30,000 points): coral lagoon, sunken ruins, a volcano with a lava tube under it, trench vents. Extra turtles and pufferfish, no penguins.
-  - Each map has its own colors, zone names, decor (Blender-rendered coral, kelp, wrecks, landmarks), creature/predator mix and treasure spots (chests respawn 150 s after opening; a random chest can also appear on the abyss floor).
-  - Map select after the first run (Play -> map cards with a picture of the map, best score there, unlock progress). The pause screen shows the whole map with where you are and the treasure spots.
+- **Maps (done):** each map is a bounded 40,000 px world (~30 screens across) with solid terrain like Hungry Shark, beaches at both ends and named regions with a danger rating (1-5, on the region banner and the pause map). Metrics, layouts and region tables: [LEVEL_DESIGN.md](LEVEL_DESIGN.md). You slide along rock (a hard bump thuds); creatures and predators steer around it; crabs walk on the real ground. Creatures spawn around the camera by depth zone, weighted by the region's own mix, only in open water.
+  - **Goals per map:** 6 pearls (some in grottos only a small seal fits; saved the moment you take one), a giant-squid boss in its lair (it telegraphs, lunges or sweeps its arms, then is exposed: bite it to take a heart), chests. 3 pearls open the next map; all pearls + the boss = mastered.
+  - **Size gates:** strong currents across the entrances of the dangerous regions push back a seal below the gate's size ("Too strong! Grow to size N").
+  - **Seal Bay** (free) -> **Arctic** (3 Seal Bay pearls) -> **Tropical Lagoon** (3 Arctic pearls). Older saves with a best score of 12,000 / 30,000 keep their unlocks.
+  - Map dangers on top of the usual ones: eel dens in cave walls, urchin beds, chained minefields, toxic and volcanic-heat clouds, fishing boats on surface lanes (see Hazards).
+  - Each map has its own colors, decor (Blender-rendered coral, kelp, wrecks, landmarks, beach props, rock/coral/ice clusters set into the rock edges), creature/predator mix and treasure spots (chests respawn 150 s after opening; a random chest can also appear on the abyss floor).
+  - Map select after the first run (Play -> map cards with a picture of the map, best score, pearls, unlock progress). The pause screen shows the whole map: where you are, regions and their danger, pearls found and missing, gates, chests and the boss lair.
 - Vertical range from sky through surface to the abyss; depth zones are the same on every map:
 - Depth zones, each with own palette, creatures and hazards:
   1. **Surface / Sky** — water line, seabirds, jumping fish, boats (later). Seal can leap and fly ballistically.
@@ -19,7 +20,7 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
   4. **Deep** — anglerfish, mines, orcas, dim lighting.
   5. **Abyss** — endgame zone, big predators, rich rewards, hardest hunger drain.
 - A run's difficulty scales with elapsed time (and depth).
-- Measured with terrain (balance bot, human mode, no upgrades, 2026-10-03): Seal Bay 3:26 / 4:58, Arctic 6:07, Tropical 2:03 / 8:10; scores 8k-59k. Same spread as before maps; unlock scores set so each map takes a few good runs.
+- Measured with terrain on the earlier 14-16k maps (balance bot, human mode, no upgrades, 2026-10-03): Seal Bay 3:26 / 4:58, Arctic 6:07, Tropical 2:03 / 8:10. The 40k maps still need a balance pass.
 
 ## Controls
 - **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Speed ramps from 0 at 18 px to full at 110 px from the seal, so pointing straight at nearby prey still chases at full speed. Mouse leaving the canvas = glide.
@@ -70,11 +71,14 @@ Appear from 25 s into a run: 2 allowed at first, +2 per minute, max 7 (`DANGER` 
 | Jellyfish ✅ | Drifts slowly, bobs and pulses; reef/ocean/deep | 12 damage, 0.7 s stun, knockback |
 | Sea mine ✅ | Sways on its chain, blinks; ocean/deep/abyss | 30 damage, explodes (gone), big knockback |
 | Pufferfish ✅ | Puffs up near the seal for 2 s, then needs 2.5 s to recover | Eating it puffed stings (see prey table) |
-| Fishing net / hook (later) | Hangs from surface | Slows/traps |
-| Toxic waste / oil (later) | Zone | Drains hunger fast |
+| Urchin bed ✅ | Fixed on the seabed in beds (map config) | 8 damage, 0.4 s stun |
+| Minefield ✅ | Chained mines in fixed fields (map config) | as sea mine |
+| Toxic / heat cloud ✅ | Map zones (pollution, volcanic vents) | Hunger drains 3x (toxic) / 2x (heat) inside |
+| Fishing boat ✅ | Patrols a surface lane; the crew attacks a seal within 650 px and 1,000 px deep | Nets sink and trap (6 damage, 2.2 s at 30% speed); harpoons 16 damage + knockback; a size-7 seal rams it for 3 crates of fish |
+| Eel den ✅ | Moray in a cave wall: tenses, lunges out 230 px, snaps back; electric eel: charges, zaps 240 px around | 18 / 14 damage; edible at tier 5 / 6 |
 
 ### Predators
-- Shark ✅ (ocean/deep, from 45 s), Orca ✅ (ocean/deep, from 3 min; tier 6 = never edible outside a frenzy, 40 damage), Anglerfish ✅ (deep/abyss while you're there: lurks still behind a glowing lure, 0.35 s telegraph, short 540 px/s lunge; edible from size 4). Giant squid later.
+- Shark ✅ (ocean/deep, from 45 s), Orca ✅ (ocean/deep, from 3 min; tier 6 = never edible outside a frenzy, 40 damage), Anglerfish ✅ (deep/abyss while you're there: lurks still behind a glowing lure, 0.35 s telegraph, short 540 px/s lunge; edible from size 4), Barracuda ✅ (packs of 3-4 in their home regions; fast, small bites), Hammerhead ✅ (tier 6, open-water regions, charges). Giant squid bosses ✅ (one per map lair, 6-8 hearts; see Maps).
 - States: patrol → notice (0.8 s telegraph: stops, turns to the seal, flashes red, "!") → chase (370 px/s, turns slower than the seal, gives up after 6 s or 900 px) → bite → recover (swims off, then 4 s cooldown). Only hunts a seal that's in the water. Off-screen hunters show a red arrow at the screen edge.
 - Shark bite: 28 damage + knockback. Outrun it with boost, out-turn it, or leap out of the water.
 - Seal outgrowing a predator's tier (shark = tier 5, max size) makes it flee and turns it into a big reward (45 nutrition, 250 score, 5 coins).

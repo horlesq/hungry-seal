@@ -8,7 +8,11 @@ import { createServer } from 'vite';
 const SECONDS = Number(process.env.SOAK_SECONDS ?? 240);
 const RESTARTS = Number(process.env.SOAK_RESTARTS ?? 20);
 const PORT = 5191;
-const server = await createServer({ server: { port: PORT, strictPort: true }, logLevel: 'error' });
+const server = await createServer({
+  // No hot reload or file watching: editing src/ during the soak must not reload the page.
+  server: { port: PORT, strictPort: true, hmr: false, watch: null },
+  logLevel: 'error',
+});
 await server.listen();
 const browser = await chromium.launch({
   channel: process.env.PLAYTEST_BROWSER ?? 'chrome',
