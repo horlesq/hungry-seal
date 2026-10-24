@@ -90,13 +90,18 @@ export const HUNGER = {
     deep: 1.35,
     abyss: 1.6,
   } satisfies Record<ZoneId, number>,
+  /**
+   * Bigger seals burn more (index 0 = size 1). A big seal sees ~3x more ocean, swims faster
+   * and has a bigger mouth, so without this it never goes hungry once grown.
+   */
+  sizeMultiplier: [1, 1.08, 1.17, 1.28, 1.4, 1.53, 1.67, 1.82],
   /** Below this fraction the HUD bar flashes. */
   lowFraction: 0.25,
 } as const;
 
 export const GROWTH = {
   /** Growth points to go from stage N to N+1 (index 0 = stage 1 -> 2). Max stage = length + 1. */
-  stageCosts: [60, 130, 220, 340, 480, 650, 850],
+  stageCosts: [60, 140, 260, 420, 620, 880, 1200],
   /**
    * Per stage, index 0 = stage 1 (docs/LEVEL_DESIGN.md metrics: the seal grows ~4x, 106 ->
    * 422 px long). Bite tier = stage number. `zoom` pulls the camera back as the seal grows so
@@ -127,6 +132,13 @@ export const FEEDING = {
   pufferDamage: 14,
   pufferKnockback: 300,
   pufferStun: 0.4,
+  /**
+   * Prey this many tiers below the seal's size still give full nutrition and growth; each
+   * tier further below divides them by (1 + outgrownFalloff * tiers): a minnow is worth 40%
+   * to a size-8 seal, a turtle 63%.
+   */
+  outgrownFree: 2,
+  outgrownFalloff: 0.3,
 } as const;
 
 export const SPAWN = {

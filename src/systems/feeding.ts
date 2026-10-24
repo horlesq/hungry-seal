@@ -6,6 +6,16 @@ export function canEat(sealStage: number, preyTier: number): boolean {
   return sealStage >= preyTier;
 }
 
+/**
+ * How much a meal of `preyTier` is worth to a seal of `sealStage` (nutrition and growth):
+ * full value up to FEEDING.outgrownFree tiers below its size, then less and less, so a big
+ * seal has to hunt big prey instead of grazing on minnows (Hungry Shark style).
+ */
+export function mealValue(sealStage: number, preyTier: number): number {
+  const outgrown = sealStage - preyTier - FEEDING.outgrownFree;
+  return outgrown > 0 ? 1 / (1 + FEEDING.outgrownFalloff * outgrown) : 1;
+}
+
 export function circlesOverlap(
   ax: number,
   ay: number,

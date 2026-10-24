@@ -20,7 +20,7 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
   4. **Deep** — anglerfish, mines, orcas, dim lighting.
   5. **Abyss** — endgame zone, big predators, rich rewards, hardest hunger drain.
 - A run's difficulty scales with elapsed time (and depth).
-- Measured with terrain on the earlier 14-16k maps (balance bot, human mode, no upgrades, 2026-10-03): Seal Bay 3:26 / 4:58, Arctic 6:07, Tropical 2:03 / 8:10. The 40k maps still need a balance pass.
+- Measured on the 40k maps with the 8-size ladder: see Difficulty curve below.
 
 ## Controls
 - **Mouse:** seal swims toward the cursor without clicking (Feeding Frenzy / Hungry Shark PC style); hold left button to boost. Speed ramps from 0 at 18 px to full at 110 px from the seal, so pointing straight at nearby prey still chases at full speed. Mouse leaving the canvas = glide.
@@ -36,7 +36,7 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
 
 ### Hunger (health)
 - Single bar (max 100). Drains continuously; rate rises with time in the run and with depth zone.
-  - Current tuning: 2.1/s at the start (full bar lasts ~48 s without food), +100% after 360 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6.
+  - Current tuning: 2.1/s at the start (full bar lasts ~48 s without food), +100% after 360 s, zone multiplier reef 1.0 / ocean 1.15 / deep 1.35 / abyss 1.6, size multiplier x1 at size 1 to x1.82 at size 8 (`HUNGER.sizeMultiplier`): a big seal sees ~3x more ocean, swims faster and has a bigger mouth, so without it a grown seal never went hungry.
 - Eating restores hunger by the prey's nutrition value.
 - Hazards and predators deal damage to the same bar. Zero = run ends.
 - Starvation warning: bar flashes and a red screen vignette pulses below 25%.
@@ -46,13 +46,14 @@ You are a hungry seal exploring a big ocean map. Your belly is always emptying. 
 - Bite on contact when seal stage (bite tier) >= prey tier. Otherwise the seal bumps off: it loses most of its speed, the prey bolts, and "Too big!" pops up (no damage yet).
 - Predators bite the seal with their mouth (see Damage).
 - Eating gives: nutrition, score (x combo), growth progress, sometimes a coin.
+- **Outgrown prey** (Hungry Shark style): prey up to 2 tiers below your size give full nutrition and growth; each tier further below divides them by (1 + 0.3 x tiers) (`mealValue` in systems/feeding.ts). A minnow is worth 40% to a size-8 seal, a turtle 63%: a big seal has to hunt big prey and the predators it has outgrown. Score isn't reduced.
 - Feedback: gulp squash, star sparks, floating "+score" text; brief hit-stop on bigger prey.
 
 ### Growth
 - Growth meter fills from eating. Filling it grows the seal by a stage (8 sizes per run, ~4x longer from size 1 to 8) and raises bite tier: size N eats tier N. Stage resets at the start of each run.
   - Size is physical: everything edible at a size looks clearly smaller than the seal, and predators are bigger than it until it outgrows them. Small seals fit through grottos; big ones push through size-gate currents. The camera pulls back as the seal grows (zoom 1 -> 0.55) and the ocean fills up to match (spawn counts follow the view size).
   - Eating: the meal is pulled into the mouth and shrinks away (a gulp), with the chomp burst.
-  - Current tuning (`GROWTH` in balance.ts, metrics table in [LEVEL_DESIGN.md](LEVEL_DESIGN.md)): stage costs 60 / 130 / 220 / 340 / 480 / 650 / 850 growth points; scale 0.6 -> 2.4; top speed up to +30%.
+  - Current tuning (`GROWTH` in balance.ts, metrics table in [LEVEL_DESIGN.md](LEVEL_DESIGN.md)): stage costs 60 / 140 / 260 / 420 / 620 / 880 / 1200 growth points; scale 0.6 -> 2.4; top speed up to +30%. A good player reaches size 5-6 around 3-4 min and size 7 (the boss) around 5 min.
 
 ### Combo and Frenzy
 - Eating within 2.2 s of the last meal builds a combo (done). Multiplier on score: x2 at 2 meals, x3 at 5, x4 at 10, x5 at 16. Getting hurt breaks the combo. Combos of 5+ get a "N COMBO!" callout when they end. HUD shows multiplier, count and a shrinking timer bar.
@@ -158,6 +159,12 @@ First run only (until the first run ends): bottom-centre hints — how to swim (
 - 2-4 min: predators frequent, hunger drain noticeably higher; player must have grown.
 - Without upgrades a typical first run lasts ~2-3 min; with upgrades 5+ min.
 - Measured (Phase 7, human-like balance bot, which plays better than a first-timer): fresh save 1:49 / 2:15 / 2:54 / 3:42 / 3:54 / 10:00+ (median ~3:20, deaths mostly sharks); all upgrades at level 3: 7:41, 10:00+, and a run still at full health at 4:46 when stopped. Coins per run: ~30-140 fresh, ~430-490 upgraded, plus mission rewards. Maxing every upgrade costs 13,720 coins (roughly 40-60 runs).
+- Measured on the 40k maps (Phase 8, 2026-10-24, `BOT_MAP=<map> npm run balance -- human 600 [3]`). The bot got smarter in this pass (hunts outgrown predators, times pufferfish, keeps a berth that grows with its size), so it plays better than the Phase 7 bot.
+  - Before the size changes: 4 of 6 fresh runs never ended (size 8 by 3-4 min, hunger pinned near full, 10:00+ and 200-380k score).
+  - After, fresh save: Seal Bay 1:11 / 4:07 / 6:38, Arctic 4:10 / 5:21 (one more run stuck under a floe, a bot fault), Tropical 5:11 / 5:52 / 7:32. Median ~5:10, deaths spread over stings, mines, orcas and late starvation; coins ~190-560 per run.
+  - All upgrades at level 3: Seal Bay 7:02, Arctic 10:00+, Tropical 10:00+ (~950-1,000 coins in 10 min).
+  - Arctic's Floe Fields were made a calm teaching stretch (no barracuda packs): before, 4 of 5 fresh Arctic runs died there at size 1-2.
+  - Open: Tropical is the third map but plays a little easier than Seal Bay for the bot; and scores now run 30-150k for a good run, so the old score unlock (Arctic 12,000, Tropical 30,000) opens the maps after one or two good runs, before the pearls do.
 
 ## Juice checklist
 Screen shake, hit-stop on big bites, particles (bubbles, blood-free chomp bits/stars), water splash on breach, parallax backgrounds, light rays, floating text, squash and stretch, low-hunger vignette, satisfying audio per bite.

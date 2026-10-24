@@ -225,7 +225,9 @@ export const ARCTIC: MapDef = {
       blurb: 'Leap between the floes. Something shiny sits on one',
       x0: 2600,
       x1: 9000,
-      danger: 2,
+      // The teaching stretch (like Seal Bay's Coral Gardens): no barracuda packs, which
+      // caught most small seals here before they could grow (balance bot, 2026-10-24).
+      danger: 1,
     },
     {
       id: 'icebergs',
@@ -288,7 +290,14 @@ export const ARCTIC: MapDef = {
       x1: 37400,
       danger: 2,
     },
-    { id: 'east-shore', name: 'East Shore', blurb: 'Snow, at last', x0: 37400, x1: MAP_WIDTH, danger: 1 },
+    {
+      id: 'east-shore',
+      name: 'East Shore',
+      blurb: 'Snow, at last',
+      x0: 37400,
+      x1: MAP_WIDTH,
+      danger: 1,
+    },
   ],
   gates: [
     { x: 29600, y: 5080, w: 5600, h: 220, dir: [0, -1], minStage: 5 },

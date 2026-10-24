@@ -198,16 +198,7 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     zones: ['reef', 'ocean'],
     spawn: { kind: 'zone', zones: ['reef', 'ocean'], after: 35, max: 4 },
     pack: { min: 3, max: 4, spread: 90 },
-    regions: [
-      'kelp',
-      'wrecks',
-      'shark-shelf',
-      'floes',
-      'tanker',
-      'city',
-      'hammerheads',
-      'pirate-cove',
-    ],
+    regions: ['kelp', 'wrecks', 'shark-shelf', 'tanker', 'city', 'hammerheads', 'pirate-cove'],
   },
   // The big danger of open water: charges in pairs.
   hammerhead: {

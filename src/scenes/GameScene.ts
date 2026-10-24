@@ -55,7 +55,7 @@ import { Pickups, type PickupEvent } from '../systems/Pickups';
 import { completedNow, emptyRunStats, type RunStats } from '../systems/progress';
 import { ComboSystem } from '../systems/ComboSystem';
 import { Effects } from '../systems/Effects';
-import { canEat, circlesOverlap } from '../systems/feeding';
+import { canEat, circlesOverlap, mealValue } from '../systems/feeding';
 import { FrenzySystem } from '../systems/FrenzySystem';
 import { GrowthSystem } from '../systems/GrowthSystem';
 import { HazardField } from '../systems/HazardField';
@@ -352,6 +352,7 @@ export class GameScene extends Phaser.Scene {
         this.elapsed,
         zoneAt(this.seal.y).id,
         this.mapHazards.drainAt(this.seal.x, this.seal.y),
+        this.seal.stage,
       );
       this.updateMapWarnings();
       this.trackDistance(dt);
@@ -568,29 +569,32 @@ export class GameScene extends Phaser.Scene {
     }
     for (const h of this.eels.heads()) {
       if (!canEat(stage, h.tier) || !circlesOverlap(mouth.x, mouth.y, r, h.x, h.y, h.r)) continue;
-      this.feed(h.x, h.y, this.eels.eat(h.eel));
+      this.feed(h.x, h.y, this.eels.eat(h.eel), h.tier);
       this.effects.chomp(h.x, h.y, true);
       audio.play(SoundKeys.ChompBig);
     }
   }
 
   /**
-   * Shared rewards for any meal. Score = base x combo x frenzy. Also charges the frenzy
-   * meter. Returns the points scored.
+   * Shared rewards for any meal. Score = base x combo x frenzy; nutrition and growth shrink
+   * for prey the seal has long outgrown (`tier`; none = full value). Also charges the
+   * frenzy meter. Returns the points scored.
    */
   private feed(
     x: number,
     y: number,
     reward: { nutrition: number; score: number; growth: number },
+    tier = this.seal.stage,
   ): number {
     const comboMult = this.combo.hit();
     const points = reward.score * comboMult * (this.frenzy.active ? FRENZY.scoreMult : 1);
-    this.hunger.feed(reward.nutrition);
+    const value = mealValue(this.seal.stage, tier);
+    this.hunger.feed(reward.nutrition * value);
     this.score += points;
     this.eaten++;
     this.seal.chomp();
     this.effects.floatText(x, y - 24, `+${points}`);
-    if (this.growth.add(reward.growth * this.mods.growthMult) > 0) this.onGrow();
+    if (this.growth.add(reward.growth * value * this.mods.growthMult) > 0) this.onGrow();
     if (this.frenzy.feed(comboMult * this.mods.frenzyChargeMult)) this.startFrenzy();
     this.hudDirty = true;
     return points;
@@ -632,7 +636,7 @@ export class GameScene extends Phaser.Scene {
     const chance = COINS.dropChanceByTier[Math.min(def.tier, COINS.dropChanceByTier.length - 1)];
     if (Math.random() < chance) this.coins.drop(c.x, c.y, 1);
     this.countMeal(def.id);
-    this.feed(c.x, c.y, def);
+    this.feed(c.x, c.y, def, def.tier);
     c.despawn();
   }
 
@@ -646,7 +650,7 @@ export class GameScene extends Phaser.Scene {
     this.hitStop = HITSTOP.explode;
     this.shake(260, 0.01);
     this.countMeal(def.id);
-    this.feed(p.x, p.y, def);
+    this.feed(p.x, p.y, def, def.tier);
     p.despawn();
   }
 
@@ -1045,7 +1049,7 @@ export class GameScene extends Phaser.Scene {
       coins: this.coins.countActive(),
       stage: this.growth.stage,
       hunger: this.hunger.value,
-      drain: this.hunger.drainRate(this.elapsed, zone.id),
+      drain: this.hunger.drainRate(this.elapsed, zone.id, this.seal.stage),
       elapsed: this.elapsed,
     });
   }

@@ -7,6 +7,8 @@ export interface HungerParams {
   baseDrainPerSec: number;
   rampSeconds: number;
   zoneMultiplier: Readonly<Record<ZoneId, number>>;
+  /** Bigger seals burn more: drain multiplier per growth stage (index 0 = stage 1). */
+  sizeMultiplier?: readonly number[];
   lowFraction: number;
 }
 
@@ -33,15 +35,17 @@ export class HungerSystem {
     return this.value <= 0;
   }
 
-  /** Hunger lost per second after `elapsed` seconds of the run, in `zone`. */
-  drainRate(elapsed: number, zone: ZoneId): number {
+  /** Hunger lost per second after `elapsed` seconds of the run, in `zone`, at `stage`. */
+  drainRate(elapsed: number, zone: ZoneId, stage = 1): number {
     const p = this.params;
-    return p.baseDrainPerSec * (1 + elapsed / p.rampSeconds) * p.zoneMultiplier[zone];
+    const sizes = p.sizeMultiplier ?? [];
+    const size = sizes.length ? sizes[Math.min(Math.max(stage, 1), sizes.length) - 1] : 1;
+    return p.baseDrainPerSec * (1 + elapsed / p.rampSeconds) * p.zoneMultiplier[zone] * size;
   }
 
   /** `extra` multiplies the drain (toxic water, hot vents). */
-  update(dt: number, elapsed: number, zone: ZoneId, extra = 1): void {
-    this.value = Math.max(0, this.value - this.drainRate(elapsed, zone) * extra * dt);
+  update(dt: number, elapsed: number, zone: ZoneId, extra = 1, stage = 1): void {
+    this.value = Math.max(0, this.value - this.drainRate(elapsed, zone, stage) * extra * dt);
   }
 
   /** Restores hunger (clamped to max). Returns the amount actually gained. */

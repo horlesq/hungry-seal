@@ -9,8 +9,11 @@
 // The human bot plays like a player who follows the hints: flees hunting predators upward
 // (to leap out) and steers around puffed-up pufferfish.
 //
-// Reference (Phase 5 tuning): human survives 2:26-4:40, reaching stage 3-4 (Phase 4 code
-// with this bot: 1:01-4:45, median ~3:30). Results vary a lot: take several samples.
+// It chases the nearest meal; once big it skips prey worth less than half (a player learns
+// that minnows barely feed a big seal) and hunts predators it has outgrown.
+//
+// Reference numbers per map are in docs/GAME_DESIGN.md (Difficulty curve). Results vary a lot:
+// take several samples. BOT_MAP=bay|arctic|tropical picks the map; BOT_PORT runs several at once.
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 
@@ -145,9 +148,17 @@ while (Date.now() - start < seconds * 1000) {
       fleeY += ((m.y - y) / d) * w;
     };
     // Radii tuned to a reasonable player: dodge what's close, don't flee from everything.
-    for (const h of s.hazards.alive) if (h.active) avoid(h.x, h.y, 120);
-    // A player stung once steers around puffed-up pufferfish.
-    for (const c of s.spawner.alive) if (c.active && c.puffed) avoid(c.x, c.y, 80);
+    // A bigger seal keeps a bigger berth (its body is up to 4x longer).
+    const body = s.seal.radius * 1.2;
+    for (const h of s.hazards.alive) if (h.active) avoid(h.x, h.y, 120 + body);
+    for (const h of s.mapHazards.alive) if (h.active && h.visible) avoid(h.x, h.y, 100 + body);
+    // A player stung once steers around puffed-up pufferfish, and gives the others room
+    // unless they're catching their breath after a puff (the safe window to eat one).
+    for (const c of s.spawner.alive) {
+      if (!c.active || !c.params.puff) continue;
+      if (c.puffed) avoid(c.x, c.y, 80 + body);
+      else if (c.motion.puffCooldown < 0.5) avoid(c.x, c.y, 40 + body);
+    }
     for (const p of s.predators.alive) {
       if (!p.active || p.def.tier <= s.seal.stage) continue;
       if (p.motion.state === 'notice' || p.motion.state === 'chase') {
@@ -181,17 +192,40 @@ while (Date.now() - start < seconds * 1000) {
       };
     }
 
+    // Nearest meal in sight, like the original bot; a big seal skips prey it has long
+    // outgrown (worth < half, see mealValue in systems/feeding.ts) while anything better is in
+    // view, and hunts predators it has outgrown.
     let best = null;
     let bestD = Infinity;
+    let fallback = null;
+    let fallbackD = Infinity;
+    const consider = (c) => {
+      if (human && !cam.worldView.contains(c.x, c.y)) return;
+      if (!clear(c.x, c.y)) return;
+      const d = Math.hypot(c.x - m.x, c.y - m.y);
+      const gap = Math.max(0, s.seal.stage - c.def.tier - 2);
+      if (1 / (1 + 0.3 * gap) >= 0.5) {
+        if (d < bestD) {
+          bestD = d;
+          best = c;
+        }
+      } else if (d < fallbackD) {
+        fallbackD = d;
+        fallback = c;
+      }
+    };
     for (const c of s.spawner.alive) {
       if (!c.active || c.def.tier > s.seal.stage || c.puffed) continue;
-      if (human && !cam.worldView.contains(c.x, c.y)) continue;
-      if (!clear(c.x, c.y)) continue;
-      const d = Math.hypot(c.x - m.x, c.y - m.y);
-      if (d < bestD) {
-        bestD = d;
-        best = c;
-      }
+      // Pufferfish only while they recover from a puff.
+      if (c.params.puff && c.motion.puffCooldown < 0.5) continue;
+      consider(c);
+    }
+    for (const p of s.predators.alive) {
+      if (p.active && p.def.tier <= s.seal.stage) consider(p);
+    }
+    if (!best) {
+      best = fallback;
+      bestD = fallbackD;
     }
     // Lead the target a bit; otherwise drift toward the reef band.
     const lead = human ? 0 : 0.15;
@@ -199,8 +233,13 @@ while (Date.now() - start < seconds * 1000) {
     let tx = best ? best.x + best.motion.vx * lead : m.x + 300;
     let ty = best ? best.y + best.motion.vy * lead : 1100;
     if (!best && !clear(tx, ty)) {
-      tx = m.x;
-      ty = m.y - 300;
+      // Rock in the way: try diving forward, then back the other way, then up.
+      const options = [
+        [m.x + 300, m.y + 300],
+        [m.x - 300, 1100],
+        [m.x, m.y - 300],
+      ];
+      [tx, ty] = options.find(([x, y]) => clear(x, y)) ?? options[2];
     }
     // Screen = (world - worldView) * zoom: the camera zooms out as the seal grows.
     return {
@@ -239,7 +278,8 @@ while (Date.now() - start < seconds * 1000) {
   if (info.t - lastLog >= 5) {
     lastLog = info.t;
     // BOT_SHOTS=1: a screenshot every 5 s (.playtest/bot-<t>.png) to see what it's doing.
-    if (process.env.BOT_SHOTS) await page.screenshot({ path: `.playtest/bot-${Math.round(info.t)}.png` });
+    if (process.env.BOT_SHOTS)
+      await page.screenshot({ path: `.playtest/bot-${Math.round(info.t)}.png` });
     console.log(
       `t=${info.t.toFixed(0).padStart(3)}s hunger=${info.hunger.toFixed(0).padStart(3)} score=${String(info.score).padStart(5)} eaten=${String(info.eaten).padStart(3)} stage=${info.stage} coins=${String(info.coins).padStart(3)} hazards=${info.hazards} predators=${info.predators} y=${info.zone.toFixed(0)}${info.flee ? ' FLEEING' : ''}`,
     );

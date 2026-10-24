@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canEat, circlesOverlap } from './feeding';
+import { FEEDING } from '../config/balance';
+import { canEat, circlesOverlap, mealValue } from './feeding';
 import { GrowthSystem } from './GrowthSystem';
 import { HungerSystem, type HungerParams } from './HungerSystem';
 
@@ -26,6 +27,16 @@ describe('HungerSystem', () => {
     expect(h.drainRate(0, 'ocean')).toBeGreaterThan(h.drainRate(0, 'reef'));
   });
 
+  it('bigger seals drain faster', () => {
+    const h = new HungerSystem({ ...HUNGER, sizeMultiplier: [1, 1.5, 2] });
+    expect(h.drainRate(0, 'reef', 1)).toBeCloseTo(2);
+    expect(h.drainRate(0, 'reef', 3)).toBeCloseTo(4);
+    // Past the table: the last entry.
+    expect(h.drainRate(0, 'reef', 8)).toBeCloseTo(4);
+    h.update(1, 0, 'reef', 1, 2);
+    expect(h.value).toBeCloseTo(97);
+  });
+
   it('feeding clamps to max and reports the real gain', () => {
     const h = new HungerSystem(HUNGER);
     h.damage(10);
@@ -44,6 +55,22 @@ describe('HungerSystem', () => {
     const h = new HungerSystem(HUNGER);
     h.damage(76);
     expect(h.isLow).toBe(true);
+  });
+});
+
+describe('mealValue', () => {
+  it('is full for prey near the seal size and drops for long-outgrown prey', () => {
+    expect(mealValue(3, 3)).toBe(1);
+    expect(mealValue(3, 3 - FEEDING.outgrownFree)).toBe(1);
+    const a = mealValue(8, 4);
+    const b = mealValue(8, 1);
+    expect(a).toBeLessThan(1);
+    expect(b).toBeLessThan(a);
+    expect(b).toBeGreaterThan(0.2);
+  });
+
+  it('is full for a frenzy meal above the seal size', () => {
+    expect(mealValue(2, 6)).toBe(1);
   });
 });
 

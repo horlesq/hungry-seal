@@ -82,7 +82,7 @@ Each map has:
 
 ## 5. Arctic (40,000 px)
 
-West Shore (snowy beach, penguin colony) -> Floe Fields (leap between floes; pearl on a floe) ->
+West Shore (snowy beach, penguin colony) -> Floe Fields (leap between floes; pearl on a floe; the calm teaching stretch, danger 1, no barracuda) ->
 Iceberg Alley (orcas, danger 4) -> Ice Caves (TIGHT tunnels, pearl) -> Old Tanker (wreck,
 oil/toxic zone, minefield, trawler lane) -> Seamount (rest) -> the Abyss Rift (gate 5, eels) ->
 Colossal Squid's lair (gate 7) -> Glacier Wall and East Shore.
