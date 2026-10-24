@@ -4,7 +4,8 @@
 - **Phaser 4.2.1** (no physics plugin, see Physics below), **TypeScript 6** (strict), **Vite 8**.
 - No React/other UI framework. HUD/menus are Phaser scenes/containers.
 - Package manager: npm. Lint/format: ESLint 10 (flat config) + Prettier. Tests: Vitest. Browser playtest: playwright-core driving the locally installed Chrome.
-- Deploy target: static build (`vite build` -> `dist/`, relative `base: './'`). Live at https://hungry-seal.horly.dev/ (Vercel, from `main`). GitHub Actions (`.github/workflows/ci.yml`) only runs checks.
+- Deploy target: static build (`vite build` -> `dist/`, relative `base: './'`, no source maps, Phaser in its own `phaser-<hash>.js` chunk so game updates don't re-download the engine). Live at https://hungry-seal.horly.dev/ (Vercel, from `main`) and as a zip on itch.io (`npm run release`, see [RELEASE.md](RELEASE.md)). GitHub Actions (`.github/workflows/ci.yml`) only runs checks.
+- The version (`package.json`) is injected as `__APP_VERSION__` (vite.config.ts `define`, declared in `src/env.d.ts`): shown on the title screen, names the service worker cache and the release zip.
 
 > Verify all Phaser APIs against the installed Phaser 4 version: grep `node_modules/phaser/types/phaser.d.ts`. Do not copy Phaser 3 snippets blindly.
 
@@ -14,17 +15,31 @@ Files marked (planned) don't exist yet.
 hungry-seal/
   CLAUDE.md
   docs/                 design, architecture, roadmap, assets notes
+  art/                  Blender-rendered PNGs (sources; npm run assets turns them into WebP)
   public/
     favicon.svg
-    assets/             Blender-rendered sprite sheets (seals, creatures, decor, pickups)
+    assets/             WebP sprite sheets built from art/ (seals, creatures, decor, pickups)
+    icons/              app icons (built from favicon.svg by npm run assets)
+    manifest.webmanifest, sw.js   install + offline support (sw.js registered in production)
+  store/                itch.io cover, screenshots (npm run store-shots) and page text
   scripts/
     playtest.mjs        headless browser smoke playtest (npm run playtest)
     balance-bot.mjs     bot plays a run and logs hunger/score/stage (npm run balance)
+    soak.mjs            long run + restarts, fails on leaks (npm run soak)
+    perf.mjs            emulated mid-range phone: frame times per situation, CPU hotspots (npm run perf)
+    browsers.mjs        Chrome / Edge / Firefox / WebKit / iPhone smoke test (npm run browsers)
+    dist-check.mjs      production build: boots, download size, service worker, offline (npm run dist-check)
+    release.mjs         dist/ -> release/hungry-seal-<version>-web.zip (npm run release)
+    store-shots.mjs     store page images into store/ (npm run store-shots)
+  tools/
+    build-assets.mjs    art/*.png -> public/assets/*.webp, app icons (npm run assets)
+    blender/            Blender scripts that model and render the sprites (see ASSETS.md)
   src/
-    main.ts             loads the UI font, then Phaser.Game bootstrap, window resize -> applyViewport;
+    main.ts             loads the UI font, then Phaser.Game bootstrap, window resize -> applyViewport,
+                        removes the HTML loading screen, registers the service worker (production);
                         window.__PHASER_GAME__ in dev
     config/
-      game.ts           Phaser config, scale, physics
+      game.ts           Phaser config (render.pathDetailThreshold), ADAPTIVE_RESOLUTION
       layout.ts         edge-anchored touch UI (boostButtonCenter, pauseButtonCenter, safe-area aware), UI font
       keys.ts           scene keys, registry keys
       balance.ts        movement, camera, input, hunger, growth, feeding, spawn, effects tuning
@@ -46,7 +61,7 @@ hungry-seal/
       GameMap.ts        map definition + baked terrain (cached per map), the current map
     scenes/
       BootScene.ts      reads ?debug, starts Preload
-      PreloadScene.ts   load manifest, progress bar, generate missing placeholders + UI textures
+      PreloadScene.ts   load manifest (minus lazy entries), progress bar, placeholders + UI textures
       MenuScene.ts      title: bitten wordmark intro, Play / Upgrades, coins, sound + fullscreen, seal watching the pointer
       GameScene.ts      the run (pauses itself on Esc / P / HUD button / tab or window blur)
       HudScene.ts       overlay UI running parallel to GameScene (status panel, score, pause button)
@@ -67,6 +82,7 @@ hungry-seal/
       widgets.ts        ocean backdrop, CurrencyPill (coins/gems), drawSegments, drawBar
       missions.ts       MissionPanel (title screen mission list)
       mapThumb.ts       picture of a whole map drawn from its terrain (map cards, pause map)
+      shapes.ts         cheap rounded rects / circles / arcs for Graphics (use instead of the stock ones)
     audio/
       synth.ts          PURE offline synth: effects + seamless stereo music loop (+ tests)
       sounds.ts         SoundKeys + tone recipes for every effect
@@ -110,11 +126,13 @@ hungry-seal/
                            music loop, mute (save is the source of truth)
       SaveService.ts       localStorage wrapper (guarded; in-memory fallback), `saves` singleton
       Viewport.ts          current viewport, safe-area insets, canvas resize, fitUiCamera/fitWorldCamera,
-                           sharpenTexts, textureScale
+                           sharpenTexts, textureScale, lowerResolution (adaptive resolution)
+      LazyTextures.ts      textures loaded on demand (lazy manifest entries: skins, bosses), released after
     utils/
       math.ts           clamp, lerp, angle helpers, frame-rate independent damp (+ tests)
       rng.ts            seeded mulberry32 RNG (+ tests)
       viewport.ts       PURE viewport math: backing size, zoom, visible design area (+ tests)
+      resolution.ts     PURE adaptive resolution: when to step the pixel ratio down (+ tests)
   index.html
   vite.config.ts        also holds the Vitest config
   eslint.config.js
@@ -170,9 +188,16 @@ hungry-seal/
 - UI scenes call `fitUiCamera()` → camera shows design space `[0..viewWidth] x [0..viewHeight]`; anchor UI to edges with `getViewport().viewWidth/viewHeight` (never fixed 1280/720) and re-layout via `onResize()` (Menu/GameOver just restart). The world camera uses `fitWorldCamera()`; world systems use `camera.worldView` for anything view-sized.
 - Text: `sharpenTexts(scene)` re-rasterizes all Text at the current zoom (call after create and on resize); text created later sets `resolution: uiTextResolution()`.
 - Textures carry a pixel density in `texture.customData.resolution` (placeholders: 2 for sprites/effects/UI, 1 for soft backgrounds; real files: manifest `resolution`). Anything that sets a sprite/particle/tile scale multiplies by `textureScale(scene, key)` so display size stays in design units.
-- Portrait phones currently get a very tall view; add a rotate-device prompt or portrait layout in Phase 9.
-- Pixel-art off; smooth textures. Use texture atlases for final art to cut draw calls.
-- Target 60 FPS on mid-range phones; profile in Phase 9.
+- Pixel-art off; smooth textures. No atlases: Phaser 4 batches sprites across textures, and draw submission is ~5% of a frame (`npm run perf`).
+- Target 60 FPS on mid-range phones. `npm run perf` plays the heaviest situations on an emulated phone (CPU x4) and prints frame times and hotspots (`PERF_PROFILE=1`); keep the worst situation well above 60 fps there, since the GPU in that test is a desktop one.
+- **Graphics are expensive in WebGL:** Phaser cuts every arc into 100 points and triangulates the whole path again on every frame, even when nothing changed. Draw rounded rects, circles and arcs with `ui/shapes.ts` (polygons sized to the radius), and don't redraw thousands of small shapes per frame (the mine chains are a TileSprite). `render.pathDetailThreshold: 3` merges what's left.
+- **Adaptive resolution:** GameScene feeds `ResolutionGovernor` (utils/resolution.ts) the frame rate; after 4 s under 45 fps it calls `lowerResolution`, which caps the pixel ratio at the next step (2, 1.5, 1.25, 1) for the session and re-applies the viewport (scenes re-fit on the resize as usual). It never steps back up.
+
+## Loading and offline
+- **Art** is WebP (`public/assets/`), built from the PNG sources in `art/` by `npm run assets` (quality 90, lossless-quality alpha: ~8x smaller, no visible difference). Blender scripts write to `art/`.
+- **Lazy textures:** manifest entries with `lazy: true` (every seal skin and the three bosses) are not loaded at boot. Preload loads the worn skin; SkinsScene loads all skins in its `preload()` (with a "Loading skins..." line) and releases all but the worn one on shutdown; GameScene's `preload()` loads the worn skin and its map's boss and releases other maps' bosses. Use `queueTextures` in `preload()` and `finishTextures` at the top of `create()` (it paints a placeholder if a file failed).
+- **Loading screen:** `index.html` shows a CSS loader (icon, name, sliding bar) while the script and font download; `main.ts` fades it out on Phaser's READY, when PreloadScene's progress bar takes over.
+- **Service worker** (`public/sw.js`, production only, registered as `sw.js?v=<version>`): page = network first (updates show up when online), everything else = cache first, refreshed in the background. The first visit loads before the worker controls the page, so `main.ts` posts a `precache` message with every file the page fetched (Resource Timing) plus every manifest URL; the worker caches them. Cache lookups use `ignoreVary` (module scripts send an Origin header). Each version gets its own cache; older ones are deleted on activate.
 
 ## Physics and time
 - **No physics plugin** (removed in Phase 2). Every mover runs its own kinematic model (`sealMotion`, `creatureAI`) integrated with frame dt, and contacts are circle-vs-circle checks (`systems/feeding.ts`). Reasons: all motion is custom anyway, ≤ ~120 movers makes O(n) checks trivially cheap, the checks are unit-testable, and it avoids Arcade body/scale issues (the roll flip squashed the seal's body). Re-add Arcade only if a feature needs real collision response.
@@ -203,6 +228,7 @@ hungry-seal/
 - Playtest flows: desktop movement + pause, gameplay (eating/growth/game over) and mobile run with `?calm`; the danger flow runs without it and places threats with `hazards.spawnAt` / `predators.spawnAt`. Page-side helpers must return plain data, never game objects (serializing the scene graph takes seconds and breaks timing checks).
 - `npm run balance -- [human|perfect] [seconds]` runs a bot that chases prey with the mouse, dodges close threats (boosting away from hunting sharks), and logs hunger/score/stage every 5 s plus hits taken and cause of death. Results vary a lot run to run: take several samples. Reference numbers are in the script header and ROADMAP.
 - Manual play on a real phone over LAN: `npm run dev:host`, open the printed network URL.
+- `npm run perf` (frame times on an emulated phone), `npm run browsers` (Chrome, Edge, Firefox, WebKit, WebKit as an iPhone; Firefox/WebKit via `npx playwright-core install firefox webkit`), `npm run dist-check` (the production build: boots, download size, service worker, offline).
 
 ## Scripts
-`npm run dev` | `dev:host` | `build` | `preview` | `typecheck` | `lint` | `format` | `format:check` | `test` | `test:watch` | `playtest` | `balance` | `soak` | `check`
+`npm run dev` | `dev:host` | `build` | `preview` | `typecheck` | `lint` | `format` | `format:check` | `test` | `test:watch` | `playtest` | `balance` | `soak` | `check` | `assets` | `perf` | `browsers` | `dist-check` | `store-shots` | `release`

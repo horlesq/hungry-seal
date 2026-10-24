@@ -6,6 +6,7 @@ import { missionDef, type MissionDef } from '../config/missions';
 import type { ActiveMission } from '../systems/progress';
 import { COLORS, CSS, drawPanel, formatNumber, uiText } from './theme';
 import { UiTextures } from './uiTextures';
+import { strokeArc, strokeRing } from './shapes';
 
 const HEAD = 48;
 const ROW = 58;
@@ -52,12 +53,10 @@ export class MissionPanel extends Phaser.GameObjects.Container {
       // Progress ring.
       const ring = scene.add.graphics();
       const frac = Math.min(1, m.progress / def.target);
-      ring.lineStyle(5, COLORS.trench, 0.8).strokeCircle(36, cy, 14);
+      strokeRing(ring.lineStyle(5, COLORS.trench, 0.8), 36, cy, 14);
       if (frac > 0) {
-        ring.lineStyle(5, COLORS.glacier, 1);
-        ring.beginPath();
-        ring.arc(36, cy, 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
-        ring.strokePath();
+        const top = -Math.PI / 2;
+        strokeArc(ring.lineStyle(5, COLORS.glacier, 1), 36, cy, 14, top, top + Math.PI * 2 * frac);
       }
       this.add(ring);
       this.add(

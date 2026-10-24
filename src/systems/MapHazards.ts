@@ -25,8 +25,12 @@ interface Cloud {
 export class MapHazards {
   /** Urchins and mines still in play. */
   readonly alive: Hazard[] = [];
-  private readonly chains: Array<{ mine: Hazard; groundY: number }> = [];
-  private readonly chainGfx: Phaser.GameObjects.Graphics;
+  /** Anchor chains: a tiled link texture from each mine down to the seabed. */
+  private readonly chains: Array<{
+    mine: Hazard;
+    groundY: number;
+    sprite: Phaser.GameObjects.TileSprite;
+  }> = [];
   private readonly clouds: Cloud[] = [];
   private time = 0;
 
@@ -46,17 +50,23 @@ export class MapHazards {
         this.add(new Hazard(scene).spawn(HAZARDS.urchin, x, ground - 13, random));
       }
     }
-    this.chainGfx = scene.add.graphics().setDepth(8);
+    const linkScale = textureScale(scene, TextureKeys.Chain);
     for (const field of def.minefields) {
       for (let i = 0; i < field.count; i++) {
-        const x = field.x0 + ((i + 0.5) / field.count) * (field.x1 - field.x0) + (random() - 0.5) * 160;
+        const x =
+          field.x0 + ((i + 0.5) / field.count) * (field.x1 - field.x0) + (random() - 0.5) * 160;
         const ground = t.groundBelow(x, 700, 6000);
         if (ground === null) continue;
         const y = ground - 200 - random() * 420;
         if (t.distance(x, y) < 60) continue;
         const mine = new Hazard(scene).spawn(HAZARDS.mine, x, y, random);
         this.add(mine);
-        this.chains.push({ mine, groundY: ground });
+        const sprite = scene.add
+          .tileSprite(x, y + 24, 12, ground - y - 24, TextureKeys.Chain)
+          .setOrigin(0.5, 0)
+          .setTileScale(linkScale)
+          .setDepth(8);
+        this.chains.push({ mine, groundY: ground, sprite });
       }
     }
     for (const z of def.toxicZones) {
@@ -112,15 +122,13 @@ export class MapHazards {
       h.setVisible(on);
       if (on) h.step(dt);
     }
-    this.chainGfx.clear();
     for (const c of this.chains) {
-      if (!c.mine.active || !near(c.mine.x, c.mine.y)) continue;
-      this.chainGfx.lineStyle(4, 0x2a2f36, 1);
-      this.chainGfx.lineBetween(c.mine.x, c.mine.y + 24, c.mine.x, c.groundY);
-      this.chainGfx.lineStyle(2, 0x6b7380, 1);
-      for (let y = c.mine.y + 34; y < c.groundY; y += 14) {
-        this.chainGfx.strokeEllipse(c.mine.x, y, 6, 10);
-      }
+      const on = c.mine.active && near(c.mine.x, c.mine.y);
+      c.sprite.setVisible(on);
+      if (!on) continue;
+      // The mine bobs; the chain hangs from it to the seabed.
+      const top = c.mine.y + 24;
+      c.sprite.setPosition(c.mine.x, top).setSize(12, Math.max(0, c.groundY - top));
     }
     for (const c of this.clouds) {
       const on = near(c.x, c.y);
@@ -134,7 +142,7 @@ export class MapHazards {
   destroy(): void {
     for (const h of this.alive) h.destroy();
     for (const c of this.clouds) for (const p of c.puffs) p.destroy();
-    this.chainGfx.destroy();
+    for (const c of this.chains) c.sprite.destroy();
     this.alive.length = 0;
   }
 }

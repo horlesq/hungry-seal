@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 import { SoundKeys } from '../audio/sounds';
 import { audio } from '../services/AudioManager';
 import { BUTTON_DEPTH, COLORS, CSS, uiText } from './theme';
+import { fillDisc, fillRoundRect, strokeRing, strokeRoundRect } from './shapes';
 
 export type ButtonVariant = 'primary' | 'gold' | 'secondary' | 'quiet';
 
@@ -188,8 +189,8 @@ export class Button extends Phaser.GameObjects.Container {
     const bx = this.opts.round ? w * 0.35 : w / 2 - 8;
     const by = this.opts.round ? -h * 0.35 : -h / 2 + 6;
     this.badge.clear().setVisible(on);
-    this.badge.fillStyle(COLORS.ink, 1).fillCircle(bx, by, 11);
-    this.badge.fillStyle(COLORS.gold, 1).fillCircle(bx, by, 8);
+    fillDisc(this.badge.fillStyle(COLORS.ink, 1), bx, by, 11);
+    fillDisc(this.badge.fillStyle(COLORS.gold, 1), bx, by, 8);
     return this;
   }
 
@@ -234,17 +235,17 @@ export class Button extends Phaser.GameObjects.Container {
     this.faceGfx.clear().fillStyle(st.face, 1);
     this.ring.clear().lineStyle(4, COLORS.glacier, 1);
     if (round) {
-      this.edge.fillCircle(0, BUTTON_DEPTH, w / 2);
-      this.faceGfx.fillCircle(0, 0, w / 2);
-      if (st.line > 0) this.faceGfx.lineStyle(2, COLORS.foam, st.line).strokeCircle(0, 0, w / 2);
-      this.ring.strokeCircle(0, BUTTON_DEPTH / 2, w / 2 + 8);
+      fillDisc(this.edge, 0, BUTTON_DEPTH, w / 2);
+      fillDisc(this.faceGfx, 0, 0, w / 2);
+      if (st.line > 0) strokeRing(this.faceGfx.lineStyle(2, COLORS.foam, st.line), 0, 0, w / 2);
+      strokeRing(this.ring, 0, BUTTON_DEPTH / 2, w / 2 + 8);
     } else {
-      this.edge.fillRoundedRect(-w / 2, -h / 2 + BUTTON_DEPTH, w, h, r);
-      this.faceGfx.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+      fillRoundRect(this.edge, -w / 2, -h / 2 + BUTTON_DEPTH, w, h, r);
+      fillRoundRect(this.faceGfx, -w / 2, -h / 2, w, h, r);
       if (st.line > 0) {
-        this.faceGfx.lineStyle(2, COLORS.foam, st.line).strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+        strokeRoundRect(this.faceGfx.lineStyle(2, COLORS.foam, st.line), -w / 2, -h / 2, w, h, r);
       }
-      this.ring.strokeRoundedRect(-w / 2 - 7, -h / 2 - 7, w + 14, h + BUTTON_DEPTH + 14, r + 7);
+      strokeRoundRect(this.ring, -w / 2 - 7, -h / 2 - 7, w + 14, h + BUTTON_DEPTH + 14, r + 7);
     }
     this.layoutContent(st);
   }

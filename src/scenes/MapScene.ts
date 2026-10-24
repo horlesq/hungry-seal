@@ -18,6 +18,7 @@ import { COLORS, CSS, EDGE, formatNumber, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
 import { addBackdrop, BACKDROPS, drawBar } from '../ui/widgets';
 import { DESIGN_HEIGHT } from '../utils/viewport';
+import { strokeRoundRect } from '../ui/shapes';
 
 interface Card {
   def: MapDef;
@@ -113,9 +114,10 @@ export class MapScene extends Phaser.Scene {
       align: 'center',
       wrap: w - 48,
     }).setOrigin(0.5, 0);
-    const status = uiText(this, x, y + h / 2 - 38, '', 'caption', { weight: 800, size: 20 }).setOrigin(
-      0.5,
-    );
+    const status = uiText(this, x, y + h / 2 - 38, '', 'caption', {
+      weight: 800,
+      size: 20,
+    }).setOrigin(0.5);
     const rect = new Phaser.Geom.Rectangle(x - w / 2, y - h / 2, w, h);
     return { def, button, thumb, status, lock: this.lockIcon(def, thumb), rect };
   }
@@ -134,10 +136,10 @@ export class MapScene extends Phaser.Scene {
       color: CSS.mist,
       wrap: w - 360,
     });
-    const status = uiText(this, tx, y + h / 2 - 34, '', 'caption', { weight: 800, size: 19 }).setOrigin(
-      0,
-      0.5,
-    );
+    const status = uiText(this, tx, y + h / 2 - 34, '', 'caption', {
+      weight: 800,
+      size: 19,
+    }).setOrigin(0, 0.5);
     const rect = new Phaser.Geom.Rectangle(x - w / 2, y - h / 2, w, h);
     return { def, button, thumb, status, lock: this.lockIcon(def, thumb), rect };
   }
@@ -194,7 +196,14 @@ export class MapScene extends Phaser.Scene {
       if (def.id === this.selected) {
         // Selection: a bright ring (the card keeps its dark fill so the text stays readable).
         const b = card.rect;
-        g.lineStyle(5, COLORS.glacier, 1).strokeRoundedRect(b.x - 5, b.y - 5, b.width + 10, b.height + 10, 26);
+        strokeRoundRect(
+          g.lineStyle(5, COLORS.glacier, 1),
+          b.x - 5,
+          b.y - 5,
+          b.width + 10,
+          b.height + 10,
+          26,
+        );
       }
       card.thumb.setAlpha(open ? 1 : 0.45);
       if (open) {
@@ -208,7 +217,9 @@ export class MapScene extends Phaser.Scene {
         const u = def.unlock!;
         const have = pearlsFound(data, u.after);
         card.status
-          .setText(`Find ${u.pearls} pearls in ${MAPS[u.after].name} (${Math.min(have, u.pearls)}/${u.pearls})`)
+          .setText(
+            `Find ${u.pearls} pearls in ${MAPS[u.after].name} (${Math.min(have, u.pearls)}/${u.pearls})`,
+          )
           .setColor(CSS.gold);
         // Progress toward the unlock, under the status line.
         const b = card.status.getBounds();

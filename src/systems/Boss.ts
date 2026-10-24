@@ -12,6 +12,7 @@ import { audio } from '../services/AudioManager';
 import { textureScale } from '../services/Viewport';
 import { loopFrames } from '../entities/sheetAnim';
 import { circlesOverlap } from './feeding';
+import { strokeRing } from '../ui/shapes';
 
 export const BOSSES: Record<
   BossId,
@@ -255,7 +256,7 @@ export class Boss {
       .setAlpha(exposed ? 0.55 + 0.3 * Math.sin(this.t * 10) : 0.3);
     this.ring.clear();
     if (this.state === 'sweep' && this.sweepR > 0) {
-      this.ring.lineStyle(14, this.def.glow, 0.6).strokeCircle(this.x, this.y, this.sweepR);
+      strokeRing(this.ring.lineStyle(14, this.def.glow, 0.6), this.x, this.y, this.sweepR);
     }
     return this.events;
   }

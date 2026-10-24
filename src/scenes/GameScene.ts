@@ -17,6 +17,7 @@ import {
   PICKUPS,
   SEAL_MOTION,
 } from '../config/balance';
+import type { TextureKey } from '../config/assets';
 import { RegistryKeys, SceneKeys } from '../config/keys';
 import { missionDef } from '../config/missions';
 import { skinDef } from '../config/skins';
@@ -27,7 +28,7 @@ import { Decor } from '../systems/Decor';
 import { Gates } from '../systems/Gates';
 import { Eels } from '../systems/Eels';
 import { Boats, BOATS, type BoatEvent } from '../systems/Boats';
-import { Boss, BOSS, type BossEvent } from '../systems/Boss';
+import { Boss, BOSS, BOSSES, type BossEvent } from '../systems/Boss';
 import type { Hazard } from '../entities/Hazard';
 import { MapHazards } from '../systems/MapHazards';
 import { Pearls } from '../systems/Pearls';
@@ -47,8 +48,17 @@ import {
   type DeathCause,
   type RunResult,
 } from '../services/EventBus';
+import { finishTextures, queueTextures, releaseTextures } from '../services/LazyTextures';
 import { saves } from '../services/SaveService';
-import { fitWorldCamera, getViewport, onResize, sharpenTexts } from '../services/Viewport';
+import {
+  fitWorldCamera,
+  getViewport,
+  lowerResolution,
+  onResize,
+  sharpenTexts,
+} from '../services/Viewport';
+import { ADAPTIVE_RESOLUTION } from '../config/game';
+import { ResolutionGovernor } from '../utils/resolution';
 import { CoinField } from '../systems/CoinField';
 import { Darkness } from '../systems/Darkness';
 import { Pickups, type PickupEvent } from '../systems/Pickups';
@@ -165,6 +175,7 @@ export class GameScene extends Phaser.Scene {
   private readonly missionsShown = new Set<string>();
   private readonly liveRun: RunStats = emptyRunStats();
 
+  private resolution!: ResolutionGovernor;
   private readonly lookAhead = new Phaser.Math.Vector2();
   private readonly tail = new Phaser.Math.Vector2();
   private readonly mouth = new Phaser.Math.Vector2();
@@ -175,7 +186,25 @@ export class GameScene extends Phaser.Scene {
     super({ key: SceneKeys.Game });
   }
 
+  /** Lazy textures this run needs: the skin you wear and the map's boss. */
+  private runTextures(): TextureKey[] {
+    const map = MAPS[saves.data.maps.selected] ?? MAPS.bay;
+    return [skinDef(saves.data.skins.equipped).texture, BOSSES[map.boss.id].texture];
+  }
+
+  preload(): void {
+    queueTextures(this, this.runTextures());
+  }
+
   create(): void {
+    const textures = this.runTextures();
+    finishTextures(this, textures);
+    // Other maps' bosses aren't needed until you play there.
+    releaseTextures(
+      this,
+      Object.values(BOSSES).map((b) => b.texture),
+      textures,
+    );
     this.score = 0;
     this.eaten = 0;
     this.runCoins = 0;
@@ -187,6 +216,7 @@ export class GameScene extends Phaser.Scene {
     this.comboShown = 0;
     this.frenzyShown = { meter: -1, active: false };
     this.debugTimer = 0;
+    this.resolution = new ResolutionGovernor(ADAPTIVE_RESOLUTION);
     this.lastStamina = -1;
     this.lastTooBigAt = -Infinity;
     this.hitStop = 0;
@@ -327,6 +357,11 @@ export class GameScene extends Phaser.Scene {
   override update(time: number, delta: number): void {
     // Clamp dt so a background-tab stall doesn't teleport anything.
     const dt = Math.min(delta, 50) / 1000;
+    // A device that can't keep up renders fewer pixels (see ADAPTIVE_RESOLUTION).
+    if (this.resolution.update(delta / 1000, this.game.loop.actualFps)) {
+      const dpr = lowerResolution(this.game, ADAPTIVE_RESOLUTION.steps);
+      if (dpr !== null) console.info(`[perf] slow frames: rendering at ${dpr}x`);
+    }
     // Hit-stop: freeze the simulation for a few frames on big impacts.
     if (this.hitStop > 0) {
       this.hitStop -= dt;

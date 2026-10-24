@@ -67,7 +67,7 @@ Notes carried forward:
 - Sharks live in ocean/deep, so the shallow reef is relatively safe but only has tier-1 food; growth pushes you deeper (intended risk/reward).
 - No audio yet (Phase 4). Hit feedback currently relies on visuals only.
 
-## Phase 4 — PLAYABLE DEMO (vertical slice) — [~] in progress
+## Phase 4 — PLAYABLE DEMO (vertical slice) ✅
 Goal: a shareable build that shows the whole game concept in ~5-10 minutes.
 - [x] Resolution: native-resolution canvas, no letterbox bars on any aspect ratio, 2x placeholder art, crisp text (user-reported issue)
 - [x] Depth zones with distinct spawn tables; zone banner ("OPEN OCEAN — Sardines, squid, turtles... and sharks") on entering each zone. Distinct zone *visuals* beyond the gradient → art pass.
@@ -77,15 +77,15 @@ Goal: a shareable build that shows the whole game concept in ~5-10 minutes.
 - [x] Menu with Play / Shop / Sound toggle; results screen with Swim again / Shop / Menu buttons
 - [x] Audio: synthesized SFX (chomp, coin, splash, hurt, zap, explosion, boost, grow, frenzy, shark alert, UI) + procedural music loop; mute persists
 - [x] First-run onboarding hints (move, eat, boost, danger, grow, shark)
-- [ ] Free/generated art pass v1 on seal + main creatures + UI (or clean placeholders) — waiting on assets (see ASSETS.md)
+- [x] Free/generated art pass v1 on seal + main creatures + UI — superseded by the Phase 8 Blender art
 - [x] Deployed to a public URL for testers: https://hungry-seal.horly.dev/ (Vercel, deploys `main`). GitHub Actions (`.github/workflows/ci.yml`) typechecks, lints, unit-tests and builds every push/PR
 **Exit:** a stranger can open the link, understand it, play several runs, buy upgrades, and want another run.
 
-## Phase 5 — Content expansion — [~] in progress
+## Phase 5 — Content expansion ✅
 Goal: enough variety for a full game.
 - [x] Deep + Abyss zones: darkness that deepens with depth (light circle around the seal), glowing creatures/hazards/pickups visible through it; zone banners updated
 - [x] Creature roster: + pufferfish (puffs up, stings if eaten puffed), crab (walks the abyss seabed), lanternfish (glowing deep food); predators + orca (tier 6: always a threat, only edible in a frenzy, from 3 min) and anglerfish (deep/abyss ambusher with a glowing lure). Penguin/turtle done in Phase 4.
-- [~] Growth stages 1-5: scale, speed, bite tier, and camera zoom-out per stage done; distinct seal visuals per stage → art pass
+- [x] Growth stages: scale, speed, bite tier, and camera zoom-out per stage (8 sizes since Phase 8). Distinct seal looks per size stay a post-1.0 idea (the seal grows ~4x instead)
 - [x] All 7 upgrades (+ Big Jaws growth, Coin Whiskers magnet, Feeding Frenzy charge); two-row shop
 - [x] Treasure chests on the seabed (coin burst + 150) and floating magnet orbs (12 s long-range coin magnet); frenzy remains the power-up
 - [x] Predator variety via per-predator spawn rules (schedule or home zones) and AI params (shark chaser, orca late hunter, anglerfish ambusher)
@@ -123,7 +123,7 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] Pooling audit (creatures, hazards, predators, coins, float texts, rings, glows all pooled; only rare pickups are created/destroyed) and `npm run soak`: 4-minute run through every zone + 20 restarts with flat heap (~76 MB after GC), bounded objects, no listener growth, 165 fps
 **Exit (Feature-complete beta):** everything in v1 scope present and balanced.
 
-## Phase 8 — Art, audio, maps and polish (level design + art pass in progress)
+## Phase 8 — Art, audio, maps and polish ✅ (2026-10-24)
 - [x] Final consistent art style pass (Hungry Shark-like chunky cartoon): seal, creatures, backgrounds, UI, icons
   - [x] Blender pipeline: `tools/blender/bridge.mjs` drives Blender over MCP; toon shader + inverted-hull outline
   - [x] All 9 seal skins modeled in Blender (`tools/blender/seal.py`), animated sheets (swim, bite, turn)
@@ -137,17 +137,18 @@ Installed the `frontend-design` and `game-ui-ux` skills and rebuilt every screen
 - [x] Accessibility: reduced motion for UI intros, screen-shake toggle, high-contrast (colour-blind safe) warnings
 - [x] Level design pass ([LEVEL_DESIGN.md](LEVEL_DESIGN.md), `level-design` skill): 40,000 px maps with beaches at both ends, named regions with danger 1-5 (banner + pause map), size-gate currents, 6 pearls per map (3 open the next map), giant-squid boss lairs, eel dens, urchin beds, minefields, toxic/heat clouds, fishing-boat lanes (nets, harpoons, crates), barracuda packs and hammerheads; every map checked reachable per size (`world/mapCheck.test.ts`); terrain bake in a worker
 - [x] Art pass 2 ([ART_DIRECTION.md](ART_DIRECTION.md), `create-game-assets` skill): GPU terrain shader with Blender material tiles; Blender barracuda, hammerhead, moray, electric eel, three squid bosses, fishing boat, net, harpoon, crate; rock/coral/ice clusters set into the terrain edge; beach props (lifeguard tower, umbrellas, sandcastles, huts)
-- [ ] Balance the 40k maps (balance bot per map) and playtest by hand ([REGRESSION.md](REGRESSION.md))
+- [x] Balance the 40k maps: balance bot per map (`BOT_MAP`), fresh and upgraded. Found and fixed: a big seal never went hungry (food intake grows ~4x with size, drain didn't) and Arctic's teaching stretch (Floe Fields) had barracuda packs that ate most size-1/2 seals. Numbers in GAME_DESIGN.md (Difficulty curve). Hand playtest: see the by-hand list in [REGRESSION.md](REGRESSION.md)
 - [x] Size ladder: 8 sizes (~4x growth, LEVEL_DESIGN.md metrics) with camera zoom-out to 0.55, re-tiered and re-sized prey and predators, gulp on eating, spawn density and recycling that follow the view size, darkness sized to the view, a bigger boss; size-7 boss gates and boat ramming are now reachable
-- [ ] Balance the size ladder (stage costs, growth per meal) with the bot on all three maps
+- [x] Balance the size ladder: hunger drain grows with size (x1 -> x1.82), prey you've long outgrown give less nutrition and growth (`mealValue`), stage costs raised to 60/140/260/420/620/880/1200 (size 7, the boss, takes ~5 min of good play instead of ~3)
 
-## Phase 9 — Performance, mobile, and release
-- [ ] Mobile perf profiling (target 60 FPS mid-range); texture atlases, resolution scaling
-- [~] Touch UX refinement, orientation handling: floating joystick, portrait layouts for every screen, phone camera zoom, fullscreen button and safe areas done; remaining: real-device testing
-- [ ] Browser matrix test (Chrome, Safari iOS, Firefox, Edge)
-- [ ] Bundle size + load time optimization, loading screen
-- [ ] PWA/offline (optional), analytics (optional, privacy-respecting)
-- [ ] Release build, versioning, changelog, store page assets (itch.io)
+## Phase 9 — Performance, mobile, and release (1.0 built 2026-10-24; publishing is by hand)
+- [x] Mobile perf profiling (`npm run perf`: emulated phone, CPU x4, frame times + CPU hotspots). The HUD's Graphics were ~40% of a frame (Phaser re-triangulates every arc as 100 points each frame): rounded rects and circles are now small polygons (`ui/shapes.ts`), mine chains a tiled sprite. Worst situation went from ~60 fps / 30 ms p95 to ~155 fps / 6 ms p95. Adaptive resolution steps the pixel ratio down (2 -> 1.5 -> 1.25 -> 1) after 4 s under 45 fps. Atlases: not needed, Phaser 4 batches across textures (draw submission is ~5% of a frame)
+- [~] Touch UX refinement, orientation handling: floating joystick, portrait layouts for every screen, phone camera zoom, fullscreen button and safe areas done; emulated iPhone (WebKit) passes; remaining: a pass on real phones (REGRESSION.md by-hand list)
+- [x] Browser matrix (`npm run browsers`): Chrome, Edge, Firefox, WebKit, WebKit as an iPhone all boot, play and load skins on WebGL. Real iOS Safari sound still to check by hand (Playwright's Windows WebKit has no Web Audio)
+- [x] Bundle size + load time: art as WebP (22.8 -> 2.9 MB), skins you don't wear and bosses load on demand (~80 MB less GPU memory), Phaser in its own long-cached chunk, no source maps in the build; boot downloads ~4.1 MB (~2.9 MB with gzip). HTML loading screen until Phaser's progress bar takes over
+- [x] PWA/offline: web app manifest + icons, service worker (`public/sw.js`), works offline after one visit (`npm run dist-check`). Analytics: none in 1.0 (no backend, nothing to consent to)
+- [x] Release build, versioning (1.0.0, shown on the title screen), [CHANGELOG.md](../CHANGELOG.md), `npm run release` (build + checks + itch.io zip), store images (`npm run store-shots` -> `store/`) and page text ([store/itch-page.md](../store/itch-page.md)); steps in [RELEASE.md](RELEASE.md)
+- [ ] Publish: upload the zip to itch.io and merge to `main` (Vercel deploys it)
 **Exit:** 1.0 released.
 
 ---

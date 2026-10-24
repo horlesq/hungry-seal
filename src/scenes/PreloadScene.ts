@@ -1,9 +1,13 @@
-// Loads everything in the asset manifest with a progress bar, then fills any missing
-// textures with generated placeholders.
+// Loads the asset manifest with a progress bar (except lazy entries: skins you don't wear and
+// bosses, see services/LazyTextures.ts), then fills any missing textures with generated
+// placeholders.
 import Phaser from 'phaser';
 import { ASSET_MANIFEST } from '../config/assets';
 import { SceneKeys } from '../config/keys';
+import { skinDef } from '../config/skins';
 import { audio } from '../services/AudioManager';
+import { finishEntry, LAZY_KEYS, queueEntry } from '../services/LazyTextures';
+import { saves } from '../services/SaveService';
 import { fitUiCamera } from '../services/Viewport';
 import { ensurePlaceholderTextures } from '../systems/PlaceholderArt';
 import { COLORS, uiText } from '../ui/theme';
@@ -18,20 +22,7 @@ export class PreloadScene extends Phaser.Scene {
   preload(): void {
     this.createProgressBar();
 
-    for (const entry of ASSET_MANIFEST) {
-      if (!entry.url) continue;
-      switch (entry.type) {
-        case 'image':
-          this.load.image(entry.key, entry.url);
-          break;
-        case 'spritesheet':
-          this.load.spritesheet(entry.key, entry.url, {
-            frameWidth: entry.frameWidth,
-            frameHeight: entry.frameHeight,
-          });
-          break;
-      }
-    }
+    for (const entry of this.bootEntries()) queueEntry(this.load, entry);
 
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
       console.warn(`[assets] failed to load "${file.key}" (${file.url}); using placeholder`);
@@ -39,20 +30,22 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Real art declares its pixel density in the manifest (e.g. drawn at 2x = resolution 2).
-    for (const entry of ASSET_MANIFEST) {
-      if (entry.url && this.textures.exists(entry.key)) {
-        const data = this.textures.get(entry.key).customData as { resolution?: number };
-        data.resolution = entry.resolution ?? 1;
-      }
-    }
-    const generated = ensurePlaceholderTextures(this);
+    // Real art declares its pixel density in the manifest (e.g. drawn at 2x = resolution 2);
+    // anything that failed gets its placeholder.
+    for (const entry of this.bootEntries()) finishEntry(this, entry);
+    const generated = ensurePlaceholderTextures(this, LAZY_KEYS);
     if (import.meta.env.DEV && generated.length > 0) {
       console.info(`[assets] placeholders generated: ${generated.join(', ')}`);
     }
     ensureUiTextures(this);
     audio.register(this.game);
     this.scene.start(SceneKeys.Menu);
+  }
+
+  /** Everything but the lazy entries, plus the skin the seal is wearing. */
+  private bootEntries() {
+    const skin = skinDef(saves.data.skins.equipped).texture;
+    return ASSET_MANIFEST.filter((e) => !e.lazy || e.key === skin);
   }
 
   private createProgressBar(): void {

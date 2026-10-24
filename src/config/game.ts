@@ -1,5 +1,17 @@
 import Phaser from 'phaser';
+import type { ResolutionParams } from '../utils/resolution';
 import type { Viewport } from '../utils/viewport';
+
+/**
+ * Adaptive resolution (utils/resolution.ts): a run that stays under lowFps for slowSeconds
+ * renders at the next lower pixel ratio. Lasts for the session; the game never steps back up.
+ */
+export const ADAPTIVE_RESOLUTION: ResolutionParams = {
+  lowFps: 45,
+  slowSeconds: 4,
+  settleSeconds: 4,
+  steps: [2, 1.5, 1.25, 1],
+};
 
 /**
  * The canvas backing store is sized in device pixels (sharp on hi-DPI screens) and shown at
@@ -30,6 +42,10 @@ export function createGameConfig(
     render: {
       antialias: true,
       pixelArt: false,
+      // WebGL Graphics cut every arc into 100 points and triangulate them each frame; merging
+      // points closer than 3 screen px keeps rounded HUD panels and buttons smooth for a
+      // fraction of the cost (it was ~40% of a phone's frame).
+      pathDetailThreshold: 3,
     },
     scene: scenes,
   };

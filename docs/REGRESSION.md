@@ -7,6 +7,9 @@ Run before merging a phase or anything that touches gameplay, input, saves or la
 - `npm run soak`: a long run through every depth zone plus 20 restarts; fails if objects, tweens, timers, event listeners or the heap keep growing.
 - After tuning anything in `src/config/`: `npm run balance -- human 600` (fresh save) and `npm run balance -- human 600 3` (all upgrades at level 3), several samples each. Targets in GAME_DESIGN.md (Difficulty curve).
 - Look at the screenshots in `.playtest/`: passing checks don't prove it looks right.
+- After touching rendering, UI drawing or spawning: `npm run perf` (emulated phone, CPU x4). The worst situation should stay well above 60 fps with a p95 under ~17 ms; `PERF_PROFILE=1` shows hotspots.
+- Before a release: `npm run browsers` (Chrome, Edge, Firefox, WebKit, WebKit as an iPhone) and `npm run release` (builds, runs `dist-check`: boot download, service worker, offline start, then zips).
+- Balance on every map: `BOT_MAP=bay|arctic|tropical npm run balance -- human 600 [3]`.
 
 ## By hand (what the bots can't judge)
 On a real phone (`npm run dev:host`, open the network URL), upright and sideways:
@@ -16,6 +19,9 @@ On a real phone (`npm run dev:host`, open the network URL), upright and sideways
 - [ ] Sound starts after the first tap; the mute button works and is remembered.
 - [ ] Switching apps pauses the run; coming back shows the pause menu.
 - [ ] Fullscreen button (Android) enters and leaves fullscreen.
+- [ ] Frame rate holds (no stutter at size 8 in the deep or the boss lair); on an older phone the picture may get a little softer after a few seconds (adaptive resolution), never choppy.
+- [ ] iOS Safari: sound plays after the first tap (the automated WebKit has no Web Audio, so only a real device shows this).
+- [ ] "Add to Home Screen" / "Install app" works; the installed game opens fullscreen and starts in airplane mode after one online visit.
 
 On desktop:
 - [ ] Mouse steering feels direct; hold click to boost; WASD/arrows and Space work.

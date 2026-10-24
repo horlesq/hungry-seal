@@ -25,7 +25,8 @@ from toonkit import (  # noqa: E402
     surface_y, toon_material, tube,
 )
 
-OUT_DIR = os.path.join(REPO_DIR, "public", "assets")
+# Source PNGs; `npm run assets` turns them into the WebP files the game loads.
+OUT_DIR = os.path.join(REPO_DIR, "art")
 FRAME_DU = (176, 88)  # design units per frame (manifest frameWidth/Height = 3x this)
 CENTER = (-0.05, 0.12)  # frame centre (x, z) in BU: the sprite's origin
 

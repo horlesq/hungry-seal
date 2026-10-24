@@ -7,6 +7,7 @@
 import Phaser from 'phaser';
 import { UI_FONT } from '../config/layout';
 import { uiTextResolution } from '../services/Viewport';
+import { fillRoundRect, strokeRoundRect } from './shapes';
 
 export const FONT_FAMILY = UI_FONT;
 
@@ -174,9 +175,9 @@ export function drawPanel(
   const { radius = 24, fill = COLORS.ink, alpha = 0.86, line = 0.16, depth = 0 } = style;
   if (depth > 0) {
     g.fillStyle(COLORS.trench, Math.min(1, alpha + 0.1));
-    g.fillRoundedRect(x, y + depth, w, h, radius);
+    fillRoundRect(g, x, y + depth, w, h, radius);
   }
-  g.fillStyle(fill, alpha).fillRoundedRect(x, y, w, h, radius);
-  if (line > 0) g.lineStyle(2, COLORS.foam, line).strokeRoundedRect(x, y, w, h, radius);
+  fillRoundRect(g.fillStyle(fill, alpha), x, y, w, h, radius);
+  if (line > 0) strokeRoundRect(g.lineStyle(2, COLORS.foam, line), x, y, w, h, radius);
   return g;
 }

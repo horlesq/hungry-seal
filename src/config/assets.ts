@@ -55,6 +55,8 @@ export const TextureKeys = {
   Bubble: 'fx-bubble',
   Droplet: 'fx-droplet',
   Ring: 'fx-ring',
+  /** One link of a mine's anchor chain, tiled down to the seabed. */
+  Chain: 'fx-chain',
   Glow: 'fx-glow',
   LightRays: 'fx-lightrays',
   Surface: 'fx-surface',
@@ -101,14 +103,17 @@ export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
 /**
  * `resolution` = pixels per design unit of the file (default 1). Author art at ~2x its
  * on-screen size and set `resolution: 2` so it stays sharp when the camera zooms in.
+ * `lazy` = not loaded at boot but when a screen needs it (services/LazyTextures.ts): skins
+ * you aren't wearing and the bosses, which together are half the art.
  */
 export type AssetEntry =
-  | { type: 'image'; key: TextureKey; url?: string; resolution?: number }
+  | { type: 'image'; key: TextureKey; url?: string; resolution?: number; lazy?: boolean }
   | {
       type: 'spritesheet';
       key: TextureKey;
       url?: string;
       resolution?: number;
+      lazy?: boolean;
       frameWidth: number;
       frameHeight: number;
     };
@@ -132,13 +137,17 @@ export const SEAL_SHEET = {
 /** Pixels per design unit of the Blender-rendered sheets (tools/blender). */
 const SHEET_RES = 3;
 
-/** A Blender-rendered animation sheet: `<key>-sheet.png`, frames of w x h design units. */
+/**
+ * A Blender-rendered animation sheet: `<key>-sheet.webp` (built from art/ by `npm run assets`),
+ * frames of w x h design units.
+ */
 function sheet(
   key: TextureKey,
   w: number,
   h: number,
-  file = `${key}-sheet.png`,
+  file = `${key}-sheet.webp`,
   res = SHEET_RES,
+  lazy = false,
 ): AssetEntry {
   return {
     type: 'spritesheet',
@@ -147,11 +156,17 @@ function sheet(
     resolution: res,
     frameWidth: w * res,
     frameHeight: h * res,
+    ...(lazy ? { lazy } : {}),
   };
 }
 
-/** Seal skins share one frame size and the SEAL_SHEET layout. */
-const sealSheet = (key: TextureKey, file?: string) => sheet(key, 176, 88, file);
+/**
+ * Seal skins share one frame size and the SEAL_SHEET layout. Lazy: boot loads only the one
+ * you wear; the Skins screen loads the rest.
+ */
+const sealSheet = (key: TextureKey, file?: string) => sheet(key, 176, 88, file, SHEET_RES, true);
+/** Bosses are loaded by the run on the boss's map. */
+const bossSheet = (key: TextureKey) => sheet(key, 380, 200, undefined, 2, true);
 
 /**
  * Looping animation speed (frames per second) of creature sheets; anything not listed plays
@@ -175,7 +190,7 @@ export const ANIM_FPS: Partial<Record<TextureKey, number>> = {
 export const DEFAULT_ANIM_FPS = 8;
 
 export const ASSET_MANIFEST: readonly AssetEntry[] = [
-  sealSheet(TextureKeys.Seal, 'seal-sheet.png'),
+  sealSheet(TextureKeys.Seal, 'seal-sheet.webp'),
   sealSheet(TextureKeys.SealArctic),
   sealSheet(TextureKeys.SealSeaLion),
   sealSheet(TextureKeys.SealTropical),
@@ -206,9 +221,9 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   sheet(TextureKeys.Hammerhead, 240, 110),
   sheet(TextureKeys.MorayEel, 170, 44),
   sheet(TextureKeys.ElectricEel, 180, 44),
-  sheet(TextureKeys.BossKraken, 380, 200, undefined, 2),
-  sheet(TextureKeys.BossColossal, 380, 200, undefined, 2),
-  sheet(TextureKeys.BossAbyssal, 380, 200, undefined, 2),
+  bossSheet(TextureKeys.BossKraken),
+  bossSheet(TextureKeys.BossColossal),
+  bossSheet(TextureKeys.BossAbyssal),
   sheet(TextureKeys.Boat, 360, 200, undefined, 2),
   sheet(TextureKeys.Net, 120, 120),
   sheet(TextureKeys.Harpoon, 90, 16),
@@ -222,6 +237,7 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { type: 'image', key: TextureKeys.Bubble },
   { type: 'image', key: TextureKeys.Droplet },
   { type: 'image', key: TextureKeys.Ring },
+  { type: 'image', key: TextureKeys.Chain },
   { type: 'image', key: TextureKeys.Glow },
   { type: 'image', key: TextureKeys.LightRays },
   { type: 'image', key: TextureKeys.Surface },
@@ -230,7 +246,7 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { type: 'image', key: TextureKeys.SeabedNear },
   { type: 'image', key: TextureKeys.SeabedGround },
   { type: 'image', key: TextureKeys.MarineSnow },
-  { type: 'image', key: TextureKeys.TerrainMaterials, url: 'assets/terrain-materials.png' },
+  { type: 'image', key: TextureKeys.TerrainMaterials, url: 'assets/terrain-materials.webp' },
   sheet(TextureKeys.DecorKelp, 60, 260),
   sheet(TextureKeys.DecorSeaweed, 60, 80),
   sheet(TextureKeys.DecorCoralBranch, 90, 90),

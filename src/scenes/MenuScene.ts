@@ -134,7 +134,9 @@ export class MenuScene extends Phaser.Scene {
     const help = touch
       ? 'Touch and drag anywhere to swim, like a joystick. Tap Boost to dash.'
       : 'Move the mouse or use WASD to swim. Click, Space or Shift to boost.';
-    uiText(this, L.textX, v.viewHeight - safe.bottom - EDGE, help, 'caption', {
+    // Upright: the version sits under the centred help line; wide: in the bottom-right corner.
+    const bottom = v.viewHeight - safe.bottom - EDGE;
+    uiText(this, L.textX, v.portrait ? bottom - 24 : bottom, help, 'caption', {
       size: 18,
       color: CSS.foam,
       align: v.portrait ? 'center' : 'left',
@@ -142,6 +144,17 @@ export class MenuScene extends Phaser.Scene {
     })
       .setOrigin(L.textOrigin, 1)
       .setAlpha(0.8);
+    uiText(
+      this,
+      v.portrait ? v.viewWidth / 2 : v.viewWidth - safe.right - EDGE,
+      bottom,
+      `v${__APP_VERSION__}`,
+      'caption',
+      { size: 14, color: CSS.mist },
+    )
+      .setOrigin(v.portrait ? 0.5 : 1, 1)
+      .setAlpha(0.6)
+      .setName('version');
 
     // Top-right: coin balance, fullscreen, sound.
     const right = v.viewWidth - safe.right - EDGE;

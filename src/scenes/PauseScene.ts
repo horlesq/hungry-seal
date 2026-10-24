@@ -14,6 +14,7 @@ import { mapThumbnail } from '../ui/mapThumb';
 import { COLORS, CSS, drawPanel, EDGE, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
 import { currentMap } from '../world/GameMap';
+import { fillDisc, strokeRing } from '../ui/shapes';
 
 /** Danger colors along the top of the map (calm .. deadly). */
 /** Map panel: header (title + danger strip) above the map, legend below. */
@@ -37,7 +38,10 @@ export class PauseScene extends Phaser.Scene {
     const safe = getSafeInsets();
     const wide = !v.portrait;
     const cx = v.viewWidth / 2;
-    const top = Math.max(safe.top + 10, wide ? (v.viewHeight - 720) / 2 : (v.viewHeight - 1200) / 2);
+    const top = Math.max(
+      safe.top + 10,
+      wide ? (v.viewHeight - 720) / 2 : (v.viewHeight - 1200) / 2,
+    );
 
     // The scrim also swallows clicks so nothing reaches the HUD underneath.
     const scrim = this.add
@@ -45,7 +49,9 @@ export class PauseScene extends Phaser.Scene {
       .setOrigin(0)
       .setInteractive();
     const content = this.add.container(0, 0);
-    content.add(uiText(this, cx, top + 52, 'Paused', 'title', { size: wide ? 56 : 52 }).setOrigin(0.5));
+    content.add(
+      uiText(this, cx, top + 52, 'Paused', 'title', { size: wide ? 56 : 52 }).setOrigin(0.5),
+    );
 
     // Laid out top-down: title, map panel (header + map + legend), buttons.
     const mapW = wide ? Math.min(1160, v.viewWidth - 80) : Math.min(660, v.viewWidth - 40);
@@ -73,7 +79,9 @@ export class PauseScene extends Phaser.Scene {
       variant: 'primary',
       fontSize: 34,
     });
-    const restart = make('Restart run', 'restart', () => this.restartRun(), { icon: UiTextures.Restart });
+    const restart = make('Restart run', 'restart', () => this.restartRun(), {
+      icon: UiTextures.Restart,
+    });
     const settings = make('Settings', 'settings', () => this.openSettings());
     const quit = make('Quit to menu', 'quit', () => this.quit(), { variant: 'quiet' });
     buttons.push(resume, restart, settings, quit);
@@ -129,7 +137,12 @@ export class PauseScene extends Phaser.Scene {
   }
 
   /** The whole map with markers, centred at (x, y). */
-  private mapPanel(x: number, y: number, width: number, stretch: number): Phaser.GameObjects.Container {
+  private mapPanel(
+    x: number,
+    y: number,
+    width: number,
+    stretch: number,
+  ): Phaser.GameObjects.Container {
     const map = currentMap();
     const def = map.def;
     const panel = this.add.container(x, y);
@@ -142,11 +155,18 @@ export class PauseScene extends Phaser.Scene {
     const Y = (wy: number) => -h / 2 + wy * sy;
 
     const bg = this.add.graphics();
-    drawPanel(bg, -w / 2 - 16, -h / 2 - PANEL_HEAD, w + 32, h + PANEL_HEAD + PANEL_FOOT, { alpha: 0.92 });
-    const game = this.scene.get(SceneKeys.Game) as Phaser.Scene & { seal?: { x: number; y: number } };
+    drawPanel(bg, -w / 2 - 16, -h / 2 - PANEL_HEAD, w + 32, h + PANEL_HEAD + PANEL_FOOT, {
+      alpha: 0.92,
+    });
+    const game = this.scene.get(SceneKeys.Game) as Phaser.Scene & {
+      seal?: { x: number; y: number };
+    };
     const here = game?.seal ? map.regionAt(game.seal.x, game.seal.y) : def.regions[0];
     const found = saves.data.maps.pearls[map.id] ?? [];
-    const title = uiText(this, -w / 2, -h / 2 - 70, def.name, 'heading', { size: 28 }).setOrigin(0, 0.5);
+    const title = uiText(this, -w / 2, -h / 2 - 70, def.name, 'heading', { size: 28 }).setOrigin(
+      0,
+      0.5,
+    );
     const where = uiText(this, w / 2, -h / 2 - 70, `You are in ${here.name}`, 'caption', {
       size: 17,
       color: CSS.glacier,
@@ -159,7 +179,12 @@ export class PauseScene extends Phaser.Scene {
       if (r.y0 !== undefined) continue; // lairs are marked separately
       const x0 = X(r.x0);
       const x1 = X(r.x1);
-      g.fillStyle(dangerColor(r.danger), r.id === here.id ? 1 : 0.6).fillRect(x0, -h / 2 - 34, x1 - x0 - 2, 8);
+      g.fillStyle(dangerColor(r.danger), r.id === here.id ? 1 : 0.6).fillRect(
+        x0,
+        -h / 2 - 34,
+        x1 - x0 - 2,
+        8,
+      );
       const label = uiText(this, (x0 + x1) / 2, -h / 2 - 44, r.name, 'caption', {
         size: 12,
         weight: r.id === here.id ? 800 : 600,
@@ -171,7 +196,12 @@ export class PauseScene extends Phaser.Scene {
 
     // Gates: a bar across each current with its size.
     for (const gate of def.gates) {
-      g.fillStyle(COLORS.gold, 0.9).fillRect(X(gate.x - gate.w / 2), Y(gate.y) - 1.5, Math.max(4, gate.w * sx), 3);
+      g.fillStyle(COLORS.gold, 0.9).fillRect(
+        X(gate.x - gate.w / 2),
+        Y(gate.y) - 1.5,
+        Math.max(4, gate.w * sx),
+        3,
+      );
       labels.push(
         uiText(this, X(gate.x + gate.w / 2) + 4, Y(gate.y), String(gate.minStage), 'caption', {
           size: 13,
@@ -182,18 +212,20 @@ export class PauseScene extends Phaser.Scene {
     }
     // Chests.
     for (const t of def.treasure) {
-      g.fillStyle(COLORS.gold, 1).fillCircle(X(t.x), Y(t.y), 3.5);
+      fillDisc(g.fillStyle(COLORS.gold, 1), X(t.x), Y(t.y), 3.5);
     }
     // The boss lair.
     const bx = X(def.boss.x);
     const by = Y(def.boss.y);
     const beaten = saves.data.maps.bosses.includes(map.id);
-    g.fillStyle(beaten ? COLORS.mist : COLORS.coral, 1).fillCircle(bx, by, 8);
-    g.lineStyle(2.5, COLORS.trench, 1).lineBetween(bx - 4, by - 4, bx + 4, by + 4).lineBetween(bx + 4, by - 4, bx - 4, by + 4);
+    fillDisc(g.fillStyle(beaten ? COLORS.mist : COLORS.coral, 1), bx, by, 8);
+    g.lineStyle(2.5, COLORS.trench, 1)
+      .lineBetween(bx - 4, by - 4, bx + 4, by + 4)
+      .lineBetween(bx + 4, by - 4, bx - 4, by + 4);
     // Pearls: filled = found, rings = still out there.
     def.pearls.forEach((p, i) => {
-      if (found.includes(i)) g.fillStyle(0xffd6f5, 1).fillCircle(X(p.x), Y(p.y), 5);
-      else g.lineStyle(2, 0xffd6f5, 0.95).strokeCircle(X(p.x), Y(p.y), 5);
+      if (found.includes(i)) fillDisc(g.fillStyle(0xffd6f5, 1), X(p.x), Y(p.y), 5);
+      else strokeRing(g.lineStyle(2, 0xffd6f5, 0.95), X(p.x), Y(p.y), 5);
     });
 
     // Legend.

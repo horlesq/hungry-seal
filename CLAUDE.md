@@ -20,6 +20,11 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 - `npm run balance -- human 600 [upgradeLevel]` — bot plays a run (optionally with every upgrade at a level); use it after any tuning change in `config/*.ts`. Take several samples (high variance). Run batches of 2-4 per background task (each run can take 10 min).
 - `node tools/blender/bridge.mjs exec tools/blender/<name>.py` — rebuild and render a Blender-modeled sprite (Blender open with the MCP add-on; see ASSETS.md).
 - `npm run soak` — long run + 20 restarts; fails on growing objects, listeners or heap.
+- `npm run perf` — emulated mid-range phone, frame times per heavy situation (`PERF_PROFILE=1` for hotspots). Run after rendering/UI/spawning changes.
+- `npm run browsers` — Chrome, Edge, Firefox, WebKit, iPhone (WebKit) smoke test.
+- `npm run assets` — after rendering Blender sprites (they land in `art/`): builds the WebP files in `public/assets/` and the app icons.
+- `npm run release` — build + `dist-check` (download size, service worker, offline) + itch.io zip in `release/`. Steps: [docs/RELEASE.md](docs/RELEASE.md).
+- Balance per map: `BOT_MAP=arctic npm run balance -- human 600`.
 - Release checklist: [docs/REGRESSION.md](docs/REGRESSION.md).
 - URL flags: `?debug` (overlay + hit circles, or press `), `?calm` (no hazards/predators), `?canvasTerrain` (old canvas terrain instead of the shader).
 - Git: `main` holds finished phases; do each phase on a `phase-N-...` branch.
@@ -30,6 +35,7 @@ TypeScript + Vite + Phaser 4. No physics plugin: custom kinematic motion + circl
 - Use the design system in `src/ui/`: tokens and `uiText()` in `theme.ts`, `Button` (+ `setName` for tests), `FocusNav` for keyboard, `widgets.ts`. No ad-hoc fonts, colors or glossy buttons.
 - Buoy orange (`variant: 'primary'`) is for the single main action on a screen; gold is for spending coins.
 - Anchor to view edges plus `getSafeInsets()`; check desktop and phone screenshots after UI changes.
+- Draw rounded rects, circles and arcs with `ui/shapes.ts`, never Graphics' `fillRoundedRect`/`fillCircle`/`arc` (WebGL re-triangulates them every frame; it was ~40% of a phone frame).
 
 ## Decisions already made (do not re-litigate)
 - Side-scroll, free 2D swim in all directions; seal can leap out of the water.

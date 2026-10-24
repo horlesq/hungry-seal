@@ -14,6 +14,7 @@ import { COLORS, CSS, drawPanel, EDGE, formatNumber, uiText } from '../ui/theme'
 import { UiTextures } from '../ui/uiTextures';
 import { addBackdrop, BACKDROPS, CurrencyPill } from '../ui/widgets';
 import { DESIGN_HEIGHT } from '../utils/viewport';
+import { fillDisc } from '../ui/shapes';
 
 const PANEL_TOP = 112;
 const BADGE = { w: 104, h: 150 };
@@ -114,7 +115,7 @@ export class StatsScene extends Phaser.Scene {
     runs.forEach((r, i) => {
       const y = b.y + 84 + i * 46;
       const g = this.add.graphics();
-      g.fillStyle(i === 0 ? COLORS.gold : COLORS.inkRaised, 1).fillCircle(b.x + 38, y, 17);
+      fillDisc(g.fillStyle(i === 0 ? COLORS.gold : COLORS.inkRaised, 1), b.x + 38, y, 17);
       uiText(this, b.x + 38, y + 1, String(i + 1), 'heading', {
         size: 20,
         color: i === 0 ? CSS.ink : CSS.foam,
@@ -165,8 +166,8 @@ export class StatsScene extends Phaser.Scene {
       const x = b.x + (b.w - gridW) / 2 + (i % cols) * BADGE.w + BADGE.w / 2;
       const y = b.y + 92 + Math.floor(i / cols) * (BADGE.h + 4);
       const g = this.add.graphics();
-      g.fillStyle(COLORS.trench, 0.7).fillCircle(x, y + 3, 28);
-      g.fillStyle(done ? COLORS.gold : COLORS.inkRaised, 1).fillCircle(x, y, 28);
+      fillDisc(g.fillStyle(COLORS.trench, 0.7), x, y + 3, 28);
+      fillDisc(g.fillStyle(done ? COLORS.gold : COLORS.inkRaised, 1), x, y, 28);
       const icon = this.add.image(x, y, done ? UiTextures.Star : UiTextures.Lock);
       icon.setScale((done ? 34 : 26) / icon.frame.width).setTint(done ? COLORS.ink : COLORS.mist);
       const name = uiText(this, x, y + 40, a.name, 'caption', {

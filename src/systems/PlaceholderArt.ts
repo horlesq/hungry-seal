@@ -84,6 +84,7 @@ const PAINTERS: Partial<Record<TextureKey, Painter>> = {
   [TextureKeys.Bubble]: { width: 32, height: 32, draw: drawBubble, res: HI },
   [TextureKeys.Droplet]: { width: 16, height: 16, draw: drawDroplet, res: HI },
   [TextureKeys.Ring]: { width: 128, height: 32, draw: drawRing, res: HI },
+  [TextureKeys.Chain]: { width: 12, height: 14, draw: drawChain, res: HI },
   [TextureKeys.Glow]: { width: 256, height: 256, draw: drawGlow },
   [TextureKeys.LightRays]: { width: 1024, height: 640, draw: drawLightRays },
   [TextureKeys.Surface]: { width: 256, height: 64, draw: drawSurface, res: HI },
@@ -104,23 +105,35 @@ for (const skin of SKINS) {
   };
 }
 
-/** Paints every placeholder whose key has no texture yet. Returns the generated keys. */
-export function ensurePlaceholderTextures(scene: Phaser.Scene): string[] {
+/**
+ * Paints every placeholder whose key has no texture yet, except `skip` (textures loaded
+ * later, on demand). Returns the generated keys.
+ */
+export function ensurePlaceholderTextures(
+  scene: Phaser.Scene,
+  skip: ReadonlySet<string> = new Set(),
+): string[] {
   const generated: string[] = [];
-  for (const [key, painter] of Object.entries(PAINTERS) as Array<[TextureKey, Painter]>) {
-    if (scene.textures.exists(key)) continue;
-    const res = painter.res ?? 1;
-    const texture = scene.textures.createCanvas(key, painter.width * res, painter.height * res);
-    if (!texture) continue;
-    texture.context.save();
-    texture.context.scale(res, res);
-    painter.draw(texture.context, painter.width, painter.height);
-    texture.context.restore();
-    texture.refresh();
-    (texture.customData as { resolution?: number }).resolution = res;
-    generated.push(key);
+  for (const key of Object.keys(PAINTERS) as TextureKey[]) {
+    if (!skip.has(key) && paintPlaceholder(scene, key)) generated.push(key);
   }
   return generated;
+}
+
+/** Paints one placeholder if the key has none yet and there's a painter for it. */
+export function paintPlaceholder(scene: Phaser.Scene, key: TextureKey): boolean {
+  const painter = PAINTERS[key];
+  if (!painter || scene.textures.exists(key)) return false;
+  const res = painter.res ?? 1;
+  const texture = scene.textures.createCanvas(key, painter.width * res, painter.height * res);
+  if (!texture) return false;
+  texture.context.save();
+  texture.context.scale(res, res);
+  painter.draw(texture.context, painter.width, painter.height);
+  texture.context.restore();
+  texture.refresh();
+  (texture.customData as { resolution?: number }).resolution = res;
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -813,7 +826,7 @@ function drawEel(
   for (let i = 0; i <= 20; i++) {
     const t = i / 20;
     const x = 4 + t * (w - 30);
-    const thick = (h * 0.42) * (0.25 + 0.75 * Math.pow(t, 0.6));
+    const thick = h * 0.42 * (0.25 + 0.75 * Math.pow(t, 0.6));
     const wave = Math.sin(t * Math.PI * 2.2) * h * 0.08 * (1 - t);
     top.push([x, cy + wave - thick / 2]);
     bottom.push([x, cy + wave + thick / 2]);
@@ -823,7 +836,12 @@ function drawEel(
   ctx.moveTo(top[0][0], top[0][1]);
   for (const [x, y] of top) ctx.lineTo(x, y);
   ctx.quadraticCurveTo(w - 2, cy - h * 0.18, w - 4, cy);
-  ctx.quadraticCurveTo(w - 2, cy + h * 0.2, bottom[bottom.length - 1][0], bottom[bottom.length - 1][1]);
+  ctx.quadraticCurveTo(
+    w - 2,
+    cy + h * 0.2,
+    bottom[bottom.length - 1][0],
+    bottom[bottom.length - 1][1],
+  );
   for (let i = bottom.length - 1; i >= 0; i--) ctx.lineTo(bottom[i][0], bottom[i][1]);
   ctx.closePath();
   ctx.fill();
@@ -1403,6 +1421,17 @@ function drawRing(ctx: Ctx, w: number, h: number): void {
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.ellipse(w / 2, h / 2, w / 2 - 4, h / 2 - 4, 0, 0, TAU);
+  ctx.stroke();
+}
+
+/** A mine's anchor chain, one link per tile: a dark cable with a grey link around it. */
+function drawChain(ctx: Ctx, w: number, h: number): void {
+  ctx.fillStyle = '#2a2f36';
+  ctx.fillRect(w / 2 - 2, 0, 4, h);
+  ctx.strokeStyle = '#6b7380';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(w / 2, h / 2, 3, 5, 0, 0, TAU);
   ctx.stroke();
 }
 

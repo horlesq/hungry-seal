@@ -3,7 +3,7 @@
 # so the terrain shader can tint them per map (docs/ART_DIRECTION.md).
 #
 # Run from the repo root: node tools/blender/bridge.mjs exec tools/blender/materials.py
-# Output: public/assets/terrain-materials.png (1024x1024, tiles in a 2x2 grid:
+# Output: art/terrain-materials.png (1024x1024, tiles in a 2x2 grid:
 #   0 rock (top-left), 1 sand (top-right), 2 coral stone (bottom-left), 3 plates (bottom-right)).
 #
 # Seamless by construction: every object near an edge is also placed one tile over, and the
@@ -23,7 +23,8 @@ import toonkit  # noqa: E402
 importlib.reload(toonkit)
 from toonkit import clear_scene, link  # noqa: E402
 
-OUT = os.path.join(REPO_DIR, "public", "assets", "terrain-materials.png")
+# Source PNG; `npm run assets` turns it into the WebP file the game loads.
+OUT = os.path.join(REPO_DIR, "art", "terrain-materials.png")
 TILE = 4.0  # world units per tile
 PX = 512
 

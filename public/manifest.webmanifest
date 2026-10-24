@@ -1,0 +1,22 @@
+{
+  "name": "Hungry Seal",
+  "short_name": "Hungry Seal",
+  "description": "A bright, chunky arcade swim-and-eat game. Gobble fish, grow 8 sizes, dodge sharks and beat the squid bosses.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#041a31",
+  "theme_color": "#041a31",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

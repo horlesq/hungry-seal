@@ -16,6 +16,7 @@ import { COLORS, CSS, drawPanel, EDGE, UPGRADE_HUES, uiText } from '../ui/theme'
 import { UiTextures, type UiTexture } from '../ui/uiTextures';
 import { addBackdrop, BACKDROPS, CurrencyPill, drawSegments } from '../ui/widgets';
 import { DESIGN_HEIGHT } from '../utils/viewport';
+import { fillDisc } from '../ui/shapes';
 
 const CARD_W = 596;
 const CARD_H = 108;
@@ -122,8 +123,8 @@ export class ShopScene extends Phaser.Scene {
     });
     // Icon well in the upgrade's own hue.
     const wellX = -CARD_W / 2 + 56;
-    bg.fillStyle(COLORS.trench, 0.6).fillCircle(wellX, 3, 36);
-    bg.fillStyle(UPGRADE_HUES[def.id], 1).fillCircle(wellX, 0, 36);
+    fillDisc(bg.fillStyle(COLORS.trench, 0.6), wellX, 3, 36);
+    fillDisc(bg.fillStyle(UPGRADE_HUES[def.id], 1), wellX, 0, 36);
     const icon = this.add.image(wellX, 0, ICONS[def.id]);
     icon.setScale(40 / icon.frame.width).setTint(COLORS.ink);
 

@@ -9,6 +9,7 @@ import { TextureKeys } from '../config/assets';
 import { SceneKeys } from '../config/keys';
 import { SKINS, skinDef, type Currency, type SkinDef, type SkinId } from '../config/skins';
 import { audio } from '../services/AudioManager';
+import { finishTextures, queueTextures, releaseTextures } from '../services/LazyTextures';
 import { saves } from '../services/SaveService';
 import {
   fitUiCamera,
@@ -54,7 +55,27 @@ export class SkinsScene extends Phaser.Scene {
     super({ key: SceneKeys.Skins });
   }
 
+  /** Every skin's sheet (boot only loads the one you wear). */
+  private get skinTextures() {
+    return SKINS.map((s) => s.texture);
+  }
+
+  preload(): void {
+    if (queueTextures(this, this.skinTextures) === 0) return;
+    const v = fitUiCamera(this);
+    addBackdrop(this, v, BACKDROPS.deep);
+    uiText(this, v.viewWidth / 2, v.viewHeight / 2, 'Loading skins...', 'heading', {
+      size: 30,
+    }).setOrigin(0.5);
+  }
+
   create(): void {
+    finishTextures(this, this.skinTextures);
+    // Keep only the worn skin in memory once we leave.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>
+      releaseTextures(this, this.skinTextures, [skinDef(saves.data.skins.equipped).texture]),
+    );
+    this.children.removeAll(true);
     this.cards = [];
     this.leaving = false;
     this.selected = saves.data.skins.equipped;

@@ -9,9 +9,12 @@ import {
   type Insets,
   type Viewport,
 } from '../utils/viewport';
+import { nextResolutionStep } from '../utils/resolution';
 
 let current: Viewport = computeViewport(1280, 720, 1);
 let safe: Insets = NO_INSETS;
+/** Pixel-ratio cap for the session, lowered by adaptive resolution on slow devices. */
+let dprCap = Infinity;
 
 export function getViewport(): Viewport {
   return current;
@@ -27,7 +30,7 @@ export function measureViewport(): Viewport {
   current = computeViewport(
     window.innerWidth,
     window.innerHeight,
-    window.devicePixelRatio,
+    Math.min(window.devicePixelRatio, dprCap),
     isMobileDevice(),
   );
   safe = cssInsetsToDesign(readSafeAreaCss(), current);
@@ -74,6 +77,18 @@ export function applyViewport(game: Phaser.Game): void {
   game.scale.resize(v.width, v.height);
   game.scale.setZoom(1 / v.dpr);
   game.registry.set('viewport', v);
+}
+
+/**
+ * Renders fewer pixels from now on (the next lower step of `steps`). Returns the new pixel
+ * ratio, or null if it's already as low as it goes. Scenes re-fit on the resize as usual.
+ */
+export function lowerResolution(game: Phaser.Game, steps: readonly number[]): number | null {
+  const next = nextResolutionStep(current.dpr, steps);
+  if (next === null) return null;
+  dprCap = next;
+  applyViewport(game);
+  return next;
 }
 
 /**

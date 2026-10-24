@@ -35,6 +35,7 @@ import { COLORS, CSS, drawPanel, EDGE, formatNumber, uiText } from '../ui/theme'
 import { UiTextures } from '../ui/uiTextures';
 import { PEARL_KEY } from '../systems/Pearls';
 import { drawBar, drawSegments } from '../ui/widgets';
+import { fillDisc, strokeArc, strokeRing, strokeRoundRect } from '../ui/shapes';
 
 /** Status panel geometry (relative to its top-left corner). */
 const PANEL = { w: 436, h: 106 };
@@ -352,7 +353,9 @@ export class HudScene extends Phaser.Scene {
       this.bossRoot = this.add.container(0, 0, [this.bossBar, this.bossName]);
     }
     const v = getViewport();
-    this.bossRoot.setPosition(v.viewWidth / 2, v.viewHeight - getSafeInsets().bottom - 64).setVisible(b.show);
+    this.bossRoot
+      .setPosition(v.viewWidth / 2, v.viewHeight - getSafeInsets().bottom - 64)
+      .setVisible(b.show);
     if (!b.show) return;
     this.bossName.setText(b.name);
     const w = 360;
@@ -360,7 +363,8 @@ export class HudScene extends Phaser.Scene {
     drawBar(g, -w / 2, 6, w, 18, b.hp / b.max, COLORS.coral);
     // Heart notches.
     g.lineStyle(2, COLORS.trench, 0.9);
-    for (let i = 1; i < b.max; i++) g.lineBetween(-w / 2 + (w * i) / b.max, 6, -w / 2 + (w * i) / b.max, 24);
+    for (let i = 1; i < b.max; i++)
+      g.lineBetween(-w / 2 + (w * i) / b.max, 6, -w / 2 + (w * i) / b.max, 24);
   }
 
   private onPearls(p: { found: number; total: number }): void {
@@ -416,7 +420,7 @@ export class HudScene extends Phaser.Scene {
       alpha: 0.84,
       line: 0,
     });
-    this.hintBg.lineStyle(2, COLORS.glacier, 0.45).strokeRoundedRect(-w / 2, -h / 2, w, h, 28);
+    strokeRoundRect(this.hintBg.lineStyle(2, COLORS.glacier, 0.45), -w / 2, -h / 2, w, h, 28);
     this.hintRoot.setAlpha(0).setScale(0.94);
     this.tweens.add({
       targets: this.hintRoot,
@@ -452,9 +456,9 @@ export class HudScene extends Phaser.Scene {
     const gap = 26;
     for (let i = 0; i < 5; i++) {
       const x = (i - 2) * gap;
-      g.fillStyle(COLORS.trench, 0.75).fillCircle(x, y, 10);
-      if (i < danger) g.fillStyle(color, 1).fillCircle(x, y, 7);
-      else g.lineStyle(2, COLORS.mist, 0.5).strokeCircle(x, y, 6);
+      fillDisc(g.fillStyle(COLORS.trench, 0.75), x, y, 10);
+      if (i < danger) fillDisc(g.fillStyle(color, 1), x, y, 7);
+      else strokeRing(g.lineStyle(2, COLORS.mist, 0.5), x, y, 6);
     }
   }
 
@@ -544,8 +548,8 @@ export class HudScene extends Phaser.Scene {
     const b = TOUCH_UI.boostButton;
     const bg = this.add.graphics();
     // Positioned in layout().
-    bg.fillStyle(COLORS.ink, 0.5).fillCircle(0, 0, b.radius);
-    bg.lineStyle(3, COLORS.foam, 0.55).strokeCircle(0, 0, b.radius);
+    fillDisc(bg.fillStyle(COLORS.ink, 0.5), 0, 0, b.radius);
+    strokeRing(bg.lineStyle(3, COLORS.foam, 0.55), 0, 0, b.radius);
     const bolt = this.add.image(0, -12, UiTextures.Bolt).setTint(COLORS.foam);
     bolt.setScale(44 / bolt.frame.width);
     const label = uiText(this, 0, 28, 'Boost', 'caption', { weight: 800, color: CSS.foam });
@@ -560,11 +564,10 @@ export class HudScene extends Phaser.Scene {
     const r = TOUCH_UI.boostButton.radius + 9;
     const g = this.boostRing;
     g.clear();
-    g.lineStyle(8, COLORS.trench, 0.45).strokeCircle(0, 0, r);
+    strokeRing(g.lineStyle(8, COLORS.trench, 0.45), 0, 0, r);
     g.lineStyle(8, this.boost.active ? COLORS.gold : COLORS.glacier, 1);
-    g.beginPath();
-    g.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * this.boost.stamina);
-    g.strokePath();
+    const top = -Math.PI / 2;
+    strokeArc(g, 0, 0, r, top, top + Math.PI * 2 * this.boost.stamina);
   }
 
   private onBoost(state: BoostState): void {
@@ -618,7 +621,7 @@ export class HudScene extends Phaser.Scene {
     const h = 66;
     this.toastBg.clear();
     drawPanel(this.toastBg, -w / 2, -h / 2, w, h, { radius: 22, alpha: 0.9, line: 0 });
-    this.toastBg.lineStyle(2, COLORS.gold, 0.8).strokeRoundedRect(-w / 2, -h / 2, w, h, 22);
+    strokeRoundRect(this.toastBg.lineStyle(2, COLORS.gold, 0.8), -w / 2, -h / 2, w, h, 22);
     const left = -w / 2 + 20;
     (this.toast.getByName('check') as Phaser.GameObjects.Image).setX(left + 15);
     label.setX(left + 44);
@@ -638,11 +641,11 @@ export class HudScene extends Phaser.Scene {
   private createStick(): void {
     const r = INPUT.stick.radius;
     const base = this.add.graphics();
-    base.fillStyle(COLORS.ink, 0.35).fillCircle(0, 0, r);
-    base.lineStyle(3, COLORS.foam, 0.5).strokeCircle(0, 0, r);
+    fillDisc(base.fillStyle(COLORS.ink, 0.35), 0, 0, r);
+    strokeRing(base.lineStyle(3, COLORS.foam, 0.5), 0, 0, r);
     this.stickKnob = this.add.graphics();
-    this.stickKnob.fillStyle(COLORS.ink, 0.5).fillCircle(0, 3, TOUCH_UI.stickKnob);
-    this.stickKnob.fillStyle(COLORS.foam, 0.9).fillCircle(0, 0, TOUCH_UI.stickKnob);
+    fillDisc(this.stickKnob.fillStyle(COLORS.ink, 0.5), 0, 3, TOUCH_UI.stickKnob);
+    fillDisc(this.stickKnob.fillStyle(COLORS.foam, 0.9), 0, 0, TOUCH_UI.stickKnob);
     this.stick = this.add.container(0, 0, [base, this.stickKnob]);
     this.stick.setVisible(this.sys.game.device.input.touch);
     this.stickActive = false;

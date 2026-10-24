@@ -2,7 +2,7 @@
 # animation sheet for each: tails sweep, wings flap, legs walk, bells pulse.
 #
 # Run from the repo root: node tools/blender/bridge.mjs exec tools/blender/creatures.py [ONLY=shark,crab]
-# Output: public/assets/<texture key>-sheet.png, frames of the placeholder's design size x3
+# Output: art/<texture key>-sheet.png, frames of the placeholder's design size x3
 # (x2 for the bosses), 2 columns. Everything faces +X (right) and is centred on the frame, like the placeholders.
 import importlib
 import math
@@ -24,7 +24,8 @@ from toonkit import (  # noqa: E402
     setup_render, skin_tube, smooth01, surface_y, toon_material, tube,
 )
 
-OUT_DIR = os.path.join(REPO_DIR, "public", "assets")
+# Source PNGs; `npm run assets` turns them into the WebP files the game loads.
+OUT_DIR = os.path.join(REPO_DIR, "art")
 COLS = 2
 TAU = 2 * math.pi
 

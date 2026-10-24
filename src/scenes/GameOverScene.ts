@@ -15,6 +15,7 @@ import { FocusNav } from '../ui/FocusNav';
 import { COLORS, CSS, drawPanel, formatNumber, reducedMotion, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
 import { DESIGN_HEIGHT } from '../utils/viewport';
+import { fillRoundRect } from '../ui/shapes';
 
 /** Ignore input briefly so a click/finger still held from the run doesn't skip the screen. */
 const INPUT_DELAY = 700;
@@ -337,8 +338,8 @@ export class GameOverScene extends Phaser.Scene {
     const w = label.width + 36;
     const h = 44;
     const g = this.add.graphics();
-    g.fillStyle(COLORS.goldEdge, 1).fillRoundedRect(-w / 2, -h / 2 + 4, w, h, h / 2);
-    g.fillStyle(COLORS.gold, 1).fillRoundedRect(-w / 2, -h / 2, w, h, h / 2);
+    fillRoundRect(g.fillStyle(COLORS.goldEdge, 1), -w / 2, -h / 2 + 4, w, h, h / 2);
+    fillRoundRect(g.fillStyle(COLORS.gold, 1), -w / 2, -h / 2, w, h, h / 2);
     return this.add.container(right - w / 2, y, [g, label]);
   }
 

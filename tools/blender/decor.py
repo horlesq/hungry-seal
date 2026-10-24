@@ -4,7 +4,7 @@
 # else is a single frame.
 #
 # Run from the repo root: node tools/blender/bridge.mjs exec tools/blender/decor.py [ONLY=kelp,chest]
-# Output: public/assets/<texture key>-sheet.png. Ground decor stands on the bottom edge of its
+# Output: art/<texture key>-sheet.png. Ground decor stands on the bottom edge of its
 # frame (the game anchors it bottom-centre); icicles hang from the top edge.
 import importlib
 import math
@@ -25,7 +25,8 @@ from toonkit import (  # noqa: E402
     skin_tube, smooth01, surface_y, toon_material, tube,
 )
 
-OUT_DIR = os.path.join(REPO_DIR, "public", "assets")
+# Source PNGs; `npm run assets` turns them into the WebP files the game loads.
+OUT_DIR = os.path.join(REPO_DIR, "art")
 TAU = 2 * math.pi
 INK = H("#1f1a26")
 

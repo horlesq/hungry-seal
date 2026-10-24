@@ -6,6 +6,7 @@ import { textureScale } from '../services/Viewport';
 import type { Viewport } from '../utils/viewport';
 import { COLORS, CSS, drawPanel, formatNumber, reducedMotion, uiText } from './theme';
 import { UiTextures } from './uiTextures';
+import { fillRoundRect } from './shapes';
 
 export interface Backdrop {
   top: number;
@@ -114,9 +115,9 @@ export function drawSegments(
   const r = Math.min(h / 2, segW / 2);
   for (let i = 0; i < count; i++) {
     const sx = x + i * (segW + gap);
-    g.fillStyle(COLORS.trench, 0.75).fillRoundedRect(sx, y, segW, h, r);
+    fillRoundRect(g.fillStyle(COLORS.trench, 0.75), sx, y, segW, h, r);
     const f = Phaser.Math.Clamp(filled - i, 0, 1);
-    if (f > 0) g.fillStyle(color, 1).fillRoundedRect(sx, y, Math.max(h, segW * f), h, r);
+    if (f > 0) fillRoundRect(g.fillStyle(color, 1), sx, y, Math.max(h, segW * f), h, r);
   }
 }
 
@@ -132,14 +133,15 @@ export function drawBar(
   alpha = 1,
 ): void {
   const r = h / 2;
-  g.fillStyle(COLORS.trench, 0.75).fillRoundedRect(x, y, w, h, r);
+  fillRoundRect(g.fillStyle(COLORS.trench, 0.75), x, y, w, h, r);
   const f = Phaser.Math.Clamp(frac, 0, 1);
   if (f <= 0) return;
   const fw = Math.max(h, w * f);
-  g.fillStyle(color, alpha).fillRoundedRect(x, y, fw, h, r);
+  fillRoundRect(g.fillStyle(color, alpha), x, y, fw, h, r);
   // Soft top highlight so fills read as liquid rather than flat paint.
   if (h >= 14) {
-    g.fillStyle(0xffffff, 0.22 * alpha).fillRoundedRect(
+    fillRoundRect(
+      g.fillStyle(0xffffff, 0.22 * alpha),
       x + r / 2,
       y + 3,
       fw - r,
