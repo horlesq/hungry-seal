@@ -34,14 +34,7 @@ export interface GrowthState {
 }
 
 export type DamageSource =
-  | HazardId
-  | PredatorId
-  | 'pufferfish'
-  | 'moray'
-  | 'eel'
-  | 'boss'
-  | 'net'
-  | 'harpoon';
+  HazardId | PredatorId | 'pufferfish' | 'moray' | 'eel' | 'boss' | 'net' | 'harpoon';
 export type DeathCause = 'starved' | DamageSource;
 
 export interface ComboState {

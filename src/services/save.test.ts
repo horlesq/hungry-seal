@@ -106,7 +106,13 @@ describe('save data', () => {
       runs: 5,
       skins: { owned: ['harbor', 'walrus'], equipped: 'walrus' },
     });
-    expect(s).toMatchObject({ version: SAVE_VERSION, coins: 300, gems: 0, runs: 5, achievements: [] });
+    expect(s).toMatchObject({
+      version: SAVE_VERSION,
+      coins: 300,
+      gems: 0,
+      runs: 5,
+      achievements: [],
+    });
     expect(s.skins.equipped).toBe('walrus');
     expect(s.stats).toEqual(emptyLifetimeStats());
     expect(s.missions.active.map((m) => m.id)).toEqual(STARTER_MISSIONS);
@@ -230,7 +236,11 @@ describe('save data', () => {
 
   it('migrates pearls and bosses (v6), dropping junk', () => {
     const s = migrateSave({
-      maps: { selected: 'bay', pearls: { bay: [0, 2, 2, 9, 'x'], nowhere: [1] }, bosses: ['bay', 'moon'] },
+      maps: {
+        selected: 'bay',
+        pearls: { bay: [0, 2, 2, 9, 'x'], nowhere: [1] },
+        bosses: ['bay', 'moon'],
+      },
     });
     expect(s.maps.pearls).toEqual({ bay: [0, 2] });
     expect(s.maps.bosses).toEqual(['bay']);

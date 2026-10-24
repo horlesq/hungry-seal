@@ -46,7 +46,10 @@ export class SettingsScene extends Phaser.Scene {
     const left = cx - PANEL.w / 2;
     const top = cy - PANEL.h / 2;
 
-    this.add.rectangle(0, 0, v.viewWidth, v.viewHeight, COLORS.trench, 0.6).setOrigin(0).setInteractive();
+    this.add
+      .rectangle(0, 0, v.viewWidth, v.viewHeight, COLORS.trench, 0.6)
+      .setOrigin(0)
+      .setInteractive();
     drawPanel(this.add.graphics(), left, top, PANEL.w, PANEL.h, { alpha: 0.96, depth: 6 });
     uiText(this, cx, top + 50, 'Settings', 'title', { size: 46 }).setOrigin(0.5);
 
@@ -98,16 +101,19 @@ export class SettingsScene extends Phaser.Scene {
       onClick: () => this.nudge(key, STEP),
     }).setName(`${key}-up`);
     const bar = this.add.graphics();
-    const hit = this.add.zone(barX, y - 16, barW, 32).setOrigin(0).setInteractive({ useHandCursor: true });
+    const hit = this.add
+      .zone(barX, y - 16, barW, 32)
+      .setOrigin(0)
+      .setInteractive({ useHandCursor: true });
     const setFrom = (p: Phaser.Input.Pointer) => this.set(key, (p.worldX - barX) / barW);
     hit.on(Phaser.Input.Events.POINTER_DOWN, setFrom);
     hit.on(Phaser.Input.Events.POINTER_MOVE, (p: Phaser.Input.Pointer) => {
       if (p.isDown) setFrom(p);
     });
-    const value = uiText(this, barX + barW + 70, y, '', 'caption', { size: 18, color: CSS.mist }).setOrigin(
-      0,
-      0.5,
-    );
+    const value = uiText(this, barX + barW + 70, y, '', 'caption', {
+      size: 18,
+      color: CSS.mist,
+    }).setOrigin(0, 0.5);
     this.sliders.push({ key, bar, value, x: barX, y, w: barW });
     return [minus, plus];
   }

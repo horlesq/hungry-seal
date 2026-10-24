@@ -130,7 +130,12 @@ export interface MapDef {
   pearls: ReadonlyArray<{ x: number; y: number }>;
   boss: { id: BossId; x: number; y: number; lairRadius: number };
   /** Cave walls where an eel hides; `dir` points from the wall into the water. */
-  eelDens: ReadonlyArray<{ x: number; y: number; kind: 'moray' | 'electric'; dir: readonly [number, number] }>;
+  eelDens: ReadonlyArray<{
+    x: number;
+    y: number;
+    kind: 'moray' | 'electric';
+    dir: readonly [number, number];
+  }>;
   /** Stretches of seabed covered in sea urchins. */
   urchinBeds: ReadonlyArray<{ x0: number; x1: number; minY: number; maxY: number }>;
   /** Mines on chains rising off the seabed. */

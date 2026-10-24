@@ -177,7 +177,14 @@ export const TROPICAL: MapDef = {
       ),
       // Pirate Cove: a pirate wreck on the slope.
       add(
-        poly([32700, 3200], [34000, 3180], [33950, 3360], [33600, 3470], [32900, 3470], [32750, 3380]),
+        poly(
+          [32700, 3200],
+          [34000, 3180],
+          [33950, 3360],
+          [33600, 3470],
+          [32900, 3470],
+          [32750, 3380],
+        ),
         { rough: 4, blend: 30 },
       ),
       cut(ellipse(33350, 3350, 560, 85), { blend: 16 }),
@@ -200,7 +207,14 @@ export const TROPICAL: MapDef = {
     ],
   },
   regions: [
-    { id: 'resort', name: 'Resort Beach', blurb: 'Sunbathers and snacks', x0: 0, x1: 2600, danger: 1 },
+    {
+      id: 'resort',
+      name: 'Resort Beach',
+      blurb: 'Sunbathers and snacks',
+      x0: 0,
+      x1: 2600,
+      danger: 1,
+    },
     {
       id: 'lagoon',
       name: 'Coral Lagoon',
@@ -279,7 +293,14 @@ export const TROPICAL: MapDef = {
       x1: 37400,
       danger: 2,
     },
-    { id: 'palm-beach', name: 'Palm Beach', blurb: 'Paradise', x0: 37400, x1: MAP_WIDTH, danger: 1 },
+    {
+      id: 'palm-beach',
+      name: 'Palm Beach',
+      blurb: 'Paradise',
+      x0: 37400,
+      x1: MAP_WIDTH,
+      danger: 1,
+    },
   ],
   gates: [
     { x: 24800, y: 3000, w: 1300, h: 220, dir: [0, -1], minStage: 5 },

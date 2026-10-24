@@ -24,7 +24,9 @@ const server = spawn(process.env.UVX ?? 'uvx', ['--from', SERVER, 'blender-mcp']
   stdio: ['pipe', 'pipe', 'inherit'],
 });
 server.on('error', (err) => {
-  console.error(`Could not start the MCP server (is uv installed? set UVX to its path): ${err.message}`);
+  console.error(
+    `Could not start the MCP server (is uv installed? set UVX to its path): ${err.message}`,
+  );
   process.exit(1);
 });
 

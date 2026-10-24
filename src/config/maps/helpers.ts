@@ -19,7 +19,12 @@ export const MAP_WIDTH = 40000;
 export type Opts = { blend?: number; rough?: number };
 export const add = (shape: TerrainShape, o: Opts = {}): TerrainOp => ({ mode: 'add', shape, ...o });
 export const cut = (shape: TerrainShape, o: Opts = {}): TerrainOp => ({ mode: 'cut', shape, ...o });
-export const circle = (x: number, y: number, r: number): TerrainShape => ({ type: 'circle', x, y, r });
+export const circle = (x: number, y: number, r: number): TerrainShape => ({
+  type: 'circle',
+  x,
+  y,
+  r,
+});
 export const ellipse = (x: number, y: number, rx: number, ry: number, rot = 0): TerrainShape => ({
   type: 'ellipse',
   x,
@@ -28,7 +33,14 @@ export const ellipse = (x: number, y: number, rx: number, ry: number, rot = 0): 
   ry,
   rot,
 });
-export const box = (x: number, y: number, w: number, h: number, round = 20, rot = 0): TerrainShape => ({
+export const box = (
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  round = 20,
+  rot = 0,
+): TerrainShape => ({
   type: 'box',
   x,
   y,
@@ -37,7 +49,10 @@ export const box = (x: number, y: number, w: number, h: number, round = 20, rot 
   round,
   rot,
 });
-export const poly = (...points: Array<[number, number]>): TerrainShape => ({ type: 'poly', points });
+export const poly = (...points: Array<[number, number]>): TerrainShape => ({
+  type: 'poly',
+  points,
+});
 export const capsule = (x1: number, y1: number, x2: number, y2: number, r1: number, r2 = r1) =>
   ({ type: 'capsule', x1, y1, x2, y2, r1, r2 }) as TerrainShape;
 
@@ -59,7 +74,10 @@ export function ring(x: number, y: number, outer: number, hole: number): Terrain
 
 /** A rock spire rising from the seabed at `baseY` up to `topY`. */
 export function spire(x: number, baseY: number, topY: number, r: number, lean = 0): TerrainOp {
-  return add(capsule(x, baseY + r, x + lean, topY + r * 0.6, r * 1.25, r), { rough: 18, blend: 90 });
+  return add(capsule(x, baseY + r, x + lean, topY + r * 0.6, r * 1.25, r), {
+    rough: 18,
+    blend: 90,
+  });
 }
 
 /**
@@ -127,5 +145,7 @@ export function beachProfile(side: 'west' | 'east', width = MAP_WIDTH): Array<[n
     [2100, S + 260],
     [2600, S + 520],
   ];
-  return side === 'west' ? west : west.map(([x, y]) => [width - x, y] as [number, number]).reverse();
+  return side === 'west'
+    ? west
+    : west.map(([x, y]) => [width - x, y] as [number, number]).reverse();
 }

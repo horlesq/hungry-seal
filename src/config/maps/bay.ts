@@ -182,7 +182,14 @@ export const BAY: MapDef = {
     ],
   },
   regions: [
-    { id: 'west-beach', name: 'West Beach', blurb: 'Sun, sand and an easy snack', x0: 0, x1: 2600, danger: 1 },
+    {
+      id: 'west-beach',
+      name: 'West Beach',
+      blurb: 'Sun, sand and an easy snack',
+      x0: 0,
+      x1: 2600,
+      danger: 1,
+    },
     {
       id: 'coral',
       name: 'Coral Gardens',
@@ -333,7 +340,13 @@ export const BAY: MapDef = {
       spacing: 260,
     },
     {
-      keys: [T.DecorCoralBranch, T.DecorCoralBrain, T.DecorCoralFan, T.DecorSeaweed, T.DecorStarfish],
+      keys: [
+        T.DecorCoralBranch,
+        T.DecorCoralBrain,
+        T.DecorCoralFan,
+        T.DecorSeaweed,
+        T.DecorStarfish,
+      ],
       minY: S + 400,
       maxY: 2000,
       minX: 2600,
@@ -391,10 +404,5 @@ export const BAY: MapDef = {
       sink: 0.3,
     },
   ],
-  treasure: [
-    { x: 3700, y: 1530 },
-    { x: 13300, y: 3300 },
-    { x: 25900, y: 6300 },
-    ventCave.chamber,
-  ],
+  treasure: [{ x: 3700, y: 1530 }, { x: 13300, y: 3300 }, { x: 25900, y: 6300 }, ventCave.chamber],
 };

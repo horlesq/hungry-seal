@@ -263,7 +263,8 @@ export function migrateSave(raw: unknown): SaveData {
   data.settings.music = unit(settings?.music, data.settings.music);
   data.settings.sfx = unit(settings?.sfx, data.settings.sfx);
   if (typeof settings?.shake === 'boolean') data.settings.shake = settings.shake;
-  if (typeof settings?.highContrast === 'boolean') data.settings.highContrast = settings.highContrast;
+  if (typeof settings?.highContrast === 'boolean')
+    data.settings.highContrast = settings.highContrast;
 
   // Maps (v5): per-map bests for known maps; keep the selection only if it's unlocked.
   const maps = record(r.maps);
@@ -276,7 +277,8 @@ export function migrateSave(raw: unknown): SaveData {
     // Pearls and bosses (v6): valid, distinct pearl indexes only.
     const list = Array.isArray(pearls[id]) ? (pearls[id] as unknown[]) : [];
     const valid = [...new Set(list)].filter(
-      (i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < MAPS[id].pearls.length,
+      (i): i is number =>
+        Number.isInteger(i) && (i as number) >= 0 && (i as number) < MAPS[id].pearls.length,
     );
     if (valid.length > 0) data.maps.pearls[id] = valid.sort();
     if (bosses.includes(id)) data.maps.bosses.push(id);
