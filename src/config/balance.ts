@@ -79,9 +79,12 @@ export const INPUT = {
 export const HUNGER = {
   max: 100,
   /** Drain at the start of a run; a full bar lasts max / this seconds without food. */
-  baseDrainPerSec: 2.1,
-  /** Drain grows linearly with run time: +100% after this many seconds. */
-  rampSeconds: 360,
+  baseDrainPerSec: 2.2,
+  /**
+   * Drain grows linearly with run time: +100% after this many seconds (and on: +200% at 6:40).
+   * The start stays forgiving; a long run gets hungry fast.
+   */
+  rampSeconds: 200,
   /** Deeper water burns more energy. */
   zoneMultiplier: {
     surface: 1,
@@ -94,9 +97,11 @@ export const HUNGER = {
    * Bigger seals burn more (index 0 = size 1). A big seal sees ~3x more ocean, swims faster
    * and has a bigger mouth, so without this it never goes hungry once grown.
    */
-  sizeMultiplier: [1, 1.08, 1.17, 1.28, 1.4, 1.53, 1.67, 1.82],
-  /** Below this fraction the HUD bar flashes. */
+  sizeMultiplier: [1, 1.08, 1.17, 1.28, 1.4, 1.6, 1.9, 2.25],
+  /** Below this fraction the HUD bar flashes... */
   lowFraction: 0.25,
+  /** ...or with fewer than this many seconds of food left (late runs drain fast). */
+  lowSeconds: 6,
 } as const;
 
 export const GROWTH = {
@@ -153,6 +158,11 @@ export const SPAWN = {
    * vanish while big creatures linger.
    */
   minFood: 14,
+  /**
+   * Food for the guarantee above means worth at least this much of its nutrition to the seal
+   * (mealValue): a grown seal is kept in reach of squid and turtles, not just minnows.
+   */
+  foodMinValue: 0.5,
   foodRadius: 1000,
   maxAlive: 58,
   /** Seconds between spawn attempts. */
@@ -181,6 +191,16 @@ export const DAMAGE = {
   invulnTime: 1.2,
   /** Hunger reaching zero within this many seconds of a hit counts as killed by it. */
   killWindow: 0.6,
+  /**
+   * Stings (jellyfish, urchins, a puffed pufferfish) hurt a bigger seal less: damage x
+   * (1 - stingSizeFalloff x (size - 1)), at least stingMinFactor (size 8: 65%). A grown seal
+   * runs into far more of them (it's 4x longer and turns wide), and the late game should be
+   * about hunger and the big hunters, not death by a thousand stings. (At 50% an upgraded
+   * size-8 seal shrugged off 45 stings and lived 8+ minutes.) Mines, predators, eels and
+   * boats always hit in full.
+   */
+  stingSizeFalloff: 0.05,
+  stingMinFactor: 0.65,
 } as const;
 
 export const COMBO = {
@@ -206,24 +226,34 @@ export const COINS = {
   clusterInterval: 3,
 } as const;
 
-/** Difficulty ramp: when hazards and predators start and how many are allowed. */
+/**
+ * Difficulty ramp: when hazards and predators start and how many are allowed. Hazard counts are
+ * for a size-1 view and scale with the view's size (HazardField) and the map's difficulty.
+ */
 export const DANGER = {
   hazardsStartAt: 25,
   /** Max hazards alive = base + perMinute * minutes since start, capped. */
   hazardsBase: 2,
   hazardsPerMinute: 2,
-  hazardsMax: 7,
+  hazardsMax: 8,
   hazardSpawnInterval: 1.2,
   /** Seconds between spawn attempts per predator kind (spawn rules live in predators.ts). */
-  predatorSpawnInterval: 6,
+  predatorSpawnInterval: 5,
 } as const;
 
 export const FRENZY = {
-  /** Meter per meal (x combo multiplier): ~28 plain meals, far fewer on a combo. */
-  perMeal: 0.036,
+  /**
+   * Meter per full-value meal (~34 plain meals). A meal counts by what it's worth to the seal
+   * (mealValue: minnows barely count for a big seal) and by the combo, at half weight: a x5
+   * combo charges x3 (see comboWeight).
+   */
+  perMeal: 0.03,
+  comboWeight: 0.5,
   decayDelay: 3,
   decayPerSec: 0.04,
   duration: 8,
+  /** Seconds after a frenzy before meals charge the meter again: a treat, not a state. */
+  cooldown: 30,
   speedMult: 1.3,
   scoreMult: 2,
   /** Coins within this distance fly to the seal during a frenzy. */

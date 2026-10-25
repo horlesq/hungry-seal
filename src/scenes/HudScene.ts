@@ -53,6 +53,8 @@ export class HudScene extends Phaser.Scene {
   private meters!: Phaser.GameObjects.Graphics;
   private stageText!: Phaser.GameObjects.Text;
   private frenzyLabel!: Phaser.GameObjects.Text;
+  /** Frenzy meter icon (dimmed while the meter recharges). */
+  private flame!: Phaser.GameObjects.Image;
   private frenzy: FrenzyState = { meter: 0, active: false };
   private hintRoot!: Phaser.GameObjects.Container;
   private hintBg!: Phaser.GameObjects.Graphics;
@@ -248,6 +250,7 @@ export class HudScene extends Phaser.Scene {
       .image(ROW.x + METERS.boostW + METERS.gap / 2, meterY, UiTextures.Flame)
       .setTint(COLORS.buoy);
     flame.setScale(22 / flame.frame.width);
+    this.flame = flame;
     this.status = this.add.container(0, 0, [
       bg,
       this.hungerBar,
@@ -283,17 +286,24 @@ export class HudScene extends Phaser.Scene {
     drawBar(this.hungerBar, ROW.x, HUNGER.y, ROW.right - ROW.x, HUNGER.h, frac, color, alpha);
   }
 
-  /** Boost stamina and frenzy charge (bottom row); the frenzy bar pulses while active. */
+  /**
+   * Boost stamina and frenzy charge (bottom row); the frenzy bar pulses while active, and its
+   * flame dims while the meter recharges after a frenzy.
+   */
   private drawMeters(time: number): void {
     const g = this.meters;
     const f = this.frenzy;
+    this.flame.setAlpha(f.resting ? 0.3 : 1);
     g.clear();
     const boostColor = this.boost.active ? COLORS.gold : COLORS.glacier;
     drawBar(g, ROW.x, METERS.y, METERS.boostW, METERS.h, this.boost.stamina, boostColor);
     const fx = ROW.x + METERS.boostW + METERS.gap;
     const pulse = f.active && Math.floor(time / 120) % 2 === 0;
     drawBar(g, fx, METERS.y, ROW.right - fx, METERS.h, f.meter, pulse ? COLORS.gold : COLORS.buoy);
-    this.frenzyLabel.setVisible(f.active).setScale(1 + 0.06 * Math.sin(time * 0.02));
+    // The region banner shows in the same spot: it wins (the glow and the meter still say
+    // "frenzy").
+    const banner = this.bannerRoot.alpha > 0.05;
+    this.frenzyLabel.setVisible(f.active && !banner).setScale(1 + 0.06 * Math.sin(time * 0.02));
   }
 
   private createScore(): void {

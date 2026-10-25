@@ -35,6 +35,8 @@ export const TROPICAL: MapDef = {
   name: 'Tropical Lagoon',
   blurb: 'Coral, a sunken city, a volcano and the Blue Hole.',
   unlock: { after: 'arctic', pearls: 3, score: 30000 },
+  // The last map: the hungriest water and the most hunters.
+  difficulty: { hunger: 1.2, danger: 1.35 },
   start: { x: 2500, y: 820 },
   palette: {
     sky: '#4cc3f5',
@@ -55,7 +57,7 @@ export const TROPICAL: MapDef = {
     deep: { name: 'Twilight', blurb: 'Lanternfish and hot vents. Something glows down there' },
     abyss: { name: 'Trench', blurb: 'The deepest water. Treasure for the brave' },
   },
-  creatureMult: { penguin: 0, turtle: 2, pufferfish: 2, minnow: 1.2 },
+  creatureMult: { penguin: 0, turtle: 2, pufferfish: 1.5, minnow: 1.2 },
   predatorMult: { shark: 1.3, orca: 0.5 },
   terrain: {
     width: MAP_WIDTH,

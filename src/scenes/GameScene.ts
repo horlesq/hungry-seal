@@ -51,10 +51,12 @@ import {
 import { finishTextures, queueTextures, releaseTextures } from '../services/LazyTextures';
 import { saves } from '../services/SaveService';
 import {
+  adaptiveResolutionOn,
   fitWorldCamera,
   getViewport,
   lowerResolution,
   onResize,
+  restoreResolution,
   sharpenTexts,
 } from '../services/Viewport';
 import { ADAPTIVE_RESOLUTION } from '../config/game';
@@ -65,7 +67,7 @@ import { Pickups, type PickupEvent } from '../systems/Pickups';
 import { completedNow, emptyRunStats, type RunStats } from '../systems/progress';
 import { ComboSystem } from '../systems/ComboSystem';
 import { Effects } from '../systems/Effects';
-import { canEat, circlesOverlap, mealValue } from '../systems/feeding';
+import { canEat, circlesOverlap, mealValue, stingFactor } from '../systems/feeding';
 import { FrenzySystem } from '../systems/FrenzySystem';
 import { GrowthSystem } from '../systems/GrowthSystem';
 import { HazardField } from '../systems/HazardField';
@@ -100,8 +102,8 @@ function hintTexts(touch: boolean): Record<HintId, string> {
       ? 'Tap Boost to dash. Leap out of the water to catch birds!'
       : 'Hold click or Space to boost. Leap out of the water to catch birds!',
     danger: 'Watch out for jellyfish and sea mines!',
-    grow: 'You grew! Bigger fish are on the menu now',
-    shark: 'Shark! Swim away: boost, or leap out of the water!',
+    grow: 'You grew! Bigger fish on the menu, and you get hungrier',
+    shark: 'Shark! It swims faster than you: boost away, or leap out!',
   };
 }
 
@@ -150,7 +152,7 @@ export class GameScene extends Phaser.Scene {
   private dead = false;
   private hudDirty = true;
   private comboShown = 0;
-  private frenzyShown = { meter: -1, active: false };
+  private frenzyShown = { meter: -1, active: false, resting: false };
   private debugTimer = 0;
   private lastStamina = -1;
   private lastTooBigAt = -Infinity;
@@ -214,7 +216,7 @@ export class GameScene extends Phaser.Scene {
     this.dead = false;
     this.hudDirty = true;
     this.comboShown = 0;
-    this.frenzyShown = { meter: -1, active: false };
+    this.frenzyShown = { meter: -1, active: false, resting: false };
     this.debugTimer = 0;
     this.resolution = new ResolutionGovernor(ADAPTIVE_RESOLUTION);
     this.lastStamina = -1;
@@ -233,13 +235,18 @@ export class GameScene extends Phaser.Scene {
     this.missionTimer = MISSION_CHECK_INTERVAL;
     this.missionsShown.clear();
 
+    // The map: set it first, the spawners and the seal read its terrain, and its difficulty
+    // scales the hunger drain.
+    this.map = GameMap.get(saves.data.maps.selected);
+    setCurrentMap(this.map);
+
     // Shop upgrades shape this run.
     const mods = runModifiers(saves.data.upgrades);
     this.mods = mods;
     this.hunger = new HungerSystem({
       ...HUNGER,
       max: HUNGER.max + mods.extraHunger,
-      baseDrainPerSec: HUNGER.baseDrainPerSec * mods.drainMult,
+      baseDrainPerSec: HUNGER.baseDrainPerSec * mods.drainMult * this.map.difficulty.hunger,
     });
     this.growth = new GrowthSystem(GROWTH.stageCosts);
     this.combo = new ComboSystem(COMBO.window, COMBO.thresholds);
@@ -250,10 +257,6 @@ export class GameScene extends Phaser.Scene {
     this.sharkNoticed = false;
     this.zoneBannerAt.clear();
     this.currentRegion = '';
-
-    // The map: set it first, the spawners and the seal read its terrain.
-    this.map = GameMap.get(saves.data.maps.selected);
-    setCurrentMap(this.map);
     this.background = new WorldBackground(this, this.map);
     this.effects = new Effects(this);
     this.spawner = new Spawner(this);
@@ -357,10 +360,17 @@ export class GameScene extends Phaser.Scene {
   override update(time: number, delta: number): void {
     // Clamp dt so a background-tab stall doesn't teleport anything.
     const dt = Math.min(delta, 50) / 1000;
-    // A device that can't keep up renders fewer pixels (see ADAPTIVE_RESOLUTION).
-    if (this.resolution.update(delta / 1000, this.game.loop.actualFps)) {
-      const dpr = lowerResolution(this.game, ADAPTIVE_RESOLUTION.steps);
-      if (dpr !== null) console.info(`[perf] slow frames: rendering at ${dpr}x`);
+    // A device that can't keep up renders fewer pixels (see ADAPTIVE_RESOLUTION), unless a
+    // step already proved it doesn't help there.
+    if (adaptiveResolutionOn()) {
+      const action = this.resolution.update(delta / 1000, this.game.loop.actualFps);
+      if (action === 'lower') {
+        const dpr = lowerResolution(this.game, ADAPTIVE_RESOLUTION.steps);
+        if (dpr !== null) console.info(`[perf] slow frames: rendering at ${dpr}x`);
+      } else if (action === 'restore') {
+        restoreResolution(this.game);
+        console.info('[perf] fewer pixels did not help: back to full resolution');
+      }
     }
     // Hit-stop: freeze the simulation for a few frames on big impacts.
     if (this.hitStop > 0) {
@@ -611,9 +621,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Shared rewards for any meal. Score = base x combo x frenzy; nutrition and growth shrink
-   * for prey the seal has long outgrown (`tier`; none = full value). Also charges the
-   * frenzy meter. Returns the points scored.
+   * Shared rewards for any meal. Score = base x combo x frenzy; nutrition, growth and frenzy
+   * charge shrink for prey the seal has long outgrown (`tier`; none = full value). Returns
+   * the points scored.
    */
   private feed(
     x: number,
@@ -630,7 +640,8 @@ export class GameScene extends Phaser.Scene {
     this.seal.chomp();
     this.effects.floatText(x, y - 24, `+${points}`);
     if (this.growth.add(reward.growth * value * this.mods.growthMult) > 0) this.onGrow();
-    if (this.frenzy.feed(comboMult * this.mods.frenzyChargeMult)) this.startFrenzy();
+    const charge = (1 + (comboMult - 1) * FRENZY.comboWeight) * value;
+    if (this.frenzy.feed(charge * this.mods.frenzyChargeMult)) this.startFrenzy();
     this.hudDirty = true;
     return points;
   }
@@ -658,7 +669,7 @@ export class GameScene extends Phaser.Scene {
         'pufferfish',
         c.x,
         c.y,
-        FEEDING.pufferDamage,
+        Math.round(FEEDING.pufferDamage * stingFactor(this.seal.stage)),
         FEEDING.pufferKnockback,
         FEEDING.pufferStun,
       );
@@ -774,7 +785,9 @@ export class GameScene extends Phaser.Scene {
         h.despawn();
         continue;
       }
-      this.hurt(def.id, h.x, h.y, def.damage, def.knockback, def.stun);
+      // Stings shrink as the seal grows; a mine blast doesn't.
+      const damage = def.explodes ? def.damage : Math.round(def.damage * stingFactor(s.stage));
+      this.hurt(def.id, h.x, h.y, damage, def.knockback, def.stun);
       if (def.explodes) {
         this.effects.explosion(h.x, h.y);
         audio.play(SoundKeys.Explode);
@@ -1037,10 +1050,11 @@ export class GameScene extends Phaser.Scene {
     const f = this.frenzy;
     if (
       f.active !== this.frenzyShown.active ||
+      f.resting !== this.frenzyShown.resting ||
       Math.abs(f.meter - this.frenzyShown.meter) > 0.002
     ) {
-      this.frenzyShown = { meter: f.meter, active: f.active };
-      EventBus.emit('run:frenzy', { meter: f.meter, active: f.active });
+      this.frenzyShown = { meter: f.meter, active: f.active, resting: f.resting };
+      EventBus.emit('run:frenzy', { ...this.frenzyShown });
     }
     if (this.hudDirty) {
       this.hudDirty = false;

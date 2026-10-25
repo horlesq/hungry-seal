@@ -1,5 +1,5 @@
-// Hunger = the seal's health. Drains continuously (faster over time and deeper down);
-// eating refills it; reaching zero ends the run. Pure logic, no Phaser.
+// Hunger = the seal's health. Drains continuously (faster over time, deeper down and for a
+// bigger seal); eating refills it; reaching zero ends the run. Pure logic, no Phaser.
 import type { ZoneId } from '../config/zones';
 
 export interface HungerParams {
@@ -9,11 +9,16 @@ export interface HungerParams {
   zoneMultiplier: Readonly<Record<ZoneId, number>>;
   /** Bigger seals burn more: drain multiplier per growth stage (index 0 = stage 1). */
   sizeMultiplier?: readonly number[];
+  /** Low (warning) below this fraction of the bar... */
   lowFraction: number;
+  /** ...or when fewer than this many seconds of food are left at the current drain. */
+  lowSeconds?: number;
 }
 
 export class HungerSystem {
   value: number;
+  /** Drain per second at the last update (for the time-based low warning). */
+  private lastRate = 0;
 
   constructor(private readonly params: HungerParams) {
     this.value = params.max;
@@ -27,8 +32,13 @@ export class HungerSystem {
     return this.value / this.params.max;
   }
 
+  /**
+   * Time to warn the player: under a fixed share of the bar, or (late in a run, when the bar
+   * empties fast) fewer than `lowSeconds` of food left.
+   */
   get isLow(): boolean {
-    return this.fraction <= this.params.lowFraction;
+    const p = this.params;
+    return this.fraction <= p.lowFraction || this.value <= this.lastRate * (p.lowSeconds ?? 0);
   }
 
   get isStarved(): boolean {
@@ -45,7 +55,8 @@ export class HungerSystem {
 
   /** `extra` multiplies the drain (toxic water, hot vents). */
   update(dt: number, elapsed: number, zone: ZoneId, extra = 1, stage = 1): void {
-    this.value = Math.max(0, this.value - this.drainRate(elapsed, zone, stage) * extra * dt);
+    this.lastRate = this.drainRate(elapsed, zone, stage) * extra;
+    this.value = Math.max(0, this.value - this.lastRate * dt);
   }
 
   /** Restores hunger (clamped to max). Returns the amount actually gained. */

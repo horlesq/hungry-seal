@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FEEDING } from '../config/balance';
-import { canEat, circlesOverlap, mealValue } from './feeding';
+import { DAMAGE, FEEDING } from '../config/balance';
+import { canEat, circlesOverlap, mealValue, stingFactor } from './feeding';
 import { GrowthSystem } from './GrowthSystem';
 import { HungerSystem, type HungerParams } from './HungerSystem';
 
@@ -55,6 +55,27 @@ describe('HungerSystem', () => {
     const h = new HungerSystem(HUNGER);
     h.damage(76);
     expect(h.isLow).toBe(true);
+  });
+
+  it('flags low hunger early when the bar empties fast', () => {
+    const h = new HungerSystem({ ...HUNGER, lowSeconds: 6 });
+    h.damage(50);
+    h.update(0.01, 0, 'reef'); // 2/s: 50 left is 25 s of food
+    expect(h.isLow).toBe(false);
+    h.update(0.01, 400, 'abyss'); // 2 x 5 x 3 = 30/s: under 2 s of food
+    expect(h.isLow).toBe(true);
+  });
+});
+
+describe('stingFactor', () => {
+  it('leaves small seals nearly full damage and softens it for a full-grown seal', () => {
+    expect(stingFactor(1)).toBe(1);
+    expect(stingFactor(2)).toBeGreaterThan(0.9);
+    // Softer at size 8, but never below the floor.
+    expect(stingFactor(8)).toBeGreaterThanOrEqual(DAMAGE.stingMinFactor);
+    expect(stingFactor(8)).toBeLessThan(0.75);
+    expect(stingFactor(99)).toBe(DAMAGE.stingMinFactor); // a frenzy stage never goes lower
+    expect(stingFactor(0)).toBe(1);
   });
 });
 

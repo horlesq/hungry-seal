@@ -1,9 +1,9 @@
 // Shared helper: pick a point just outside the camera view, biased ahead of the seal's
 // movement, clamped to a vertical band. Used by every spawner (prey, hazards, predators, coins).
 import type Phaser from 'phaser';
-import { SPAWN } from '../config/balance';
+import { GROWTH, SPAWN } from '../config/balance';
 import { zoneAt, type ZoneId } from '../config/zones';
-import { canEat } from './feeding';
+import { canEat, mealValue } from './feeding';
 
 /** Reference world view (16:9 desktop at size 1) that spawn densities are tuned for. */
 const REF_VIEW = { width: 1455, height: 720 };
@@ -95,8 +95,19 @@ export function pickOffscreenPoint(
 }
 
 /**
- * Species to spawn at world-y `y`. While food is short (`foodForStage` set), only species a
- * seal of that stage can eat, if any live at that depth; otherwise any species of the zone.
+ * True if prey of `tier` is real food for a seal of `stage`: edible and worth at least
+ * SPAWN.foodMinValue of its nutrition (mealValue). A frenzy's oversized stage counts as full
+ * size.
+ */
+export function isWorthwhileFood(stage: number, tier: number): boolean {
+  const size = Math.min(stage, GROWTH.stages.length);
+  return canEat(stage, tier) && mealValue(size, tier) >= SPAWN.foodMinValue;
+}
+
+/**
+ * Species to spawn at world-y `y`. While food is short (`foodForStage` set), only species worth
+ * eating for a seal of that stage (isWorthwhileFood), else any it can eat, if any live at that
+ * depth; otherwise any species of the zone.
  */
 export function pickSpawn<T extends { zones: readonly ZoneId[]; weight: number; tier: number }>(
   list: readonly T[],
@@ -106,12 +117,10 @@ export function pickSpawn<T extends { zones: readonly ZoneId[]; weight: number; 
   weightOf?: (d: T) => number,
 ): T | null {
   if (foodForStage !== null) {
-    const food = pickForZone(
-      list.filter((d) => canEat(foodForStage, d.tier)),
-      y,
-      random,
-      weightOf,
-    );
+    const edible = list.filter((d) => canEat(foodForStage, d.tier));
+    const worthwhile = edible.filter((d) => isWorthwhileFood(foodForStage, d.tier));
+    const food =
+      pickForZone(worthwhile, y, random, weightOf) ?? pickForZone(edible, y, random, weightOf);
     if (food) return food;
   }
   return pickForZone(list, y, random, weightOf);

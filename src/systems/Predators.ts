@@ -3,8 +3,14 @@
 import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { DANGER, SPAWN } from '../config/balance';
-import { PREDATOR_LIST, PREDATORS, type PredatorDef, type PredatorId } from '../config/predators';
-import { zoneAt, zoneBand } from '../config/zones';
+import {
+  PREDATOR_LIST,
+  PREDATORS,
+  predatorBand,
+  type PredatorDef,
+  type PredatorId,
+} from '../config/predators';
+import { zoneAt } from '../config/zones';
 import { textureScale } from '../services/Viewport';
 import { Predator } from '../entities/Predator';
 import { stepPredator, type PredatorContext, type PredatorEvent } from '../entities/predatorAI';
@@ -16,7 +22,7 @@ import { currentMap } from '../world/GameMap';
 import { saves } from '../services/SaveService';
 import { WATER_BOTTOM, WATER_TOP, type Threat } from './Spawner';
 
-const POOL_SIZE = 8;
+const POOL_SIZE = 12;
 /** Predators are big and slow to re-find; keep them around longer than prey. */
 const ARROW_INSET = 42;
 
@@ -112,9 +118,12 @@ export class Predators {
       this.timers.set(def.id, DANGER.predatorSpawnInterval);
       const alive = this.alive.filter((p) => p.def.id === def.id).length;
       if (def.regions && !def.regions.includes(currentMap().regionAt(cx, cy).id)) continue;
-      // The map's mix: fewer (skip some spawns) or more (a higher cap) of this kind.
+      // The map's mix: fewer (skip some spawns) or more (a higher cap) of this kind; later
+      // maps allow more of everything (difficulty.danger).
       const mult = currentMap().predatorMult(def.id, cx, cy);
-      const allowed = predatorsAllowed(def.spawn, elapsed, viewZone);
+      const allowed = Math.round(
+        predatorsAllowed(def.spawn, elapsed, viewZone) * currentMap().difficulty.danger,
+      );
       const cap = mult > 1 ? Math.ceil(allowed * mult) : allowed;
       if (alive < cap && (mult >= 1 || this.random() < mult)) this.spawn(def, camera, seal);
     }
@@ -132,7 +141,7 @@ export class Predators {
   /** Spawns a predator just off-screen inside its depth band. */
   spawn(def: PredatorDef, camera: Phaser.Cameras.Scene2D.Camera, seal: Threat): Predator | null {
     // Spawn inside its own depth band, just off-screen.
-    const band = zoneBand(def.zones);
+    const band = predatorBand(def);
     const p = pickOffscreenPoint(camera, seal, this.random, {
       marginMin: SPAWN.marginMin + 100,
       marginMax: SPAWN.marginMax + 200,

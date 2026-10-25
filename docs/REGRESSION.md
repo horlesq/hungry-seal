@@ -9,7 +9,7 @@ Run before merging a phase or anything that touches gameplay, input, saves or la
 - Look at the screenshots in `.playtest/`: passing checks don't prove it looks right.
 - After touching rendering, UI drawing or spawning: `npm run perf` (emulated phone, CPU x4). The worst situation should stay well above 60 fps with a p95 under ~17 ms; `PERF_PROFILE=1` shows hotspots.
 - Before a release: `npm run browsers` (Chrome, Edge, Firefox, WebKit, WebKit as an iPhone) and `npm run release` (builds, runs `dist-check`: boot download, service worker, offline start, then zips).
-- Balance on every map: `BOT_MAP=bay|arctic|tropical npm run balance -- human 600 [3]`.
+- Balance on every map: `BOT_MAP=bay|arctic|tropical npm run balance -- human 600 [3]`. Check the first log line says the map you asked for. Run at most 3-4 at once: with more, the game slows to a fraction of real time.
 
 ## By hand (what the bots can't judge)
 On a real phone (`npm run dev:host`, open the network URL), upright and sideways:
@@ -33,7 +33,9 @@ Saves (DevTools, Application > Local Storage, key `hungry-seal-save`):
 - [ ] An old save (paste a v1-v3 JSON) loads without losing coins, upgrades or skins.
 
 Play feel (a few real runs):
-- [ ] A first run without upgrades lasts about 2-3 minutes for a new player; the death screen explains what happened.
+- [ ] A first run without upgrades lasts about 2-3 minutes for a new player; the death screen explains what happened and gives a tip.
+- [ ] The first minute is learnable (food nearby, no hunter yet); from ~2 minutes the hunger bar empties visibly faster and hunters find you: a skilled player feels pushed, not bored.
+- [ ] A shark that charges can be escaped with a boost (or a leap), not by just swimming away.
 - [ ] Mission toasts, reward chips and achievements appear when expected and pay the right amounts.
 - [ ] Nothing feels unfair: predators telegraph before biting, hazards are visible in the dark.
 

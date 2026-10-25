@@ -4,12 +4,15 @@ import type { Viewport } from '../utils/viewport';
 
 /**
  * Adaptive resolution (utils/resolution.ts): a run that stays under lowFps for slowSeconds
- * renders at the next lower pixel ratio. Lasts for the session; the game never steps back up.
+ * renders at the next lower pixel ratio, for the session. A step that doesn't raise the frame
+ * rate by minGain (a battery saver capping it at 30 fps) is undone and the feature turns off.
  */
 export const ADAPTIVE_RESOLUTION: ResolutionParams = {
   lowFps: 45,
   slowSeconds: 4,
   settleSeconds: 4,
+  judgeSeconds: 2,
+  minGain: 1.15,
   steps: [2, 1.5, 1.25, 1],
 };
 

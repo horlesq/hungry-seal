@@ -1,5 +1,5 @@
 // Bite rules and contact tests. Pure logic, no Phaser.
-import { FEEDING, GROWTH } from '../config/balance';
+import { DAMAGE, FEEDING, GROWTH } from '../config/balance';
 
 /** The seal can eat anything whose tier is at or below its growth stage. */
 export function canEat(sealStage: number, preyTier: number): boolean {
@@ -14,6 +14,11 @@ export function canEat(sealStage: number, preyTier: number): boolean {
 export function mealValue(sealStage: number, preyTier: number): number {
   const outgrown = sealStage - preyTier - FEEDING.outgrownFree;
   return outgrown > 0 ? 1 / (1 + FEEDING.outgrownFalloff * outgrown) : 1;
+}
+
+/** How much of a sting's damage a seal of `stage` takes (see DAMAGE.stingSizeFalloff). */
+export function stingFactor(stage: number): number {
+  return Math.max(DAMAGE.stingMinFactor, 1 - DAMAGE.stingSizeFalloff * (Math.max(1, stage) - 1));
 }
 
 export function circlesOverlap(

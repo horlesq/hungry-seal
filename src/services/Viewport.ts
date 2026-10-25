@@ -15,6 +15,10 @@ let current: Viewport = computeViewport(1280, 720, 1);
 let safe: Insets = NO_INSETS;
 /** Pixel-ratio cap for the session, lowered by adaptive resolution on slow devices. */
 let dprCap = Infinity;
+/** The cap before the last step down (to undo a step that didn't help). */
+let previousDprCap = Infinity;
+/** Adaptive resolution found resolution isn't what holds this device back: off for the session. */
+let adaptiveOff = false;
 
 export function getViewport(): Viewport {
   return current;
@@ -84,11 +88,28 @@ export function applyViewport(game: Phaser.Game): void {
  * ratio, or null if it's already as low as it goes. Scenes re-fit on the resize as usual.
  */
 export function lowerResolution(game: Phaser.Game, steps: readonly number[]): number | null {
+  if (adaptiveOff) return null;
   const next = nextResolutionStep(current.dpr, steps);
   if (next === null) return null;
+  previousDprCap = dprCap;
   dprCap = next;
   applyViewport(game);
   return next;
+}
+
+/**
+ * Undoes the last step down (it didn't raise the frame rate: the device is capped or short of
+ * CPU, not of pixels) and turns adaptive resolution off for the session.
+ */
+export function restoreResolution(game: Phaser.Game): void {
+  adaptiveOff = true;
+  dprCap = previousDprCap;
+  applyViewport(game);
+}
+
+/** False once adaptive resolution gave up on this device (see restoreResolution). */
+export function adaptiveResolutionOn(): boolean {
+  return !adaptiveOff;
 }
 
 /**

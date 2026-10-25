@@ -5,8 +5,7 @@ import Phaser from 'phaser';
 import { TextureKeys } from '../config/assets';
 import { Depths } from '../config/depths';
 import { UI_FONT } from '../config/layout';
-import type { PredatorDef } from '../config/predators';
-import { zoneBand } from '../config/zones';
+import { predatorBand, type PredatorDef } from '../config/predators';
 import { textureScale, uiTextResolution } from '../services/Viewport';
 import { createPredatorMotion, type PredatorMotion } from './predatorAI';
 import { saves } from '../services/SaveService';
@@ -44,7 +43,7 @@ export class Predator extends Phaser.GameObjects.Sprite {
     this.def = def;
     this.motion = createPredatorMotion(x, y, heading);
     this.motion.speed = def.patrolSpeed;
-    this.band = zoneBand(def.zones);
+    this.band = predatorBand(def);
     this.facing = Math.cos(heading) >= 0 ? 1 : -1;
     this.animTime = Math.random() * 10;
     // High-contrast warnings: a bigger yellow "!" with a black outline (colour-blind safe).

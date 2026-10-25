@@ -5,6 +5,8 @@
 //   any --(seal has outgrown it and is close)--> flee --(seal far)--> patrol
 //
 // "notice" is the readable warning: the predator slows, turns toward the seal and shows "!".
+// While patrolling it stalks a catchable seal it can sense (STALK_FACTOR x notice radius):
+// it cruises toward it inside its depth band instead of wandering past.
 import type { PredatorDef } from '../config/predators';
 import { moveTowards, rotateTowards } from '../utils/math';
 
@@ -66,6 +68,10 @@ const wallNormal = { x: 0, y: 0 };
 const BAND_MARGIN = 90;
 const NOTICE_SPEED = 40;
 const FLEE_EXIT_FACTOR = 1.4;
+/** Senses (and drifts toward) a catchable seal this many notice radii away. */
+export const STALK_FACTOR = 2.5;
+/** Patrol speed multiplier while stalking. */
+const STALK_SPEED = 1.35;
 
 export function createPredatorMotion(x: number, y: number, heading: number): PredatorMotion {
   return {
@@ -118,11 +124,19 @@ export function stepPredator(
 
   switch (m.state) {
     case 'patrol': {
-      if (ctx.canEatPrey && ctx.preyInWater && m.cooldown <= 0 && dist < p.noticeRadius) {
+      const hungry = ctx.canEatPrey && ctx.preyInWater && m.cooldown <= 0;
+      if (hungry && dist < p.noticeRadius) {
         enter(m, 'notice');
         events.push('notice');
         target = toPrey;
         targetSpeed = NOTICE_SPEED;
+        break;
+      }
+      if (hungry && dist < p.noticeRadius * STALK_FACTOR) {
+        // Stalk: cruise toward the seal (the band keeps it at its own depth).
+        target = toPrey;
+        targetSpeed = p.patrolSpeed * STALK_SPEED;
+        m.targetHeading = toPrey;
         break;
       }
       target = wander(m, ctx, dt);

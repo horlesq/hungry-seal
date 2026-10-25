@@ -2,7 +2,7 @@
 // flee (and become edible) once the seal has outgrown them. Each one declares how it spawns:
 // on a run-time schedule, or whenever the camera is in its home zones.
 import { TextureKeys, type TextureKey } from './assets';
-import type { ZoneId } from './zones';
+import { zoneBand, type ZoneId } from './zones';
 
 export type PredatorId = 'shark' | 'orca' | 'anglerfish' | 'barracuda' | 'hammerhead';
 
@@ -49,6 +49,12 @@ export interface PredatorDef {
   growth: number;
   coins: number;
   zones: readonly ZoneId[];
+  /**
+   * Vertical range it patrols and spawns in (world y), overriding the zones' band. Lets open-
+   * water hunters reach up into the lower shallows while the water near the surface (where the
+   * seal can leap out) stays a refuge.
+   */
+  band?: { top: number; bottom: number };
   spawn: PredatorSpawn;
   /** Glowing spot (world px from the centre when facing right), visible in dark water. */
   glow?: { x: number; y: number; color: number; size: number };
@@ -71,8 +77,10 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     mouthRadius: 26,
     scale: 1.1,
     patrolSpeed: 110,
-    chaseSpeed: 370,
-    fleeSpeed: 420,
+    // A touch faster than a small seal's cruise (430): swimming straight away barely holds
+    // it off; a boost or a leap loses it.
+    chaseSpeed: 445,
+    fleeSpeed: 460,
     turnRate: 2.4,
     chaseTurnRate: 2.1,
     accel: 520,
@@ -89,12 +97,15 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     growth: 40,
     coins: 5,
     zones: ['ocean', 'deep'],
+    // Open water, but up into the lower shallows (the top ~850 px stay safe).
+    band: { top: 1500, bottom: 5000 },
     spawn: {
       kind: 'schedule',
       steps: [
-        { after: 45, count: 1 },
+        { after: 75, count: 1 },
         { after: 150, count: 2 },
-        { after: 270, count: 3 },
+        { after: 240, count: 3 },
+        { after: 330, count: 4 },
       ],
     },
   },
@@ -109,8 +120,9 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     mouthRadius: 43,
     scale: 1.55,
     patrolSpeed: 130,
-    chaseSpeed: 400,
-    fleeSpeed: 450,
+    // Outswims even a full-grown seal's cruise (559): the one hunter you always boost away from.
+    chaseSpeed: 560,
+    fleeSpeed: 560,
     turnRate: 2.2,
     chaseTurnRate: 2.0,
     accel: 560,
@@ -127,11 +139,15 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     growth: 60,
     coins: 10,
     zones: ['ocean', 'deep'],
+    // The top predator hunts higher than the sharks.
+    band: { top: 1150, bottom: 5000 },
     spawn: {
       kind: 'schedule',
       steps: [
-        { after: 180, count: 1 },
-        { after: 330, count: 2 },
+        { after: 165, count: 1 },
+        { after: 285, count: 2 },
+        { after: 405, count: 3 },
+        { after: 525, count: 4 },
       ],
     },
   },
@@ -196,7 +212,7 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     growth: 18,
     coins: 2,
     zones: ['reef', 'ocean'],
-    spawn: { kind: 'zone', zones: ['reef', 'ocean'], after: 35, max: 4 },
+    spawn: { kind: 'zone', zones: ['reef', 'ocean'], after: 50, max: 4 },
     pack: { min: 3, max: 4, spread: 90 },
     regions: ['kelp', 'wrecks', 'shark-shelf', 'tanker', 'city', 'hammerheads', 'pirate-cove'],
   },
@@ -211,8 +227,8 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     mouthRadius: 31,
     scale: 1.25,
     patrolSpeed: 130,
-    chaseSpeed: 410,
-    fleeSpeed: 440,
+    chaseSpeed: 470,
+    fleeSpeed: 480,
     turnRate: 2.6,
     chaseTurnRate: 2.3,
     accel: 560,
@@ -229,6 +245,7 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
     growth: 55,
     coins: 8,
     zones: ['ocean', 'deep'],
+    band: { top: 1500, bottom: 5000 },
     spawn: { kind: 'zone', zones: ['ocean', 'deep'], after: 40, max: 2 },
     pack: { min: 1, max: 2, spread: 220 },
     regions: ['shark-shelf', 'hammerheads', 'icebergs'],
@@ -236,3 +253,8 @@ export const PREDATORS: Record<PredatorId, PredatorDef> = {
 };
 
 export const PREDATOR_LIST: readonly PredatorDef[] = Object.values(PREDATORS);
+
+/** Where a predator patrols and spawns: its own band if it has one, else its zones' band. */
+export function predatorBand(def: PredatorDef): { top: number; bottom: number } {
+  return def.band ?? zoneBand(def.zones);
+}

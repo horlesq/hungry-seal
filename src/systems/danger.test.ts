@@ -27,9 +27,15 @@ describe('danger schedule', () => {
     }
   });
 
-  it('orcas arrive late in a run', () => {
-    expect(predatorsAllowed(PREDATORS.orca.spawn, 179, 'deep')).toBe(0);
-    expect(predatorsAllowed(PREDATORS.orca.spawn, 181, 'deep')).toBe(1);
+  it('orcas arrive late in a run, after the first sharks', () => {
+    const orca = PREDATORS.orca.spawn;
+    const shark = PREDATORS.shark.spawn;
+    if (orca.kind !== 'schedule' || shark.kind !== 'schedule') throw new Error('scheduled');
+    const first = orca.steps[0].after;
+    expect(first).toBeGreaterThanOrEqual(120);
+    expect(first).toBeGreaterThan(shark.steps[0].after);
+    expect(predatorsAllowed(orca, first - 1, 'deep')).toBe(0);
+    expect(predatorsAllowed(orca, first + 1, 'deep')).toBe(1);
   });
 
   it('zone predators only appear while the camera is in their zones', () => {

@@ -49,6 +49,8 @@ export interface FrenzyState {
   /** 0..1 fill, or time left while active. */
   meter: number;
   active: boolean;
+  /** Recharging after a frenzy: meals don't fill the meter yet. */
+  resting?: boolean;
 }
 
 export interface RunResult {

@@ -1,15 +1,16 @@
 // Pooled hazards (jellyfish, mines) spawned off-screen once the run is under way. The number
-// allowed grows with run time (DANGER config) so the start of a run stays safe.
+// allowed grows with run time (DANGER config) so the start of a run stays safe, with the view
+// size (gently: a big seal is also a big target) and with the map's difficulty.
 import Phaser from 'phaser';
 import { DANGER, SPAWN } from '../config/balance';
 import { HAZARD_LIST, HAZARDS, type HazardId } from '../config/hazards';
 import { Hazard } from '../entities/Hazard';
 import { hazardsAllowed } from './danger';
-import { despawnRange, pickForZone, pickOffscreenPoint, type Mover } from './spawnPoint';
+import { despawnRange, pickForZone, pickOffscreenPoint, viewScale, type Mover } from './spawnPoint';
 import { openSpot, WATER_BOTTOM, WATER_TOP } from './Spawner';
 import { currentMap } from '../world/GameMap';
 
-const POOL_SIZE = 16;
+const POOL_SIZE = 40;
 
 export class HazardField {
   readonly group: Phaser.GameObjects.Group;
@@ -50,8 +51,13 @@ export class HazardField {
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = DANGER.hazardSpawnInterval;
-    const bloom = currentMap().regionAt(cx, cy).jellyBloom ?? 1;
-    if (this.alive.length >= Math.round(hazardsAllowed(elapsed) * bloom)) return;
+    const map = currentMap();
+    const bloom = map.regionAt(cx, cy).jellyBloom ?? 1;
+    // A zoomed-out (bigger) seal sees more water, so more hazards in it, but only with the
+    // square root of the view scale: a big seal is also a much bigger target (x1.35 at size 8).
+    const density = Math.sqrt(viewScale(camera.worldView)) * map.difficulty.danger;
+    const cap = Math.min(POOL_SIZE, Math.round(hazardsAllowed(elapsed) * bloom * density));
+    if (this.alive.length >= cap) return;
 
     const p = pickOffscreenPoint(camera, seal, this.random, {
       marginMin: SPAWN.marginMin,

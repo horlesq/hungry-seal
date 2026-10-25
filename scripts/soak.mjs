@@ -81,21 +81,50 @@ const feed = () =>
     g.hunger.value = g.hunger.max;
   });
 
-// 1) A long run that tours every zone: dive to the seabed and back while swimming sideways.
+// 1) A long run that tours every zone. Steering alone gets stuck on a bounded map (it used to
+// end up pressed against the start beach), so the seal is placed at open water in each zone
+// along the map in turn and swims around there.
 console.log(`long run: ${SECONDS}s`);
 const runSamples = [];
 const keys = [
   ['d', 's'],
-  ['d', 's'],
+  ['d', 'w'],
   ['a', 's'],
   ['a', 'w'],
-  ['d', 'w'],
-  ['d', 'w'],
 ];
+/** Fractions of the map's width and world-y waypoints: shallows, open ocean, deep, abyss. */
+const waypoints = [
+  [0.15, 1100],
+  [0.3, 2600],
+  [0.5, 4200],
+  [0.65, 5600],
+  [0.8, 3000],
+  [0.9, 1200],
+];
+const placeAt = ([fx, y]) =>
+  page.evaluate(
+    ([fx, y]) => {
+      const s = window.__PHASER_GAME__.scene.getScene('Game');
+      const t = s.map.terrain;
+      const x = s.map.width * fx;
+      let px = x;
+      let py = y;
+      for (let r = 0; r < 3000 && t.distance(px, py) < 150; r += 40) {
+        px = x + Math.cos(r * 0.37) * r;
+        py = y + Math.sin(r * 0.37) * r;
+      }
+      s.seal.motion.x = px;
+      s.seal.motion.y = py;
+      s.seal.setPosition(px, py);
+      s.cameras.main.centerOn(px, py);
+    },
+    [fx, y],
+  );
 const start = Date.now();
 let step = 0;
 while (Date.now() - start < SECONDS * 1000) {
   await feed();
+  if (step % 2 === 0) await placeAt(waypoints[(step / 2) % waypoints.length]);
   const pair = keys[step % keys.length];
   for (const k of pair) await page.keyboard.down(k);
   await page.waitForTimeout(5000);
@@ -155,8 +184,17 @@ const check = (name, ok, detail) => {
 const sameStep = restartSamples.filter((_, i) => i % 5 === 4);
 const first = sameStep[0] ?? restartSamples[0];
 const last = sameStep.at(-1) ?? restartSamples.at(-1);
-const maxObjects = Math.max(...runSamples.map((s) => s.gameObjects));
-check('long run: live objects stay bounded', maxObjects < 900, `max ${maxObjects}`);
+// Pools fill up as the tour reaches new zones (~930 objects once every zone is visited), so
+// check for growth: the second half of the run mustn't keep climbing past the first.
+const objects = runSamples.map((s) => s.gameObjects);
+const half = Math.max(1, Math.floor(objects.length / 2));
+const earlyMax = Math.max(...objects.slice(0, half));
+const lateMax = Math.max(...objects.slice(half));
+check(
+  'long run: live objects stay bounded',
+  lateMax < 1200 && lateMax <= earlyMax + 80,
+  `early max ${earlyMax}, late max ${lateMax}`,
+);
 const runHeap = runSamples.map((s) => s.heapMB);
 check(
   'long run: heap stays flat',

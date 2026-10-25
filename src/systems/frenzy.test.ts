@@ -25,6 +25,23 @@ describe('FrenzySystem', () => {
     expect(f.meter).toBe(0);
   });
 
+  it('rests after a frenzy: meals do not charge the meter until the cooldown is over', () => {
+    const f = new FrenzySystem({ ...P, cooldown: 10 });
+    for (let i = 0; i < 4; i++) f.feed();
+    expect(f.active).toBe(true);
+    expect(f.update(P.duration + 0.1)).toBe(true);
+    expect(f.resting).toBe(true);
+    f.feed(4);
+    expect(f.meter).toBe(0);
+    f.update(9);
+    f.feed();
+    expect(f.meter).toBe(0);
+    f.update(1.1);
+    expect(f.resting).toBe(false);
+    f.feed();
+    expect(f.meter).toBeCloseTo(0.25);
+  });
+
   it('drains only after a pause in eating', () => {
     const f = new FrenzySystem(P);
     f.feed();

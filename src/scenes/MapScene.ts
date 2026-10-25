@@ -14,7 +14,7 @@ import { FocusNav } from '../ui/FocusNav';
 import { mapThumbnail } from '../ui/mapThumb';
 import { WORLD } from '../config/zones';
 import { GameMap } from '../world/GameMap';
-import { COLORS, CSS, EDGE, formatNumber, uiText } from '../ui/theme';
+import { COLORS, CSS, drawPanel, EDGE, formatNumber, uiText } from '../ui/theme';
 import { UiTextures } from '../ui/uiTextures';
 import { addBackdrop, BACKDROPS, drawBar } from '../ui/widgets';
 import { DESIGN_HEIGHT } from '../utils/viewport';
@@ -106,6 +106,7 @@ export class MapScene extends Phaser.Scene {
     const button = this.cardButton(def, x, y, w, h);
     const thumb = this.add.image(x, y - h / 2 + 20, '__DEFAULT').setOrigin(0.5, 0);
     this.fillThumb(thumb, def, w - 40, THUMB_H.wide);
+    this.difficultyTag(def, x - (w - 40) / 2 + 10, y - h / 2 + 30);
     const textY = y - h / 2 + 20 + THUMB_H.wide + 18;
     uiText(this, x, textY, def.name, 'heading', { size: 32 }).setOrigin(0.5, 0);
     uiText(this, x, textY + 44, def.blurb, 'body', {
@@ -129,6 +130,7 @@ export class MapScene extends Phaser.Scene {
     const button = this.cardButton(def, x, y, w, h);
     const thumb = this.add.image(x - w / 2 + 20, y, '__DEFAULT').setOrigin(0, 0.5);
     this.fillThumb(thumb, def, 300, THUMB_H.tall);
+    this.difficultyTag(def, thumb.x + 10, y - THUMB_H.tall / 2 + 10);
     const tx = thumb.x + 300 + 20;
     uiText(this, tx, y - h / 2 + 26, def.name, 'heading', { size: 30 });
     uiText(this, tx, y - h / 2 + 68, def.blurb, 'body', {
@@ -142,6 +144,27 @@ export class MapScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
     const rect = new Phaser.Geom.Rectangle(x - w / 2, y - h / 2, w, h);
     return { def, button, thumb, status, lock: this.lockIcon(def, thumb), rect };
+  }
+
+  /**
+   * "Hard" / "Hardest" tag in the corner of a map's picture, from its difficulty (later maps
+   * have hungrier water and more hunters; Seal Bay has no tag).
+   */
+  private difficultyTag(def: MapDef, x: number, y: number): void {
+    const danger = def.difficulty?.danger ?? 1;
+    if (danger <= 1) return;
+    const label = danger >= 1.3 ? 'Hardest' : 'Hard';
+    const text = uiText(this, x + 12, y + 4, label, 'caption', {
+      weight: 800,
+      size: 18,
+      color: CSS.coral,
+    });
+    drawPanel(this.add.graphics(), x, y, text.width + 24, text.height + 8, {
+      radius: 12,
+      alpha: 0.85,
+      line: 0,
+    });
+    this.children.bringToTop(text);
   }
 
   /** Shows the map's picture once its terrain is baked (in a worker, no hitch). */

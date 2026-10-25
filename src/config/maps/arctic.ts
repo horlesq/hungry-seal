@@ -61,6 +61,8 @@ export const ARCTIC: MapDef = {
   name: 'Arctic',
   blurb: 'Ice floes, icebergs, an old tanker and the Colossal Squid.',
   unlock: { after: 'bay', pearls: 3, score: 12000 },
+  // Cold water burns energy; more hunters than the bay.
+  difficulty: { hunger: 1.1, danger: 1.2 },
   start: { x: 2500, y: 820 },
   palette: {
     sky: '#9fd8f5',
@@ -217,7 +219,9 @@ export const ARCTIC: MapDef = {
       x0: 0,
       x1: 2600,
       danger: 1,
-      creatureMult: { penguin: 4 },
+      // Still a colony, but at x4 (x10 with the map's x2.5) penguins were ~65% of the start's
+      // spawns and a size-1 seal could starve before finding a minnow.
+      creatureMult: { penguin: 1.5 },
     },
     {
       id: 'floes',

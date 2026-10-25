@@ -21,7 +21,14 @@ import { getViewport } from '../services/Viewport';
 import { Creature, School } from '../entities/Creature';
 import { stepCreatureMotion, type CreatureSteerContext } from '../entities/creatureAI';
 import { canEat, extraReach } from './feeding';
-import { despawnRange, pickForZone, pickOffscreenPoint, pickSpawn, viewScale } from './spawnPoint';
+import {
+  despawnRange,
+  isWorthwhileFood,
+  pickForZone,
+  pickOffscreenPoint,
+  pickSpawn,
+  viewScale,
+} from './spawnPoint';
 
 const POOL_SIZE = 150;
 export const WATER_TOP = WORLD.surfaceY + 16;
@@ -154,7 +161,9 @@ export class Spawner {
       else if (c.flies) flyers++;
       else {
         swimmers++;
-        if (ctx.threatActive && Math.hypot(c.x - cx, c.y - cy) < foodRadius) food++;
+        // Only prey worth eating counts toward the food guarantee (minnows don't feed a big seal).
+        const near = Math.hypot(c.x - cx, c.y - cy) < foodRadius;
+        if (near && isWorthwhileFood(seal.stage, c.def.tier)) food++;
       }
     }
 

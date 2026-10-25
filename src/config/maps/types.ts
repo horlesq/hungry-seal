@@ -110,12 +110,24 @@ export interface GateDef {
 
 export type BossId = 'kraken' | 'colossal' | 'abyssal';
 
+/**
+ * How hard the map is compared to Seal Bay: later maps are played by seals with upgrades.
+ * `hunger` multiplies the hunger drain; `danger` multiplies how many hazards and predators
+ * are allowed at once.
+ */
+export interface MapDifficulty {
+  hunger: number;
+  danger: number;
+}
+
 export interface MapDef {
   id: MapId;
   name: string;
   blurb: string;
   /** Opens after this many pearls on `after`, or (older saves) this best score. */
   unlock: { after: MapId; pearls: number; score: number } | null;
+  /** Default: Seal Bay's (1, 1). */
+  difficulty?: MapDifficulty;
   start: { x: number; y: number };
   palette: MapPalette;
   /** Zone names/blurbs (depth bands), shown when no region banner applies. */

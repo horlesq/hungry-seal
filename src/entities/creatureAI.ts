@@ -92,7 +92,9 @@ const DRIFT_BOB = 18;
  * Puffers inflate when the seal comes this close, stay puffed for PUFF_TIME, then need
  * PUFF_RECOVER seconds before they can puff again: the window to eat one without a sting.
  */
-export const PUFF_RADIUS = 170;
+// Close enough that it puffs at a seal heading for it, not at one hunting other fish nearby
+// (at 170 px crowds of puffers were the top cause of damage on Seal Bay and the Lagoon).
+export const PUFF_RADIUS = 130;
 export const PUFF_TIME = 2;
 export const PUFF_RECOVER = 2.5;
 

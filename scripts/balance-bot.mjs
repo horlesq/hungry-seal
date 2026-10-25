@@ -7,10 +7,15 @@
 //   perfect = sees all prey, re-aims every 60 ms, leads targets (upper bound on skill)
 //
 // The human bot plays like a player who follows the hints: flees hunting predators upward
-// (to leap out) and steers around puffed-up pufferfish.
+// (to leap out), boosts once one charges, gives pufferfish a wide berth unless they're
+// catching their breath, and keeps a bigger berth from hazards as it grows.
 //
 // It chases the nearest meal; once big it skips prey worth less than half (a player learns
 // that minnows barely feed a big seal) and hunts predators it has outgrown.
+//
+// Every 5 s it logs hunger, score, size, coins, hazards and predators around, frenzies so far
+// and its position; the last line (DIED or ALIVE) adds seconds spent under 25% hunger, the
+// time-averaged hunger and the hits taken by source.
 //
 // Reference numbers per map are in docs/GAME_DESIGN.md (Difficulty curve). Results vary a lot:
 // take several samples. BOT_MAP=bay|arctic|tropical picks the map; BOT_PORT runs several at once.
@@ -30,54 +35,65 @@ const browser = await chromium.launch({
   args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
 });
 const upgradeLevel = Number(process.argv[4] ?? 0);
+const map = process.env.BOT_MAP ?? 'bay';
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-if (upgradeLevel > 0) {
-  await page.addInitScript((level) => {
+// The whole save in one go, before the game loads: every upgrade at `level`, the map picked
+// (unlocked via the old score unlock), no tutorial. (An init script runs again on every
+// reload, so the map must be in it: an earlier version reloaded after picking the map and the
+// script put the default map back, so upgraded runs always played Seal Bay.)
+await page.addInitScript(
+  ({ level, map }) => {
     const ids = ['speed', 'belly', 'metabolism', 'boost', 'jaws', 'magnet', 'frenzy'];
     const upgrades = Object.fromEntries(ids.map((id) => [id, level]));
     localStorage.setItem(
       'hungry-seal-save',
-      JSON.stringify({ version: 4, runs: 10, tutorialDone: true, upgrades }),
+      JSON.stringify({
+        version: 4,
+        runs: 10,
+        tutorialDone: true,
+        upgrades,
+        bestScore: 99999,
+        maps: { selected: map, best: {} },
+      }),
     );
-  }, upgradeLevel);
-}
+  },
+  { level: upgradeLevel, map },
+);
 await page.goto(`http://localhost:${PORT}/`);
 await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Menu'));
-if (process.env.BOT_MAP) {
-  // Unlock and select the map, then start the run directly (Play goes via the map select).
-  await page.evaluate((id) => {
-    const raw = localStorage.getItem('hungry-seal-save');
-    const save = raw ? JSON.parse(raw) : {};
-    save.bestScore = Math.max(save.bestScore ?? 0, 99999);
-    save.maps = { selected: id, best: {} };
-    localStorage.setItem('hungry-seal-save', JSON.stringify(save));
-  }, process.env.BOT_MAP);
-  await page.reload();
-  await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Menu'));
-  await page.evaluate(() => window.__PHASER_GAME__.scene.getScene('Menu').scene.start('Game'));
-} else {
-  await page.keyboard.press('Enter');
-}
+// Start the run directly (Play goes via the map select once you've played).
+await page.evaluate(() => window.__PHASER_GAME__.scene.getScene('Menu').scene.start('Game'));
 await page.waitForFunction(() => window.__PHASER_GAME__?.scene.isActive('Game'));
 await page.mouse.move(640, 360);
 
 const human = (process.argv[2] ?? 'human') !== 'perfect';
 const seconds = Number(process.argv[3] ?? 150);
 console.log(
-  `bot mode: ${human ? 'human' : 'perfect'}, upgrades ${upgradeLevel}, map ${process.env.BOT_MAP ?? 'bay'}`,
+  `bot mode: ${human ? 'human' : 'perfect'}, upgrades ${upgradeLevel}, map ${await page.evaluate(
+    () => window.__PHASER_GAME__.scene.getScene('Game').map.id,
+  )} (asked for ${map})`,
 );
 
 const start = Date.now();
 let lastLog = 0;
 let boosting = false;
+let last = null;
 while (Date.now() - start < seconds * 1000) {
-  const info = await page.evaluate((human) => {
+  const info = (last = await page.evaluate((human) => {
     const s = window.__PHASER_GAME__.scene.getScene('Game');
     // Tally hits by source (for the summary line), including a fatal one.
     window.__hits ??= {};
     if (s.lastHit && s.lastHit.at !== window.__lastHitAt) {
       window.__lastHitAt = s.lastHit.at;
       window.__hits[s.lastHit.source] = (window.__hits[s.lastHit.source] ?? 0) + 1;
+    }
+    // Hunger pressure over the run: seconds spent under 25% and the time-averaged level.
+    const st0 = (window.__st ??= { last: s.elapsed, low: 0, sum: 0 });
+    const dtE = Math.max(0, s.elapsed - st0.last);
+    st0.last = s.elapsed;
+    if (!s.dead) {
+      if (s.hunger.fraction < 0.25) st0.low += dtE;
+      st0.sum += s.hunger.fraction * dtE;
     }
     if (s.dead)
       return {
@@ -87,6 +103,10 @@ while (Date.now() - start < seconds * 1000) {
         t: s.elapsed,
         stage: s.seal.stage,
         coins: s.runCoins,
+        frenzies: s.frenzies,
+        low: st0.low,
+        avg: st0.sum / Math.max(1, s.elapsed),
+        x: s.seal.x,
         cause: s.lastHit && s.elapsed - s.lastHit.at < 0.6 ? s.lastHit.source : 'starved',
       };
     const cam = s.cameras.main;
@@ -102,14 +122,17 @@ while (Date.now() - start < seconds * 1000) {
       }
       return true;
     };
-    // Stuck against rock (barely moved for 1.5 s): back out upward, away from the wall.
+    // Stuck (barely moved for 1.5 s): back away from the rock along its normal, so under an
+    // ice floe it dives instead of pushing up into the ice; in open water (no rock nearby,
+    // e.g. riding the surface) it dives forward.
     const st = (window.__stuck ??= { at: s.elapsed, x: m.x, y: m.y, until: -1, tx: 0, ty: 0 });
     if (s.elapsed - st.at >= 1.5) {
       if (Math.hypot(m.x - st.x, m.y - st.y) < 70) {
         const n = terrain.normal(m.x, m.y, { x: 0, y: 0 });
+        const nearRock = terrain.distance(m.x, m.y) < 120;
         st.until = s.elapsed + 1.2;
-        st.tx = m.x + n.x * 250 + (Math.random() - 0.5) * 300;
-        st.ty = m.y - 260 + n.y * 120;
+        st.tx = m.x + (nearRock ? n.x * 260 : 200) + (Math.random() - 0.5) * 300;
+        st.ty = m.y + (nearRock ? n.y * 260 : 300);
       }
       st.at = s.elapsed;
       st.x = m.x;
@@ -133,6 +156,10 @@ while (Date.now() - start < seconds * 1000) {
         hazards: s.hazards.alive.length,
         predators: s.predators.alive.length,
         coins: s.runCoins,
+        frenzies: s.frenzies,
+        low: st0.low,
+        avg: st0.sum / Math.max(1, s.elapsed),
+        x: s.seal.x,
       };
     }
 
@@ -157,15 +184,19 @@ while (Date.now() - start < seconds * 1000) {
     for (const c of s.spawner.alive) {
       if (!c.active || !c.params.puff) continue;
       if (c.puffed) avoid(c.x, c.y, 80 + body);
-      else if (c.motion.puffCooldown < 0.5) avoid(c.x, c.y, 40 + body);
+      // Not recovering: it puffs when the seal gets within ~170 px (plus its reach), so a
+      // player who's been stung swings wide.
+      else if (c.motion.puffCooldown < 0.5) avoid(c.x, c.y, 120 + body);
     }
     for (const p of s.predators.alive) {
       if (!p.active || p.def.tier <= s.seal.stage) continue;
       if (p.motion.state === 'notice' || p.motion.state === 'chase') {
         avoid(p.x, p.y, 420);
-        // Like the in-game hint says: head up and leap out (predators only hunt in water).
-        if (Math.hypot(m.x - p.x, m.y - p.y) < 420) fleeY -= 0.7;
-        if (Math.hypot(m.x - p.x, m.y - p.y) < 300) panic = true;
+        const d = Math.hypot(m.x - p.x, m.y - p.y);
+        // Like the in-game hint says: head up and leap out (predators only hunt in water),
+        // and boost once it charges (most hunters outswim a small seal).
+        if (d < 420) fleeY -= 0.7;
+        if (d < 300 || (p.motion.state === 'chase' && d < 420)) panic = true;
       } else avoid(p.x, p.y, 160);
     }
     if (fleeX !== 0 || fleeY !== 0) {
@@ -189,6 +220,10 @@ while (Date.now() - start < seconds * 1000) {
         hazards: s.hazards.alive.length,
         predators: s.predators.alive.length,
         coins: s.runCoins,
+        frenzies: s.frenzies,
+        low: st0.low,
+        avg: st0.sum / Math.max(1, s.elapsed),
+        x: s.seal.x,
       };
     }
 
@@ -233,13 +268,15 @@ while (Date.now() - start < seconds * 1000) {
     let tx = best ? best.x + best.motion.vx * lead : m.x + 300;
     let ty = best ? best.y + best.motion.vy * lead : 1100;
     if (!best && !clear(tx, ty)) {
-      // Rock in the way: try diving forward, then back the other way, then up.
+      // Rock in the way: carry on at this depth, else turn back toward the cruising depth,
+      // else dive forward, else go up (prefer staying where the food is to sinking deep).
       const options = [
-        [m.x + 300, m.y + 300],
+        [m.x + 300, m.y],
         [m.x - 300, 1100],
+        [m.x + 300, m.y + 300],
         [m.x, m.y - 300],
       ];
-      [tx, ty] = options.find(([x, y]) => clear(x, y)) ?? options[2];
+      [tx, ty] = options.find(([x, y]) => clear(x, y)) ?? options[3];
     }
     // Screen = (world - worldView) * zoom: the camera zooms out as the seal grows.
     return {
@@ -259,12 +296,16 @@ while (Date.now() - start < seconds * 1000) {
       hazards: s.hazards.alive.length,
       predators: s.predators.alive.length,
       coins: s.runCoins,
+      frenzies: s.frenzies,
+      low: st0.low,
+      avg: st0.sum / Math.max(1, s.elapsed),
+      x: s.seal.x,
     };
-  }, human);
+  }, human));
   if (info.dead) {
     const hits = await page.evaluate(() => window.__hits ?? {});
     console.log(
-      `DIED (${info.cause}) at t=${info.t.toFixed(1)}s score=${info.score} eaten=${info.eaten} stage=${info.stage} coins=${info.coins} hits=${JSON.stringify(hits)}`,
+      `DIED (${info.cause}) at t=${info.t.toFixed(1)}s score=${info.score} eaten=${info.eaten} stage=${info.stage} coins=${info.coins} frenzies=${info.frenzies} under25%=${info.low.toFixed(0)}s avgHunger=${Math.round(info.avg * 100)}% hits=${JSON.stringify(hits)}`,
     );
     break;
   }
@@ -281,10 +322,17 @@ while (Date.now() - start < seconds * 1000) {
     if (process.env.BOT_SHOTS)
       await page.screenshot({ path: `.playtest/bot-${Math.round(info.t)}.png` });
     console.log(
-      `t=${info.t.toFixed(0).padStart(3)}s hunger=${info.hunger.toFixed(0).padStart(3)} score=${String(info.score).padStart(5)} eaten=${String(info.eaten).padStart(3)} stage=${info.stage} coins=${String(info.coins).padStart(3)} hazards=${info.hazards} predators=${info.predators} y=${info.zone.toFixed(0)}${info.flee ? ' FLEEING' : ''}`,
+      `t=${info.t.toFixed(0).padStart(3)}s hunger=${info.hunger.toFixed(0).padStart(3)} score=${String(info.score).padStart(5)} eaten=${String(info.eaten).padStart(3)} stage=${info.stage} coins=${String(info.coins).padStart(3)} hazards=${info.hazards} predators=${info.predators} frenzies=${info.frenzies} x=${info.x.toFixed(0)} y=${info.zone.toFixed(0)}${info.flee ? ' FLEEING' : ''}`,
     );
   }
   await page.waitForTimeout(human ? 250 : 60);
+}
+// Survived the whole time: the same summary as a death, so runs are easy to compare.
+if (last && !last.dead) {
+  const hits = await page.evaluate(() => window.__hits ?? {});
+  console.log(
+    `ALIVE at t=${last.t.toFixed(1)}s score=${last.score} eaten=${last.eaten} stage=${last.stage} coins=${last.coins} frenzies=${last.frenzies} under25%=${last.low.toFixed(0)}s avgHunger=${Math.round(last.avg * 100)}% hits=${JSON.stringify(hits)}`,
+  );
 }
 await browser.close();
 await server.close();

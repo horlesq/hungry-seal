@@ -2,7 +2,9 @@
 // for the session). The map being played is also kept as the "current" map so systems that
 // only need a query (is this spot open water? where's the ground?) don't need it threaded
 // through every constructor.
-import { MAPS, type MapDef, type MapId, type RegionDef } from '../config/maps';
+import { MAPS, type MapDef, type MapDifficulty, type MapId, type RegionDef } from '../config/maps';
+
+const NORMAL_DIFFICULTY: MapDifficulty = { hunger: 1, danger: 1 };
 import { WORLD, ZONES, type Zone, type ZoneId } from '../config/zones';
 import { TerrainField } from './terrain';
 
@@ -84,6 +86,11 @@ export class GameMap {
     return this.def.terrain.width;
   }
 
+  /** Hunger and danger multipliers of this map (Seal Bay = 1, 1). */
+  get difficulty(): MapDifficulty {
+    return this.def.difficulty ?? NORMAL_DIFFICULTY;
+  }
+
   /** The zone at `y` with this map's name and blurb. */
   zone(zone: Zone): Zone {
     const o = this.def.zones?.[zone.id];
@@ -103,7 +110,9 @@ export class GameMap {
       } else wide ??= r;
     }
     if (wide) return wide;
-    return x < this.def.regions[0].x0 ? this.def.regions[0] : this.def.regions[this.def.regions.length - 1];
+    return x < this.def.regions[0].x0
+      ? this.def.regions[0]
+      : this.def.regions[this.def.regions.length - 1];
   }
 
   /** Spawn weight multiplier for a creature at (x, y): map-wide x region. */

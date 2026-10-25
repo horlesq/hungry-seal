@@ -1,9 +1,10 @@
-// Frenzy: meals (weighted by combo) fill a meter; when full, the seal goes into a short
-// frenzy (fast, invulnerable, eats anything, double score). The meter drains slowly if you
-// stop eating. Pure logic, no Phaser.
+// Frenzy: meals (weighted by what they're worth and the combo) fill a meter; when full, the
+// seal goes into a short frenzy (fast, invulnerable, eats anything, double score). The meter
+// drains slowly if you stop eating, and rests for a while after a frenzy so it stays a
+// special moment rather than a state you live in. Pure logic, no Phaser.
 
 export interface FrenzyParams {
-  /** Meter gained per meal, times the combo multiplier. */
+  /** Meter gained per full-value meal (scaled by feed()'s multiplier). */
   perMeal: number;
   /** Seconds without eating before the meter starts draining. */
   decayDelay: number;
@@ -11,6 +12,8 @@ export interface FrenzyParams {
   decayPerSec: number;
   /** Seconds a frenzy lasts. */
   duration: number;
+  /** Seconds after a frenzy ends during which meals don't charge the meter. */
+  cooldown?: number;
 }
 
 export class FrenzySystem {
@@ -19,13 +22,20 @@ export class FrenzySystem {
   active = false;
   private timeLeft = 0;
   private idle = 0;
+  /** Seconds of rest left after the last frenzy. */
+  private rest = 0;
 
   constructor(private readonly p: FrenzyParams) {}
+
+  /** True while the meter rests after a frenzy (meals don't charge it). */
+  get resting(): boolean {
+    return this.rest > 0;
+  }
 
   /** Registers a meal. Returns true when this meal starts a frenzy. */
   feed(multiplier = 1): boolean {
     this.idle = 0;
-    if (this.active) return false;
+    if (this.active || this.rest > 0) return false;
     this.meter = Math.min(1, this.meter + this.p.perMeal * multiplier);
     if (this.meter < 1) return false;
     this.active = true;
@@ -41,7 +51,12 @@ export class FrenzySystem {
       if (this.timeLeft > 0) return false;
       this.active = false;
       this.meter = 0;
+      this.rest = this.p.cooldown ?? 0;
       return true;
+    }
+    if (this.rest > 0) {
+      this.rest = Math.max(0, this.rest - dt);
+      return false;
     }
     this.idle += dt;
     if (this.idle > this.p.decayDelay) {

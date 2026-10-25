@@ -8,6 +8,7 @@ import {
   type PredatorEvent,
   type PredatorMotion,
   type PredatorParams,
+  STALK_FACTOR,
 } from './predatorAI';
 
 const P: PredatorParams = {
@@ -74,6 +75,28 @@ describe('predator AI', () => {
     const before = Math.hypot(c.preyX - m.x, c.preyY - m.y);
     run(m, 0.6, c);
     expect(Math.hypot(c.preyX - m.x, c.preyY - m.y)).toBeLessThan(before);
+  });
+
+  it('stalks a catchable seal it can sense, then telegraphs once close', () => {
+    // Beyond the notice radius but within the stalk range, and swimming away from it.
+    const m = createPredatorMotion(0, 2500, Math.PI);
+    const c = ctx({ preyX: P.noticeRadius * 2, preyY: 2500 });
+    const before = Math.hypot(c.preyX - m.x, c.preyY - m.y);
+    // Turns around, then cruises over at stalking speed.
+    const events = run(m, 7, c);
+    expect(Math.hypot(c.preyX - m.x, c.preyY - m.y)).toBeLessThan(before);
+    expect(events).toContain('notice');
+  });
+
+  it('does not stalk a seal it cannot sense, or one out of the water', () => {
+    const far = createPredatorMotion(0, 2500, 0);
+    run(far, 3, ctx({ preyX: P.noticeRadius * STALK_FACTOR + 400, preyY: 2500 }));
+    expect(far.state).toBe('patrol');
+    expect(far.speed).toBeCloseTo(P.patrolSpeed);
+    const dry = createPredatorMotion(0, 2500, Math.PI);
+    run(dry, 3, ctx({ preyX: P.noticeRadius * 2, preyY: 2500, preyInWater: false }));
+    // Stalking would cruise faster than a plain patrol.
+    expect(dry.speed).toBeCloseTo(P.patrolSpeed);
   });
 
   it('ignores a seal that is out of the water', () => {

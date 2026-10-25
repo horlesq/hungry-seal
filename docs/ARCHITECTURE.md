@@ -91,7 +91,7 @@ hungry-seal/
       Seal.ts           sprite; applies sealMotion, growth stage scaling, mouth circle, visual feel
       creatureAI.ts     PURE creature behaviors (wander, drift, flee, school, band keeping) + tests
       Creature.ts       pooled prey sprite driven by a CreatureDef; School = follow-the-leader group
-      predatorAI.ts     PURE predator state machine (patrol/notice/chase/recover/flee) + tests
+      predatorAI.ts     PURE predator state machine (patrol/stalk/notice/chase/recover/flee) + tests
       Predator.ts       pooled predator sprite, mouth circle, telegraph tint + "!"
       Hazard.ts         pooled hazard sprite (drift, bob, pulse/blink)
       Coin.ts           pooled coin (float or pop-out, magnet, spin, expiry blink)
@@ -108,13 +108,13 @@ hungry-seal/
       feeding.ts           PURE bite rule (canEat) + circle overlap
       ComboSystem.ts       PURE combo count/multiplier/window (tested in combo.test.ts)
       danger.ts            PURE difficulty schedule: hazards/predators allowed by run time
-      spawnPoint.ts        shared off-screen spawn point picker + zone-weighted pick
-      HazardField.ts       pooled hazard spawning/stepping (spawnAt for scripted/tests)
+      spawnPoint.ts        shared off-screen spawn point picker + zone-weighted pick, worthwhile food
+      HazardField.ts       pooled hazard spawning/stepping, cap scaled by view size (sqrt) and map danger
       Predators.ts         predator spawning by schedule, AI stepping, off-screen warning arrows
       CoinField.ts         coin clusters + prey drops, collection
       Pickups.ts           treasure chests (seabed) + magnet orbs; returns pickup events
       Darkness.ts          depth darkness overlay with the seal's light (darknessAt() in zones.ts)
-      FrenzySystem.ts      PURE frenzy meter/duration (tested in frenzy.test.ts)
+      FrenzySystem.ts      PURE frenzy meter/duration/rest after a frenzy (tested in frenzy.test.ts)
       UpgradeSystem.ts     PURE upgrade levels -> run modifiers, purchase rules (upgrades.test.ts)
       progress.ts          PURE run stats, lifetime stats, missions, achievements, top runs (+ tests)
       Tutorial.ts          PURE first-run hint rules (tutorial.test.ts)
@@ -191,7 +191,7 @@ hungry-seal/
 - Pixel-art off; smooth textures. No atlases: Phaser 4 batches sprites across textures, and draw submission is ~5% of a frame (`npm run perf`).
 - Target 60 FPS on mid-range phones. `npm run perf` plays the heaviest situations on an emulated phone (CPU x4) and prints frame times and hotspots (`PERF_PROFILE=1`); keep the worst situation well above 60 fps there, since the GPU in that test is a desktop one.
 - **Graphics are expensive in WebGL:** Phaser cuts every arc into 100 points and triangulates the whole path again on every frame, even when nothing changed. Draw rounded rects, circles and arcs with `ui/shapes.ts` (polygons sized to the radius), and don't redraw thousands of small shapes per frame (the mine chains are a TileSprite). `render.pathDetailThreshold: 3` merges what's left.
-- **Adaptive resolution:** GameScene feeds `ResolutionGovernor` (utils/resolution.ts) the frame rate; after 4 s under 45 fps it calls `lowerResolution`, which caps the pixel ratio at the next step (2, 1.5, 1.25, 1) for the session and re-applies the viewport (scenes re-fit on the resize as usual). It never steps back up.
+- **Adaptive resolution:** GameScene feeds `ResolutionGovernor` (utils/resolution.ts) the frame rate; after 4 s under 45 fps it calls `lowerResolution`, which caps the pixel ratio at the next step (2, 1.5, 1.25, 1) for the session and re-applies the viewport (scenes re-fit on the resize as usual). After each step it measures again: if the frame rate didn't rise by 15% (a battery saver capping it at 30 fps, or a CPU-bound device) it calls `restoreResolution` and stays off for the session, so a capped phone isn't blurred for nothing.
 
 ## Loading and offline
 - **Art** is WebP (`public/assets/`), built from the PNG sources in `art/` by `npm run assets` (quality 90, lossless-quality alpha: ~8x smaller, no visible difference). Blender scripts write to `art/`.
@@ -213,6 +213,9 @@ hungry-seal/
 - Spawner keeps ~`SPAWN.targetAlive` creatures, spawning just off-screen (70% ahead of the seal) with the zone at the spawn point choosing a weighted creature, and recycles creatures > `despawnDistance` from the camera centre. Eaten prey vanish while bigger creatures linger, so when fewer than `SPAWN.minFood` edible swimmers are within `foodRadius` of the view it spawns only food (`pickSpawn`), up to `maxAlive`. Pooled objects are reused: code that holds a creature reference across frames must also check it wasn't respawned (e.g. compare its `motion` object).
 
 ## Danger, damage and saves
+- **Difficulty levers** (all data): `HUNGER` (base drain, ramp over the run, zone and size multipliers), `DANGER` (hazard schedule), `DAMAGE.sting*` (stings shrink as the seal grows; `stingFactor` in feeding.ts), each predator's `spawn` rule, speeds and optional `band` (`predators.ts`; `predatorBand()` = its band or its zones' band), `FRENZY` (charge, rest), and a map's `difficulty` (`{ hunger, danger }` in its MapDef, read through `GameMap.difficulty`; Seal Bay = 1, 1). GameScene multiplies the hunger drain by `difficulty.hunger`; HazardField and Predators multiply their caps by `difficulty.danger`.
+- **Food guarantee and meal value:** prey a seal has long outgrown are worth less (`mealValue`); the Spawner's food guarantee counts and spawns only prey worth at least `SPAWN.foodMinValue` of their nutrition (`isWorthwhileFood`), so a grown seal is kept in reach of real meals. Frenzy charge is scaled by the same value.
+- **Stalking:** a patrolling predator that can eat the seal and senses it within `STALK_FACTOR` x its notice radius cruises toward it (inside its band) at 1.35x patrol speed, so hunters find the seal instead of drifting past.
 - Hazards spawn by run time (`hazardsAllowed`); each predator kind has its own `spawn` rule in `predators.ts` — a run-time schedule (shark, orca) or home zones where it lives while the camera is there (anglerfish) — evaluated by `predatorsAllowed(rule, elapsed, viewZone)` in `systems/danger.ts`. URL `?calm` forces danger time to 0, so no hazards and no predators (every rule has `after` > 0).
 - Darkness/glow layering: world sprites < `Depths.Darkness` (25) overlay < `Depths.Glow` (26) glows < floating text (30). Anything that must be findable in the dark gets a glow image at `Depths.Glow`.
 - Contacts: hazards vs the seal's body circle; predator **mouth** circle vs the seal's body; the seal's mouth vs a predator's body when the seal has outgrown it (predators flee then).

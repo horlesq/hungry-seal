@@ -22,22 +22,67 @@ const INPUT_DELAY = 700;
 const PANEL_W = 660;
 const PANEL_H = 316;
 
+/** What got you, and a tip for next time (kept to one line on an upright phone). */
 const TITLES: Record<DeathCause, { title: string; subtitle: string; color: string }> = {
-  starved: { title: 'Starved!', subtitle: 'Your seal ran out of food', color: '#ff9a6b' },
-  shark: { title: 'Chomped!', subtitle: 'A shark got you', color: '#ff6b5f' },
-  mine: { title: 'Kaboom!', subtitle: 'You swam into a sea mine', color: '#ffb13c' },
-  jellyfish: { title: 'Stung!', subtitle: 'Zapped by a jellyfish', color: '#ff8ae0' },
-  orca: { title: 'Crunched!', subtitle: 'An orca caught you', color: '#e8eef4' },
+  starved: {
+    title: 'Starved!',
+    subtitle: 'Out of food. Big seals burn more: hunt bigger prey',
+    color: '#ff9a6b',
+  },
+  shark: {
+    title: 'Chomped!',
+    subtitle: 'Sharks outswim you: boost away when you see "!"',
+    color: '#ff6b5f',
+  },
+  mine: { title: 'Kaboom!', subtitle: 'Sea mines blink red. Give them room', color: '#ffb13c' },
+  jellyfish: {
+    title: 'Stung!',
+    subtitle: 'Jellyfish sting and stun. Steer around them',
+    color: '#ff8ae0',
+  },
+  orca: {
+    title: 'Crunched!',
+    subtitle: 'Orcas outswim you: boost, or leap out of the water',
+    color: '#e8eef4',
+  },
   anglerfish: { title: 'Lured!', subtitle: 'Never follow the pretty light', color: '#9ffcff' },
-  pufferfish: { title: 'Spiked!', subtitle: 'That pufferfish was puffed up', color: '#ffd23c' },
+  pufferfish: {
+    title: 'Spiked!',
+    subtitle: 'Eat pufferfish only while they are deflated',
+    color: '#ffd23c',
+  },
   urchin: { title: 'Prickled!', subtitle: 'Sea urchins are not food', color: '#c9a3ff' },
-  barracuda: { title: 'Nibbled!', subtitle: 'A barracuda pack got you', color: '#b9e6cf' },
-  hammerhead: { title: 'Hammered!', subtitle: 'A hammerhead caught you', color: '#ffb38a' },
-  moray: { title: 'Ambushed!', subtitle: 'A moray eel lunged from the rocks', color: '#c9e08a' },
-  eel: { title: 'Shocked!', subtitle: 'An electric eel zapped you', color: '#fff27a' },
-  boss: { title: 'Squashed!', subtitle: 'The lair boss won this time', color: '#ff7ab8' },
-  net: { title: 'Netted!', subtitle: 'Caught in a fishing net', color: '#e8d6b0' },
-  harpoon: { title: 'Harpooned!', subtitle: 'The fishermen got you', color: '#ffb38a' },
+  barracuda: {
+    title: 'Nibbled!',
+    subtitle: 'Barracuda hunt in packs. Avoid them until size 4',
+    color: '#b9e6cf',
+  },
+  hammerhead: {
+    title: 'Hammered!',
+    subtitle: 'Hammerheads charge in pairs. Boost away early',
+    color: '#ffb38a',
+  },
+  moray: {
+    title: 'Ambushed!',
+    subtitle: 'Moray eels lunge from the rocks. Give dens room',
+    color: '#c9e08a',
+  },
+  eel: {
+    title: 'Shocked!',
+    subtitle: 'Keep away from electric eels as they charge',
+    color: '#fff27a',
+  },
+  boss: {
+    title: 'Squashed!',
+    subtitle: 'Dodge its attack, then bite it while it is open',
+    color: '#ff7ab8',
+  },
+  net: { title: 'Netted!', subtitle: 'Nets slow you down. Swim around them', color: '#e8d6b0' },
+  harpoon: {
+    title: 'Harpooned!',
+    subtitle: 'Stay clear of the fishing boats until you are big',
+    color: '#ffb38a',
+  },
 };
 
 type ResultsData = RunResult & { instant?: boolean };
